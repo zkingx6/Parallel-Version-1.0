@@ -8,6 +8,8 @@ export type DbMeeting = {
   duration_minutes: number
   rotation_weeks: number
   anchor_offset: number
+  /** Base time in minutes from midnight (0–1439). null = auto fair mode. */
+  base_time_minutes?: number | null
   invite_token: string
   created_at: string
 }
@@ -33,6 +35,7 @@ export function dbMeetingToConfig(m: DbMeeting): MeetingConfig {
     anchorOffset: m.anchor_offset,
     durationMinutes: m.duration_minutes,
     rotationWeeks: m.rotation_weeks,
+    baseTimeMinutes: m.base_time_minutes === null ? null : (m.base_time_minutes ?? 540),
   }
 }
 

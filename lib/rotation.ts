@@ -282,6 +282,32 @@ function findValidCandidates(
   )
 }
 
+/** Circular distance in minutes (0–1439). Used for base-time preference. */
+function distanceMinutes(a: number, b: number): number {
+  const d = Math.abs(a - b)
+  return Math.min(d, 1440 - d)
+}
+
+/** Convert UTC hour to display-timezone minutes (0–1439). */
+function utcHourToDisplayMinutes(utcHour: number, anchorOffset: number): number {
+  const displayHour = utcHour + anchorOffset
+  const m = Math.round(displayHour * 60)
+  return ((m % 1440) + 1440) % 1440
+}
+
+/** Sort candidates by proximity to base time (soft preference). Closer first. */
+function sortByBaseTimePreference(
+  candidates: number[],
+  baseTimeMinutes: number,
+  anchorOffset: number
+): number[] {
+  return [...candidates].sort((a, b) => {
+    const distA = distanceMinutes(utcHourToDisplayMinutes(a, anchorOffset), baseTimeMinutes)
+    const distB = distanceMinutes(utcHourToDisplayMinutes(b, anchorOffset), baseTimeMinutes)
+    return distA - distB
+  })
+}
+
 // --- Constraint modes ---
 type ConstraintMode = "STRICT" | "RELAXED" | "FALLBACK"
 
@@ -352,6 +378,63 @@ function computeMaxIndividualScore(memberTimes: MemberTime[]): number {
 }
 
 /**
+ * Compute fairness-adjusted scores for candidate selection.
+ * When a member with LOW cumulative burden would get score=0 (comfortable),
+ * give them a small "burden sharing" penalty to encourage rotation.
+ * This only affects selection, not display.
+ */
+function computeFairnessAdjustedScores(
+  memberTimes: MemberTime[],
+  burden: Record<string, number>
+): Map<string, number> {
+  const maxBurden = Math.max(...Object.values(burden), 0)
+  const adjusted = new Map<string, number>()
+
+  for (const mt of memberTimes) {
+    const rawScore = mt.score ?? 0
+    const currentBurden = burden[mt.memberId] ?? 0
+    const burdenDeficit = maxBurden - currentBurden
+
+    if (rawScore === 0 && burdenDeficit >= 2) {
+      // Member is comfortable but has significantly less burden than the max.
+      // Add a small fairness adjustment to encourage sharing the load.
+      // This makes the algorithm prefer candidates where low-burden members
+      // take SOME discomfort, even if it increases total discomfort slightly.
+      adjusted.set(mt.memberId, 0.5)
+    } else {
+      adjusted.set(mt.memberId, rawScore)
+    }
+  }
+
+  return adjusted
+}
+
+/**
+ * Compute "burden equity penalty" for a candidate.
+ * Higher penalty = worse for equity (low-burden members staying at 0).
+ */
+function computeEquityPenalty(
+  memberTimes: MemberTime[],
+  burden: Record<string, number>
+): number {
+  const maxBurden = Math.max(...Object.values(burden), 1)
+  let penalty = 0
+
+  for (const mt of memberTimes) {
+    const currentBurden = burden[mt.memberId] ?? 0
+    const score = mt.score ?? 0
+    const burdenDeficit = maxBurden - currentBurden
+
+    if (score === 0 && burdenDeficit > 0) {
+      // Low-burden member staying comfortable → bad for equity
+      penalty += burdenDeficit
+    }
+  }
+
+  return penalty
+}
+
+/**
  * Internal: generate rotation with given constraint mode.
  * Returns [] if any week has no hard-valid candidates.
  */
@@ -377,11 +460,41 @@ function generateRotationWithMode(
 
   const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
 
+  // Debug: Log team configuration at start
+  if (DEBUG) {
+    console.group("[rotation] Team configuration")
+    console.table(
+      team.map((m) => ({
+        id: m.id.slice(0, 8),
+        name: m.name,
+        utcOffset: m.utcOffset,
+        workStart: m.workStartHour,
+        workEnd: m.workEndHour,
+        hardNoRanges: JSON.stringify(m.hardNoRanges),
+      }))
+    )
+    console.log("Config:", {
+      dayOfWeek: config.dayOfWeek,
+      rotationWeeks: config.rotationWeeks,
+      baseTimeMinutes: config.baseTimeMinutes,
+      anchorOffset: config.anchorOffset,
+    })
+    console.groupEnd()
+  }
+
   for (let i = 0; i < config.rotationWeeks; i++) {
     const utcDate = utcStart.plus({ weeks: i })
 
     const totalCandidates = getCandidateUtcHours().length
-    const hardValidCandidates = findValidCandidates(utcDate, team)
+    let hardValidCandidates = findValidCandidates(utcDate, team)
+    const baseTimeMinutes = config.baseTimeMinutes
+    if (baseTimeMinutes != null) {
+      hardValidCandidates = sortByBaseTimePreference(
+        hardValidCandidates,
+        baseTimeMinutes,
+        config.anchorOffset
+      )
+    }
 
     const rejectedBy = { burdenDiff: 0, consecutiveMax: 0 }
 
@@ -390,12 +503,34 @@ function generateRotationWithMode(
       return { weeks: [], modeUsed: mode }
     }
 
+    // Fairness weights (configurable)
+    const FAIRNESS_WEIGHT = 1000 // Primary: minimax burden
+    const EQUITY_WEIGHT = 100   // Secondary: penalize low-burden members staying at 0
+    const GAP_WEIGHT = 10       // Tertiary: minimize spread
+    const PAIN_WEIGHT = 1       // Quaternary: minimize total discomfort
+
     let bestHour: number | null = null
     let bestMemberTimes: MemberTime[] | null = null
+    let bestScore = Infinity
     let bestMaxProjected = Infinity
+    let bestMinProjected = -Infinity
     let bestGap = Infinity
+    let bestEquityPenalty = Infinity
     let bestSumDiscomfort = Infinity
     let bestTimeDiversity = -1
+    let bestBaseTimeDist = Infinity
+
+    // For debug: collect all candidate evaluations for week 1
+    const candidateEvaluations: Array<{
+      utcHour: number
+      score: number
+      maxProjected: number
+      minProjected: number
+      equityPenalty: number
+      gap: number
+      sumDiscomfort: number
+      perMember: Record<string, { localTime: string; rawScore: number; adjustedScore: number }>
+    }> = []
 
     for (const utcHour of hardValidCandidates) {
       const memberTimes = computeMemberTimes(utcDate, utcHour, team)
@@ -414,37 +549,129 @@ function generateRotationWithMode(
         continue
       }
 
+      // Use fairness-adjusted scores for selection (not display)
+      const adjustedScores = computeFairnessAdjustedScores(memberTimes, burden)
+
+      // Compute projected burden using ADJUSTED scores (for selection)
       const projectedBurden: Record<string, number> = { ...burden }
       for (const mt of memberTimes) {
-        projectedBurden[mt.memberId] = (projectedBurden[mt.memberId] ?? 0) + (mt.score ?? 0)
+        const adjScore = adjustedScores.get(mt.memberId) ?? 0
+        projectedBurden[mt.memberId] = (projectedBurden[mt.memberId] ?? 0) + adjScore
       }
+
       const burdens = Object.values(projectedBurden)
       const maxProjected = Math.max(...burdens, 0)
       const minProjected = Math.min(...burdens, 0)
       const gap = maxProjected - minProjected
+      const equityPenalty = computeEquityPenalty(memberTimes, burden)
       const sumDiscomfort = computeTotalScore(memberTimes)
       const slotIndex = utcHourToSlotIndex(utcHour)
       const timeDiversity = prevSlotIndex < 0 ? 0 : Math.abs(slotIndex - prevSlotIndex)
+      const baseTimeDist =
+        baseTimeMinutes != null
+          ? distanceMinutes(
+              utcHourToDisplayMinutes(utcHour, config.anchorOffset),
+              baseTimeMinutes
+            )
+          : 0
 
+      // Composite score: lower is better
+      // Primary: minimax (maxProjected)
+      // Secondary: equity penalty (penalize keeping low-burden members comfortable)
+      // Tertiary: gap (spread)
+      // Quaternary: sum discomfort
+      const compositeScore =
+        maxProjected * FAIRNESS_WEIGHT +
+        equityPenalty * EQUITY_WEIGHT +
+        gap * GAP_WEIGHT +
+        sumDiscomfort * PAIN_WEIGHT
+
+      // Debug: record candidate evaluation
+      if (DEBUG && i === 0) {
+        const perMember: Record<string, { localTime: string; rawScore: number; adjustedScore: number }> = {}
+        for (const mt of memberTimes) {
+          perMember[mt.memberId] = {
+            localTime: mt.localTime,
+            rawScore: mt.score ?? 0,
+            adjustedScore: adjustedScores.get(mt.memberId) ?? 0,
+          }
+        }
+        candidateEvaluations.push({
+          utcHour,
+          score: compositeScore,
+          maxProjected,
+          minProjected,
+          equityPenalty,
+          gap,
+          sumDiscomfort,
+          perMember,
+        })
+      }
+
+      // Selection: prefer lower composite score
+      // For tie-breaks within same composite score, use lexicographic comparison
       const isBetter =
-        maxProjected < bestMaxProjected ||
-        (maxProjected === bestMaxProjected && gap < bestGap) ||
-        (maxProjected === bestMaxProjected &&
+        compositeScore < bestScore ||
+        (compositeScore === bestScore && maxProjected < bestMaxProjected) ||
+        (compositeScore === bestScore &&
+          maxProjected === bestMaxProjected &&
+          minProjected > bestMinProjected) ||
+        (compositeScore === bestScore &&
+          maxProjected === bestMaxProjected &&
+          minProjected === bestMinProjected &&
+          gap < bestGap) ||
+        (compositeScore === bestScore &&
+          maxProjected === bestMaxProjected &&
+          minProjected === bestMinProjected &&
           gap === bestGap &&
           sumDiscomfort < bestSumDiscomfort) ||
-        (maxProjected === bestMaxProjected &&
+        (compositeScore === bestScore &&
+          maxProjected === bestMaxProjected &&
+          minProjected === bestMinProjected &&
           gap === bestGap &&
           sumDiscomfort === bestSumDiscomfort &&
-          timeDiversity > bestTimeDiversity)
+          timeDiversity > bestTimeDiversity) ||
+        (baseTimeMinutes != null &&
+          compositeScore === bestScore &&
+          maxProjected === bestMaxProjected &&
+          minProjected === bestMinProjected &&
+          gap === bestGap &&
+          sumDiscomfort === bestSumDiscomfort &&
+          timeDiversity === bestTimeDiversity &&
+          baseTimeDist < bestBaseTimeDist)
 
       if (isBetter) {
+        bestScore = compositeScore
         bestMaxProjected = maxProjected
+        bestMinProjected = minProjected
         bestGap = gap
+        bestEquityPenalty = equityPenalty
         bestSumDiscomfort = sumDiscomfort
         bestTimeDiversity = timeDiversity
+        if (baseTimeMinutes != null) bestBaseTimeDist = baseTimeDist
         bestHour = utcHour
         bestMemberTimes = memberTimes
       }
+    }
+
+    // Debug: log top 5 candidates for week 1
+    if (DEBUG && i === 0 && candidateEvaluations.length > 0) {
+      candidateEvaluations.sort((a, b) => a.score - b.score)
+      console.group("[rotation] Week 1 - Top 5 candidates")
+      for (const cand of candidateEvaluations.slice(0, 5)) {
+        console.log(
+          `UTC ${formatHourLabel(cand.utcHour)}: score=${cand.score.toFixed(1)}`,
+          `maxB=${cand.maxProjected.toFixed(1)} minB=${cand.minProjected.toFixed(1)}`,
+          `equity=${cand.equityPenalty} gap=${cand.gap.toFixed(1)} sum=${cand.sumDiscomfort}`
+        )
+        for (const [memberId, data] of Object.entries(cand.perMember)) {
+          const member = team.find((m) => m.id === memberId)
+          console.log(
+            `  ${member?.name}: ${data.localTime} (raw=${data.rawScore}, adj=${data.adjustedScore})`
+          )
+        }
+      }
+      console.groupEnd()
     }
 
     if (bestHour === null || !bestMemberTimes) {
@@ -470,10 +697,12 @@ function generateRotationWithMode(
     if (DEBUG) {
       const perMember: Record<
         string,
-        { localTime: string; dateLabel?: string; discomfort: number; burdenBefore: number; burdenAfter: number }
+        { name: string; localTime: string; dateLabel?: string; discomfort: number; burdenBefore: number; burdenAfter: number }
       > = {}
       for (const mt of bestMemberTimes) {
+        const member = team.find((t) => t.id === mt.memberId)
         perMember[mt.memberId] = {
+          name: member?.name ?? "?",
           localTime: mt.localTime,
           dateLabel: mt.localDateLabel,
           discomfort: mt.score ?? 0,
@@ -481,18 +710,29 @@ function generateRotationWithMode(
           burdenAfter: projectedBurden[mt.memberId] ?? 0,
         }
       }
-      const stats: WeekDebugStats = {
-        totalCandidates,
-        hardValidCandidates: hardValidCandidates.length,
-        rejectedBy: { ...rejectedBy },
-        chosenCandidate: {
-          slotIndex,
-          baseTime: baseTimeStr,
-          perMember,
-          projectedBurden: { ...projectedBurden },
-        },
-      }
-      console.log("[rotation] week", i + 1, "mode", mode, "stats", stats)
+
+      // Compute fairness stats
+      const burdenValues = Object.values(projectedBurden)
+      const maxBurden = Math.max(...burdenValues, 0)
+      const minBurden = Math.min(...burdenValues, 0)
+      const spread = maxBurden - minBurden
+      const sumPenalty = computeTotalScore(bestMemberTimes)
+
+      console.group(`[rotation] Week ${i + 1} — mode: ${mode}`)
+      console.log(`Candidates: ${hardValidCandidates.length}/${totalCandidates} valid`)
+      console.log(`Rejected: burdenDiff=${rejectedBy.burdenDiff}, consecutiveMax=${rejectedBy.consecutiveMax}`)
+      console.log(`Chosen: ${baseTimeStr} (slot ${slotIndex})`)
+      console.log(`Fairness: maxBurden=${maxBurden}, minBurden=${minBurden}, spread=${spread}, sumPenalty=${sumPenalty}`)
+      console.table(
+        Object.entries(perMember).map(([id, data]) => ({
+          member: data.name,
+          localTime: data.localTime + (data.dateLabel ? ` (${data.dateLabel})` : ""),
+          penalty: data.discomfort,
+          burdenBefore: data.burdenBefore,
+          burdenAfter: data.burdenAfter,
+        }))
+      )
+      console.groupEnd()
     }
 
     prevSlotIndex = slotIndex
@@ -565,9 +805,9 @@ export function canGenerateRotation(
 
 /**
  * Generate rotation with 3-level constraint degradation:
- * Mode A (STRICT): hard boundaries + burden diff <= 1 + no consecutive max
- * Mode B (RELAXED): hard boundaries + burden diff <= 1 (ignore consecutive)
- * Mode C (FALLBACK): hard boundaries only (minimize discomfort)
+ * Mode A (STRICT): hard boundaries + burden diff <= 2 + no consecutive max
+ * Mode B (RELAXED): hard boundaries + burden diff <= 2 (ignore consecutive)
+ * Mode C (FALLBACK): hard boundaries only (fairness-first with equity weighting)
  */
 export function generateRotation(
   team: TeamMember[],
@@ -580,7 +820,41 @@ export function generateRotation(
   for (const mode of modes) {
     const { weeks } = generateRotationWithMode(team, config, mode)
     if (weeks.length === config.rotationWeeks) {
-      if (DEBUG) console.log("[rotation] succeeded with mode", mode)
+      if (DEBUG) {
+        console.log("[rotation] succeeded with mode", mode)
+
+        // Final burden distribution summary
+        const finalBurden: Record<string, number> = {}
+        for (const m of team) finalBurden[m.id] = 0
+        for (const week of weeks) {
+          for (const mt of week.memberTimes) {
+            finalBurden[mt.memberId] += mt.score ?? 0
+          }
+        }
+        const burdenValues = Object.values(finalBurden)
+        const maxBurden = Math.max(...burdenValues, 0)
+        const minBurden = Math.min(...burdenValues, 0)
+        const spread = maxBurden - minBurden
+
+        console.group("[rotation] Final burden distribution")
+        console.table(
+          team.map((m) => ({
+            name: m.name,
+            totalBurden: finalBurden[m.id],
+          }))
+        )
+        console.log(
+          `Max burden: ${maxBurden}, Min burden: ${minBurden}, Spread: ${spread}`
+        )
+        if (spread <= 2) {
+          console.log("✓ Fairness check PASSED: spread <= 2")
+        } else if (spread <= 3) {
+          console.log("⚠ Fairness check WARNING: spread is 3 (acceptable for tight constraints)")
+        } else {
+          console.log("✗ Fairness check FAILED: spread > 3 (burden too concentrated)")
+        }
+        console.groupEnd()
+      }
       if (mode !== "STRICT") {
         console.warn("[rotation] modeUsed:", mode)
       }

@@ -119,10 +119,12 @@ export function RotationOutput({
   weeks,
   team,
   anchorOffset,
+  useBaseTime,
 }: {
   weeks: RotationWeekData[]
   team: TeamMember[]
   anchorOffset: number
+  useBaseTime?: boolean
 }) {
   return (
     <section>
@@ -133,6 +135,11 @@ export function RotationOutput({
         <p className="mt-0.5 text-sm text-muted-foreground">
           {weeks.length} weeks — time rotates, burden distributed
           transparently.
+          {useBaseTime !== undefined && (
+            <span className="ml-1.5 text-muted-foreground/70">
+              ({useBaseTime ? "Anchor mode" : "Auto fair mode"})
+            </span>
+          )}
         </p>
       </div>
 

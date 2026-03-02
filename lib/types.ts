@@ -21,6 +21,8 @@ export type MeetingConfig = {
   anchorOffset: number
   durationMinutes: number
   rotationWeeks: number
+  /** Base time preference in minutes from midnight (0–1439). null = auto fair mode. */
+  baseTimeMinutes?: number | null
 }
 
 export type MemberTime = {
@@ -81,6 +83,12 @@ export const FULL_DAY_HOURS = Array.from({ length: 24 }, (_, i) => ({
   label: formatHourLabel(i),
   value: i,
 }))
+
+/** Base time options: 6:00 AM–9:30 PM, every 30 min. Value = minutes from midnight (0–1439). */
+export const BASE_TIME_OPTIONS = Array.from({ length: 32 }, (_, i) => {
+  const hour = 6 + i * 0.5
+  return { label: formatHourLabel(hour), value: Math.round(hour * 60) }
+})
 
 export const MAX_HARD_NO_HOURS = 6
 

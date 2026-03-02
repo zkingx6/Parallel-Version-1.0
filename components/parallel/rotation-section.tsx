@@ -9,7 +9,7 @@ import {
   dbMeetingToConfig,
   dbMemberToTeamMember,
 } from "@/lib/database.types"
-import { TIMEZONES, RotationWeekData } from "@/lib/types"
+import { TIMEZONES, BASE_TIME_OPTIONS, RotationWeekData } from "@/lib/types"
 import {
   generateRotation,
   canGenerateRotation,
@@ -127,7 +127,7 @@ export function RotationSection({
   const config = dbMeetingToConfig(meeting)
 
   const handleConfigChange = useCallback(
-    async (updates: Record<string, number | string>) => {
+    async (updates: Record<string, number | string | null>) => {
       setMeeting((prev) => ({ ...prev, ...updates }))
       setRotation(null)
       await updateMeetingConfig(meeting.id, updates)
@@ -202,6 +202,16 @@ export function RotationSection({
                 onChange={(v) => handleConfigChange({ day_of_week: v })}
                 options={DAYS}
               />
+              {meeting.base_time_minutes != null && (
+                <>
+                  <span>at</span>
+                  <InlineSelect
+                    value={meeting.base_time_minutes ?? 540}
+                    onChange={(v) => handleConfigChange({ base_time_minutes: v })}
+                    options={BASE_TIME_OPTIONS}
+                  />
+                </>
+              )}
               <span>for</span>
               <InlineSelect
                 value={meeting.duration_minutes}
@@ -223,9 +233,25 @@ export function RotationSection({
                 options={TIMEZONE_OPTIONS}
               />
             </div>
-            <p className="text-xs text-muted-foreground/50 leading-relaxed pt-1">
-              Time rotates week to week. Some members may see a different local
-              day.
+            <label className="flex items-center gap-2.5 cursor-pointer pt-2">
+              <input
+                type="checkbox"
+                checked={meeting.base_time_minutes != null}
+                onChange={(e) =>
+                  handleConfigChange({
+                    base_time_minutes: e.target.checked ? 540 : null,
+                  })
+                }
+                className="rounded border-border/60 text-primary focus:ring-primary/20"
+              />
+              <span className="text-sm text-foreground/90">
+                Use a fixed base time
+              </span>
+            </label>
+            <p className="text-xs text-muted-foreground/50 leading-relaxed pt-0.5">
+              {meeting.base_time_minutes != null
+                ? "Time rotates week to week. Some members may see a different local day."
+                : "If disabled, Parallel will choose the fairest time for the team."}
             </p>
           </div>
         </section>
@@ -275,6 +301,7 @@ export function RotationSection({
               weeks={rotation}
               team={team}
               anchorOffset={meeting.anchor_offset}
+              useBaseTime={meeting.base_time_minutes != null}
             />
             <section className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both">
               <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 sm:p-6 space-y-5">

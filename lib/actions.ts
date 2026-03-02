@@ -29,6 +29,7 @@ export async function updateMeetingConfig(
     duration_minutes?: number
     rotation_weeks?: number
     anchor_offset?: number
+    base_time_minutes?: number | null
   }
 ) {
   const supabase = await createServerSupabase()
