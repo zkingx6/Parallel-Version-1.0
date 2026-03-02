@@ -82,6 +82,12 @@ function WeekCard({
                   )}
                 >
                   {mt.localTime}
+                  {(mt.dateOffset !== undefined && mt.dateOffset !== 0) ||
+                  mt.localDateLabel ? (
+                    <span className="ml-1 text-[10px] text-muted-foreground font-normal">
+                      ({mt.localDateLabel ?? (mt.dateOffset! > 0 ? "+1 day" : "-1 day")})
+                    </span>
+                  ) : null}
                 </span>
                 {mt.discomfort === "sacrifice" && (
                   <span className="w-1.5 h-1.5 rounded-full bg-stretch-foreground" />

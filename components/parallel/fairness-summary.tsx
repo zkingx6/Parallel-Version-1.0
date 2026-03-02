@@ -14,15 +14,20 @@ function BurdenBar({
   name,
   count,
   sacrificeCount,
+  sacrificePoints,
   max,
 }: {
   name: string
   count: number
   sacrificeCount: number
+  sacrificePoints?: number
   max: number
 }) {
   const widthPct = max > 0 ? (count / max) * 100 : 0
-  const sacrificePct = count > 0 ? (sacrificeCount / count) * 100 : 0
+  const sacrificePct =
+    count > 0 && (sacrificePoints !== undefined ? sacrificePoints : sacrificeCount)
+      ? ((sacrificePoints ?? sacrificeCount) / count) * 100
+      : 0
 
   return (
     <div className="flex items-center gap-3">
@@ -138,6 +143,7 @@ export function FairnessSummary({
               name={d.name}
               count={d.count}
               sacrificeCount={d.sacrificeCount}
+              sacrificePoints={d.sacrificePoints}
               max={maxCount * 1.2}
             />
           ))}

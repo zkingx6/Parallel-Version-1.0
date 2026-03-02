@@ -28,6 +28,12 @@ export type MemberTime = {
   localHour: number
   localTime: string
   discomfort: Discomfort
+  /** Weighted burden score 0–4 (used for fairness; derived from minutes outside working hours) */
+  score?: number
+  /** When member's local date differs from base: e.g. "Thu, Mar 6" or "+1 day" / "-1 day" */
+  localDateLabel?: string
+  /** -1, 0, or +1 when local date differs from base UTC date */
+  dateOffset?: number
 }
 
 export type RotationWeekData = {

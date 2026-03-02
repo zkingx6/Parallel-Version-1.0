@@ -1,3 +1,4 @@
+import { DateTime, FixedOffsetZone } from "luxon"
 import {
   TeamMember,
   MeetingConfig,
@@ -7,10 +8,111 @@ import {
   formatHourLabel,
 } from "./types"
 
-// --- Time helpers ---
+/**
+ * SCHEDULING ENGINE — UTC baseline, IANA timezones, weighted burden
+ *
+ * Part 1 — Timezone correctness:
+ * - All candidate times stored/generated in UTC
+ * - Convert UTC → member local (IANA) for boundary/work-hour checks
+ * - Hard boundary evaluated in member local time; overnight (start > end) handled
+ * - DST: Luxon handles automatically, no manual offset logic
+ *
+ * Part 2 — Weighted burden:
+ * - Score 0–4 per member per week (minutes outside working + extreme hour penalty)
+ * - Burden = accumulated score sum
+ * - Fairness: burden diff <= BURDEN_DIFF_THRESHOLD, no consecutive max
+ */
 
-function toLocalHour(utcHour: number, utcOffset: number): number {
-  return (((utcHour + utcOffset) % 24) + 24) % 24
+// --- IANA timezone mapping (backward compat: offset → IANA for DST-safe zones) ---
+// When DB stores only offset, we map to common IANA zones. DST handled by Luxon.
+const OFFSET_TO_IANA: Record<number, string> = {
+  [-10]: "Pacific/Honolulu",
+  [-9]: "America/Anchorage",
+  [-8]: "America/Los_Angeles",
+  [-7]: "America/Denver",
+  [-6]: "America/Chicago",
+  [-5]: "America/New_York",
+  [-4]: "America/Halifax",
+  [-3]: "America/Sao_Paulo",
+  [-2]: "America/Noronha",
+  [-1]: "Atlantic/Azores",
+  0: "Europe/London",
+  1: "Europe/Berlin",
+  2: "Africa/Cairo",
+  3: "Europe/Moscow",
+  4: "Asia/Dubai",
+  5: "Asia/Karachi",
+  5.5: "Asia/Kolkata",
+  6: "Asia/Dhaka",
+  7: "Asia/Bangkok",
+  8: "Asia/Singapore",
+  9: "Asia/Tokyo",
+  9.5: "Australia/Adelaide",
+  10: "Australia/Sydney",
+  11: "Pacific/Noumea",
+  12: "Pacific/Auckland",
+}
+
+/** Resolve IANA zone for member. Uses timezone if present, else maps from offset. */
+function getMemberZone(member: TeamMember): string | FixedOffsetZone {
+  if ("timezone" in member && typeof (member as { timezone?: string }).timezone === "string") {
+    return (member as { timezone: string }).timezone
+  }
+  const tz = OFFSET_TO_IANA[member.utcOffset]
+  if (tz) return tz
+  // Fallback: fixed offset (no DST) for unlisted offsets
+  return FixedOffsetZone.instance(Math.round(member.utcOffset * 60))
+}
+
+// --- UTC baseline: all scheduling in UTC ---
+// Candidate times are UTC. We convert to member local for boundary/work-hour checks.
+// Cross-day: e.g. Mar 1 11PM UTC → Tokyo may be Mar 2 8AM (handled by Luxon setZone).
+
+/**
+ * Convert UTC meeting time to member's local DateTime.
+ * Uses IANA timezone for DST-safe conversion. Cross-day handled automatically.
+ */
+function utcToLocalDateTime(
+  utcDate: DateTime,
+  utcHour: number,
+  member: TeamMember
+): DateTime {
+  const utcMeeting = utcDate.set({
+    hour: Math.floor(utcHour),
+    minute: Math.round((utcHour % 1) * 60),
+    second: 0,
+    millisecond: 0,
+  })
+  const zone = getMemberZone(member)
+  return utcMeeting.setZone(zone)
+}
+
+function utcToLocalHour(
+  utcDate: DateTime,
+  utcHour: number,
+  member: TeamMember
+): number {
+  const local = utcToLocalDateTime(utcDate, utcHour, member)
+  return local.hour + local.minute / 60
+}
+
+/**
+ * Hard boundary check in member LOCAL time.
+ * Overnight rule: if start > end, boundary crosses midnight.
+ */
+function isInHardNoLocal(
+  localHour: number,
+  hardNoRanges: { start: number; end: number }[]
+): boolean {
+  for (const range of hardNoRanges) {
+    if (range.start < range.end) {
+      if (localHour >= range.start && localHour < range.end) return true
+    } else {
+      // Overnight: crosses midnight (e.g. 22:00 – 04:00)
+      if (localHour >= range.start || localHour < range.end) return true
+    }
+  }
+  return false
 }
 
 function isWithinWorkingHours(
@@ -24,118 +126,433 @@ function isWithinWorkingHours(
   return localHour >= workStart || localHour < workEnd
 }
 
-function isInHardNo(utcHour: number, member: TeamMember): boolean {
-  const localHour = toLocalHour(utcHour, member.utcOffset)
-  for (const range of member.hardNoRanges) {
-    if (range.start < range.end) {
-      if (localHour >= range.start && localHour < range.end) return true
-    } else {
-      if (localHour >= range.start || localHour < range.end) return true
-    }
-  }
-  return false
-}
-
-// --- Discomfort classification ---
-
-function getDiscomfortLevel(
+/**
+ * Minutes outside working window (in member local time).
+ * Before start: start - time. After end: time - end.
+ * Overnight (start > end): within = hour >= start OR hour < end; outside = distance to nearest boundary.
+ */
+function minutesOutsideWorking(
   localHour: number,
   workStart: number,
   workEnd: number
-): Discomfort {
-  if (isWithinWorkingHours(localHour, workStart, workEnd)) return "comfortable"
-  if (localHour < 6 || localHour >= 23) return "sacrifice"
-  return "stretch"
+): number {
+  if (isWithinWorkingHours(localHour, workStart, workEnd)) return 0
+
+  const localMinutes = localHour * 60
+
+  if (workStart < workEnd) {
+    // Same-day window
+    const startMin = workStart * 60
+    const endMin = workEnd * 60
+    if (localMinutes < startMin) return startMin - localMinutes
+    return localMinutes - endMin
+  }
+
+  // Overnight window (e.g. 22–6): outside = [6, 22). Distance to nearest boundary.
+  const startMin = workStart * 60
+  const endMin = workEnd * 60
+  const distToEnd = localMinutes >= endMin ? localMinutes - endMin : endMin - localMinutes
+  const distToStart = localMinutes < startMin ? startMin - localMinutes : (24 * 60 - localMinutes) + startMin
+  return Math.min(distToEnd, distToStart)
 }
 
-// --- Date utilities ---
+/**
+ * Weighted discomfort score 0–4.
+ * - 0 min outside → 0
+ * - (0, 120] min → 1
+ * - (120, 240] min → 2
+ * - > 240 min → 3
+ * - Extreme hour (< 7 or >= 21): +1, cap at 4
+ */
+function computeWeightedDiscomfortScore(
+  localHour: number,
+  workStart: number,
+  workEnd: number
+): number {
+  const outsideMin = minutesOutsideWorking(localHour, workStart, workEnd)
+  let score: number
+  if (outsideMin <= 0) score = 0
+  else if (outsideMin <= 120) score = 1
+  else if (outsideMin <= 240) score = 2
+  else score = 3
 
-function getNextDayOfWeek(dayOfWeek: number): Date {
-  const now = new Date()
-  const current = now.getDay()
-  const daysUntil = ((dayOfWeek - current + 7) % 7) || 7
-  const next = new Date(now)
-  next.setDate(now.getDate() + daysUntil)
-  next.setHours(0, 0, 0, 0)
-  return next
+  if (localHour < 7 || localHour >= 21) {
+    score = Math.min(score + 1, 4)
+  }
+  return score
 }
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-US", {
+/** Derive display discomfort from score (for UI compatibility). */
+function scoreToDiscomfort(score: number): Discomfort {
+  if (score === 0) return "comfortable"
+  if (score <= 2) return "stretch"
+  return "sacrifice"
+}
+
+// --- Date utilities (UTC baseline) ---
+// Luxon weekday: 1=Monday, 7=Sunday. config.dayOfWeek: 1=Mon, 2=Tue, etc.
+
+function getNextMeetingDayUtc(dayOfWeek: number): DateTime {
+  const now = DateTime.utc()
+  const current = now.weekday
+  let daysUntil = dayOfWeek - current
+  if (daysUntil <= 0) daysUntil += 7
+  return now.plus({ days: daysUntil }).startOf("day")
+}
+
+function formatDate(dt: DateTime): string {
+  return dt.toLocaleString({
     weekday: "short",
     month: "short",
     day: "numeric",
   })
 }
 
-// --- Candidate scoring ---
+// --- Candidate generation: UTC hours for meeting day ---
 
-function findValidHours(team: TeamMember[]): number[] {
-  const valid: number[] = []
-  for (let h = 0; h < 24; h += 0.5) {
-    if (!team.some((m) => isInHardNo(h, m))) valid.push(h)
-  }
-  return valid
+/** Generate candidate UTC hours (0–24, half-hour steps). */
+function getCandidateUtcHours(): number[] {
+  const hours: number[] = []
+  for (let h = 0; h < 24; h += 0.5) hours.push(h)
+  return hours
 }
 
-const CONSEC_PENALTY = 6
-const CAP_PENALTY = 50
-const FAIRNESS_WEIGHT = 8
+/**
+ * Check if candidate UTC time is valid for all members.
+ * Rejects if any member has hard boundary violation in their local time.
+ */
+function isCandidateValid(
+  utcDate: DateTime,
+  utcHour: number,
+  team: TeamMember[]
+): boolean {
+  for (const m of team) {
+    const localHour = utcToLocalHour(utcDate, utcHour, m)
+    if (isInHardNoLocal(localHour, m.hardNoRanges)) return false
+  }
+  return true
+}
 
-function scoreCandidate(
-  h: number,
+/** Tunable: max burden diff for STRICT/RELAXED. Score-based burdens use 2. */
+const BURDEN_DIFF_THRESHOLD = 2
+
+/**
+ * Fairness guardrail: burden difference must be <= BURDEN_DIFF_THRESHOLD.
+ * Projected burden = accumulated score + this week's score.
+ */
+function wouldViolateBurdenDiff(
   team: TeamMember[],
   burden: Record<string, number>,
-  rawCount: Record<string, number>,
-  lastWeekUncomfortable: Set<string>,
-  lastWeekHour: number | null,
-  fairCap: number
-): number {
-  let totalCost = 0
-  const prospectiveRaw: Record<string, number> = {}
-  for (const m of team) prospectiveRaw[m.id] = rawCount[m.id]
+  memberScores: Map<string, number>
+): boolean {
+  const projected: Record<string, number> = { ...burden }
+  for (const m of team) {
+    projected[m.id] = (projected[m.id] ?? 0) + (memberScores.get(m.id) ?? 0)
+  }
+  const counts = Object.values(projected)
+  const maxB = Math.max(...counts)
+  const minB = Math.min(...counts)
+  return maxB - minB > BURDEN_DIFF_THRESHOLD
+}
 
-  for (const member of team) {
-    const localHour = toLocalHour(h, member.utcOffset)
-    const discomfort = getDiscomfortLevel(
+/**
+ * Fairness guardrail: no consecutive max discomfort.
+ * Use member(s) with highest score in that week (not binary).
+ */
+function wouldBeConsecutiveMaxDiscomfort(
+  memberTimes: MemberTime[],
+  lastWeekMaxMemberId: string | null
+): boolean {
+  if (!lastWeekMaxMemberId) return false
+  const scores = memberTimes.map((m) => m.score ?? 0)
+  const maxScore = Math.max(...scores)
+  if (maxScore === 0) return false
+  const maxMembers = memberTimes.filter((m) => (m.score ?? 0) === maxScore)
+  return maxMembers.some((m) => m.memberId === lastWeekMaxMemberId)
+}
+
+// --- Find valid candidates for a week ---
+
+function findValidCandidates(
+  utcDate: DateTime,
+  team: TeamMember[]
+): number[] {
+  return getCandidateUtcHours().filter((h) =>
+    isCandidateValid(utcDate, h, team)
+  )
+}
+
+// --- Constraint modes ---
+type ConstraintMode = "STRICT" | "RELAXED" | "FALLBACK"
+
+const DEBUG = typeof process !== "undefined" && process.env.NEXT_PUBLIC_ROTATION_DEBUG === "true"
+
+type WeekDebugStats = {
+  totalCandidates: number
+  hardValidCandidates: number
+  rejectedBy: { burdenDiff: number; consecutiveMax: number }
+  chosenCandidate?: {
+    slotIndex: number
+    baseTime: string
+    perMember: Record<
+      string,
+      { localTime: string; dateLabel?: string; discomfort: number; burdenBefore: number; burdenAfter: number }
+    >
+    projectedBurden: Record<string, number>
+  }
+}
+
+function computeMemberTimes(
+  utcDate: DateTime,
+  utcHour: number,
+  team: TeamMember[]
+): MemberTime[] {
+  const utcDayStart = utcDate.startOf("day")
+  return team.map((member) => {
+    const local = utcToLocalDateTime(utcDate, utcHour, member)
+    const localHour = local.hour + local.minute / 60
+    const score = computeWeightedDiscomfortScore(
       localHour,
       member.workStartHour,
       member.workEndHour
     )
+    const discomfort = scoreToDiscomfort(score)
 
-    const baseCost =
-      discomfort === "sacrifice" ? 2 : discomfort === "stretch" ? 1 : 0
+    const localDayStart = local.startOf("day")
+    const diffDays = localDayStart.diff(utcDayStart, "days").days
+    const dateOffset = Math.max(-1, Math.min(1, Math.round(diffDays)))
+    const localDateLabel =
+      dateOffset !== 0
+        ? dateOffset > 0
+          ? `+${dateOffset} day`
+          : `${dateOffset} day`
+        : undefined
 
-    if (baseCost > 0) {
-      let memberCost = baseCost + burden[member.id]
-      if (lastWeekUncomfortable.has(member.id)) memberCost += CONSEC_PENALTY
-      if (rawCount[member.id] >= fairCap) memberCost += CAP_PENALTY
-      totalCost += memberCost
-      prospectiveRaw[member.id]++
+    return {
+      memberId: member.id,
+      localHour,
+      localTime: formatHourLabel(localHour),
+      discomfort,
+      score,
+      dateOffset: dateOffset !== 0 ? dateOffset : undefined,
+      localDateLabel:
+        dateOffset !== 0
+          ? local.toLocaleString({ weekday: "short", month: "short", day: "numeric" })
+          : undefined,
     }
-  }
-
-  const values = Object.values(prospectiveRaw)
-  const gap = Math.max(...values) - Math.min(...values)
-  totalCost += gap * FAIRNESS_WEIGHT
-
-  if (lastWeekHour !== null && h === lastWeekHour) totalCost += 0.5
-
-  return totalCost
+  })
 }
 
-// --- Validation ---
+function computeTotalScore(memberTimes: MemberTime[]): number {
+  return memberTimes.reduce((s, mt) => s + (mt.score ?? 0), 0)
+}
+
+function computeMaxIndividualScore(memberTimes: MemberTime[]): number {
+  return Math.max(...memberTimes.map((mt) => mt.score ?? 0), 0)
+}
+
+/**
+ * Internal: generate rotation with given constraint mode.
+ * Returns [] if any week has no hard-valid candidates.
+ */
+/** Slot index 0–47 for utcHour 0–23.5 */
+function utcHourToSlotIndex(utcHour: number): number {
+  return Math.round(utcHour * 2)
+}
+
+function generateRotationWithMode(
+  team: TeamMember[],
+  config: MeetingConfig,
+  mode: ConstraintMode
+): { weeks: RotationWeekData[]; modeUsed: ConstraintMode } {
+  const weeks: RotationWeekData[] = []
+  const burden: Record<string, number> = {}
+  let lastWeekMaxMemberId: string | null = null
+  let prevSlotIndex: number = -1
+
+  const enforceBurdenDiff = mode === "STRICT" || mode === "RELAXED"
+  const enforceConsecutiveMax = mode === "STRICT"
+
+  for (const m of team) burden[m.id] = 0
+
+  const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+
+  for (let i = 0; i < config.rotationWeeks; i++) {
+    const utcDate = utcStart.plus({ weeks: i })
+
+    const totalCandidates = getCandidateUtcHours().length
+    const hardValidCandidates = findValidCandidates(utcDate, team)
+
+    const rejectedBy = { burdenDiff: 0, consecutiveMax: 0 }
+
+    if (hardValidCandidates.length === 0) {
+      if (DEBUG) console.log("[rotation] week", i + 1, "no hard-valid candidates, aborting")
+      return { weeks: [], modeUsed: mode }
+    }
+
+    let bestHour: number | null = null
+    let bestMemberTimes: MemberTime[] | null = null
+    let bestMaxProjected = Infinity
+    let bestGap = Infinity
+    let bestSumDiscomfort = Infinity
+    let bestTimeDiversity = -1
+
+    for (const utcHour of hardValidCandidates) {
+      const memberTimes = computeMemberTimes(utcDate, utcHour, team)
+
+      const memberScores = new Map<string, number>()
+      for (const mt of memberTimes) {
+        memberScores.set(mt.memberId, mt.score ?? 0)
+      }
+
+      if (enforceBurdenDiff && wouldViolateBurdenDiff(team, burden, memberScores)) {
+        rejectedBy.burdenDiff++
+        continue
+      }
+      if (enforceConsecutiveMax && wouldBeConsecutiveMaxDiscomfort(memberTimes, lastWeekMaxMemberId)) {
+        rejectedBy.consecutiveMax++
+        continue
+      }
+
+      const projectedBurden: Record<string, number> = { ...burden }
+      for (const mt of memberTimes) {
+        projectedBurden[mt.memberId] = (projectedBurden[mt.memberId] ?? 0) + (mt.score ?? 0)
+      }
+      const burdens = Object.values(projectedBurden)
+      const maxProjected = Math.max(...burdens, 0)
+      const minProjected = Math.min(...burdens, 0)
+      const gap = maxProjected - minProjected
+      const sumDiscomfort = computeTotalScore(memberTimes)
+      const slotIndex = utcHourToSlotIndex(utcHour)
+      const timeDiversity = prevSlotIndex < 0 ? 0 : Math.abs(slotIndex - prevSlotIndex)
+
+      const isBetter =
+        maxProjected < bestMaxProjected ||
+        (maxProjected === bestMaxProjected && gap < bestGap) ||
+        (maxProjected === bestMaxProjected &&
+          gap === bestGap &&
+          sumDiscomfort < bestSumDiscomfort) ||
+        (maxProjected === bestMaxProjected &&
+          gap === bestGap &&
+          sumDiscomfort === bestSumDiscomfort &&
+          timeDiversity > bestTimeDiversity)
+
+      if (isBetter) {
+        bestMaxProjected = maxProjected
+        bestGap = gap
+        bestSumDiscomfort = sumDiscomfort
+        bestTimeDiversity = timeDiversity
+        bestHour = utcHour
+        bestMemberTimes = memberTimes
+      }
+    }
+
+    if (bestHour === null || !bestMemberTimes) {
+      if (DEBUG) {
+        console.log("[rotation] week", i + 1, "mode", mode, "no acceptable candidate", {
+          totalCandidates,
+          hardValidCandidates: hardValidCandidates.length,
+          rejectedBy,
+        })
+      }
+      return { weeks: [], modeUsed: mode }
+    }
+
+    const projectedBurden: Record<string, number> = { ...burden }
+    for (const mt of bestMemberTimes) {
+      const add = mt.score ?? 0
+      projectedBurden[mt.memberId] = (projectedBurden[mt.memberId] ?? 0) + add
+    }
+
+    const slotIndex = utcHourToSlotIndex(bestHour!)
+    const baseTimeStr = `UTC ${formatHourLabel(bestHour!)}`
+
+    if (DEBUG) {
+      const perMember: Record<
+        string,
+        { localTime: string; dateLabel?: string; discomfort: number; burdenBefore: number; burdenAfter: number }
+      > = {}
+      for (const mt of bestMemberTimes) {
+        perMember[mt.memberId] = {
+          localTime: mt.localTime,
+          dateLabel: mt.localDateLabel,
+          discomfort: mt.score ?? 0,
+          burdenBefore: burden[mt.memberId] ?? 0,
+          burdenAfter: projectedBurden[mt.memberId] ?? 0,
+        }
+      }
+      const stats: WeekDebugStats = {
+        totalCandidates,
+        hardValidCandidates: hardValidCandidates.length,
+        rejectedBy: { ...rejectedBy },
+        chosenCandidate: {
+          slotIndex,
+          baseTime: baseTimeStr,
+          perMember,
+          projectedBurden: { ...projectedBurden },
+        },
+      }
+      console.log("[rotation] week", i + 1, "mode", mode, "stats", stats)
+    }
+
+    prevSlotIndex = slotIndex
+
+    lastWeekMaxMemberId = (() => {
+      const maxScore = computeMaxIndividualScore(bestMemberTimes)
+      if (maxScore === 0) return null
+      const maxMembers = bestMemberTimes.filter((m) => (m.score ?? 0) === maxScore)
+      return maxMembers[0]?.memberId ?? null
+    })()
+
+    for (const mt of bestMemberTimes) {
+      burden[mt.memberId] += mt.score ?? 0
+    }
+
+    const stretchers = bestMemberTimes
+      .filter((m) => m.discomfort !== "comfortable")
+      .map((m) => {
+        const member = team.find((t) => t.id === m.memberId)!
+        return {
+          firstName: member.name.split(" ")[0],
+          burden: burden[m.memberId],
+        }
+      })
+
+    const protectedNames = bestMemberTimes
+      .filter((m) => m.discomfort === "comfortable")
+      .filter((m) => burden[m.memberId] > 0)
+      .map((m) => team.find((t) => t.id === m.memberId)!.name.split(" ")[0])
+
+    const explanation =
+      stretchers.length === 0
+        ? "Everyone meets within working hours this week."
+        : buildExplanation(stretchers, protectedNames)
+
+    weeks.push({
+      week: i + 1,
+      date: formatDate(utcDate),
+      utcHour: bestHour,
+      memberTimes: bestMemberTimes,
+      explanation,
+    })
+  }
+
+  return { weeks, modeUsed: mode }
+}
+
+// --- Core rotation engine ---
 
 export function canGenerateRotation(
   team: TeamMember[],
-  _config: MeetingConfig
+  config: MeetingConfig
 ): { valid: boolean; reason?: string } {
   if (team.length < 2) {
     return { valid: false, reason: "Add at least 2 team members." }
   }
 
-  const validHours = findValidHours(team)
-  if (validHours.length === 0) {
+  const utcDate = getNextMeetingDayUtc(config.dayOfWeek)
+  const valid = findValidCandidates(utcDate, team)
+  if (valid.length === 0) {
     return {
       valid: false,
       reason:
@@ -146,115 +563,33 @@ export function canGenerateRotation(
   return { valid: true }
 }
 
-// --- Core rotation engine ---
-
+/**
+ * Generate rotation with 3-level constraint degradation:
+ * Mode A (STRICT): hard boundaries + burden diff <= 1 + no consecutive max
+ * Mode B (RELAXED): hard boundaries + burden diff <= 1 (ignore consecutive)
+ * Mode C (FALLBACK): hard boundaries only (minimize discomfort)
+ */
 export function generateRotation(
   team: TeamMember[],
   config: MeetingConfig
 ): RotationWeekData[] {
   if (team.length < 2) return []
 
-  const validHours = findValidHours(team)
-  if (validHours.length === 0) return []
+  const modes: ConstraintMode[] = ["STRICT", "RELAXED", "FALLBACK"]
 
-  const startDate = getNextDayOfWeek(config.dayOfWeek)
-  const weeks: RotationWeekData[] = []
-
-  const burden: Record<string, number> = {}
-  const rawCount: Record<string, number> = {}
-  const lastWeekUncomfortable = new Set<string>()
-  let lastWeekHour: number | null = null
-  const fairCap = Math.ceil(config.rotationWeeks / team.length)
-
-  for (const m of team) {
-    burden[m.id] = 0
-    rawCount[m.id] = 0
+  for (const mode of modes) {
+    const { weeks } = generateRotationWithMode(team, config, mode)
+    if (weeks.length === config.rotationWeeks) {
+      if (DEBUG) console.log("[rotation] succeeded with mode", mode)
+      if (mode !== "STRICT") {
+        console.warn("[rotation] modeUsed:", mode)
+      }
+      return weeks
+    }
   }
 
-  for (let i = 0; i < config.rotationWeeks; i++) {
-    let bestHour = validHours[0]
-    let bestScore = Infinity
-
-    for (const h of validHours) {
-      const score = scoreCandidate(
-        h,
-        team,
-        burden,
-        rawCount,
-        lastWeekUncomfortable,
-        lastWeekHour,
-        fairCap
-      )
-      if (score < bestScore) {
-        bestScore = score
-        bestHour = h
-      }
-    }
-
-    const weekDate = new Date(startDate)
-    weekDate.setDate(weekDate.getDate() + i * 7)
-
-    const memberTimes: MemberTime[] = team.map((member) => {
-      const localHour = toLocalHour(bestHour, member.utcOffset)
-      const discomfort = getDiscomfortLevel(
-        localHour,
-        member.workStartHour,
-        member.workEndHour
-      )
-      return {
-        memberId: member.id,
-        localHour,
-        localTime: formatHourLabel(localHour),
-        discomfort,
-      }
-    })
-
-    lastWeekUncomfortable.clear()
-    lastWeekHour = bestHour
-    for (const mt of memberTimes) {
-      if (mt.discomfort === "stretch") {
-        burden[mt.memberId] += 1
-        rawCount[mt.memberId]++
-        lastWeekUncomfortable.add(mt.memberId)
-      } else if (mt.discomfort === "sacrifice") {
-        burden[mt.memberId] += 2
-        rawCount[mt.memberId]++
-        lastWeekUncomfortable.add(mt.memberId)
-      }
-    }
-
-    const stretchers = memberTimes
-      .filter((m) => m.discomfort !== "comfortable")
-      .map((m) => {
-        const member = team.find((t) => t.id === m.memberId)!
-        return {
-          firstName: member.name.split(" ")[0],
-          burden: burden[m.memberId],
-        }
-      })
-
-    const protectedNames = memberTimes
-      .filter((m) => m.discomfort === "comfortable")
-      .filter((m) => burden[m.memberId] > 0)
-      .map((m) => team.find((t) => t.id === m.memberId)!.name.split(" ")[0])
-
-    let explanation: string
-    if (stretchers.length === 0) {
-      explanation = "Everyone meets within working hours this week."
-    } else {
-      explanation = buildExplanation(stretchers, protectedNames)
-    }
-
-    weeks.push({
-      week: i + 1,
-      date: formatDate(weekDate),
-      utcHour: bestHour,
-      memberTimes,
-      explanation,
-    })
-  }
-
-  return weeks
+  if (DEBUG) console.log("[rotation] all modes failed, returning []")
+  return []
 }
 
 function buildExplanation(
@@ -268,7 +603,6 @@ function buildExplanation(
     }
     return `${s.firstName} stretches this week. Lowest accumulated burden over the rotation.`
   }
-
   const names = stretchers.map((s) => s.firstName)
   const last = names.pop()!
   return `${names.join(", ")} and ${last} share the stretch. Burden balances over the cycle.`
@@ -276,6 +610,12 @@ function buildExplanation(
 
 // --- Summary helpers ---
 
+/**
+ * Burden counts: score-based totals.
+ * count = total burden points (sum of weekly scores)
+ * sacrificeCount = weeks where member had score >= 3 (extreme discomfort)
+ * sacrificePoints = sum of scores from those extreme weeks (for overlay %)
+ */
 export function getBurdenCounts(
   weeks: RotationWeekData[],
   team: TeamMember[]
@@ -284,17 +624,18 @@ export function getBurdenCounts(
   name: string
   count: number
   sacrificeCount: number
+  sacrificePoints?: number
 }[] {
-  const data: Record<string, { count: number; sacrificeCount: number }> = {}
-  for (const m of team) data[m.id] = { count: 0, sacrificeCount: 0 }
+  const data: Record<string, { count: number; sacrificeCount: number; sacrificePoints: number }> = {}
+  for (const m of team) data[m.id] = { count: 0, sacrificeCount: 0, sacrificePoints: 0 }
 
   for (const week of weeks) {
     for (const mt of week.memberTimes) {
-      if (mt.discomfort === "stretch") {
-        data[mt.memberId].count++
-      } else if (mt.discomfort === "sacrifice") {
-        data[mt.memberId].count++
+      const score = mt.score ?? 0
+      data[mt.memberId].count += score
+      if (score >= 3) {
         data[mt.memberId].sacrificeCount++
+        data[mt.memberId].sacrificePoints += score
       }
     }
   }
@@ -304,6 +645,7 @@ export function getBurdenCounts(
     name: m.name,
     count: data[m.id].count,
     sacrificeCount: data[m.id].sacrificeCount,
+    sacrificePoints: data[m.id].sacrificePoints,
   }))
 }
 
