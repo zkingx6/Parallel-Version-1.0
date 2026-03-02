@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Parallel — Rotational Fairness for Global Teams",
+  title: "Parallel — Share the weight",
   description:
-    "Parallel ensures meeting inconvenience is distributed intentionally across your global team, not absorbed by the same people every time.",
+    "A recurring meeting rotation planner for global teams. Distribute inconvenience intentionally, not by default.",
 }
 
 export default function RootLayout({
