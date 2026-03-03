@@ -46,6 +46,30 @@ export type RotationWeekData = {
   explanation: string
 }
 
+/** Result when no viable meeting time exists. Used for conflict diagnosis and suggestions. */
+export type NoViableTimeResult = {
+  status: "NO_VIABLE_TIME"
+  reason: "HARD_BOUNDARIES_BLOCK_ALL_SLOTS"
+  diagnosis: {
+    blockers: Array<{
+      memberId: string
+      name: string
+      timezone_offset: number
+      blockingType: "HARD_BOUNDARY" | "WORKING_HOURS"
+      localBlockedSummary: string
+      overlapImpact: number
+    }>
+    notes: string[]
+  }
+  suggestions: Array<{
+    id: "RELAX_HARD_BOUNDARY_1H" | "ALLOW_OUTSIDE_WORKING_HOURS"
+    title: string
+    description: string
+    impactSummary: string
+    params?: { memberId?: string; memberName?: string; relaxRange?: { start: number; end: number } }
+  }>
+}
+
 export const TIMEZONES = [
   { label: "UTC-10 (Hawaii)", value: -10 },
   { label: "UTC-9 (Alaska)", value: -9 },

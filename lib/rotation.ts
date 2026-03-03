@@ -6,6 +6,7 @@ import {
   MemberTime,
   Discomfort,
   formatHourLabel,
+  type NoViableTimeResult,
 } from "./types"
 
 /**
@@ -780,6 +781,127 @@ function generateRotationWithMode(
   return { weeks, modeUsed: mode }
 }
 
+// --- No viable time: diagnosis and suggestions ---
+
+function formatHour24(hour: number): string {
+  const h = Math.floor(hour)
+  const m = Math.round((hour % 1) * 60)
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
+}
+
+function formatHardNoRangesSummary(ranges: { start: number; end: number }[]): string {
+  if (ranges.length === 0) return ""
+  return ranges
+    .map((r) => `${formatHour24(r.start)}–${formatHour24(r.end)}`)
+    .join(" and ")
+}
+
+function formatWorkingHoursSummary(workStart: number, workEnd: number): string {
+  return `${formatHour24(workStart)}–${formatHour24(workEnd)}`
+}
+
+/**
+ * Diagnose why no viable meeting time exists. Called when findValidCandidates returns empty.
+ * Computes per-member blockers (hard boundary vs working hours) and suggestions.
+ */
+export function diagnoseNoViableTime(
+  team: TeamMember[],
+  config: MeetingConfig
+): NoViableTimeResult {
+  const utcDate = getNextMeetingDayUtc(config.dayOfWeek)
+  const candidates = getCandidateUtcHours()
+
+  const blockers: NoViableTimeResult["diagnosis"]["blockers"] = []
+
+  for (const member of team) {
+    let blockedByHard = 0
+    let blockedByWorking = 0
+    let overlapImpact = 0
+
+    for (const utcHour of candidates) {
+      const localHour = utcToLocalHour(utcDate, utcHour, member)
+      const inHard = isInHardNoLocal(localHour, member.hardNoRanges)
+      const inWork = isWithinWorkingHours(
+        localHour,
+        member.workStartHour,
+        member.workEndHour
+      )
+
+      if (inHard) blockedByHard++
+      if (!inWork) blockedByWorking++
+      if (inHard || !inWork) overlapImpact++
+    }
+    const blockingType: "HARD_BOUNDARY" | "WORKING_HOURS" =
+      blockedByHard >= blockedByWorking ? "HARD_BOUNDARY" : "WORKING_HOURS"
+
+    const hardSummary =
+      member.hardNoRanges.length > 0
+        ? `Never available: ${formatHardNoRangesSummary(member.hardNoRanges)}`
+        : ""
+    const workSummary = `Working hours ${formatWorkingHoursSummary(member.workStartHour, member.workEndHour)}`
+    const localBlockedSummary =
+      blockingType === "HARD_BOUNDARY"
+        ? hardSummary
+          ? `${hardSummary}`
+          : workSummary
+        : workSummary
+
+    blockers.push({
+      memberId: member.id,
+      name: member.name,
+      timezone_offset: member.utcOffset,
+      blockingType,
+      localBlockedSummary: localBlockedSummary || "No availability",
+      overlapImpact,
+    })
+  }
+
+  blockers.sort((a, b) => b.overlapImpact - a.overlapImpact)
+  const topBlockers = blockers.slice(0, 6)
+
+  const notes: string[] = [
+    "Your team spans different time zones. Each person has set limits on when they can meet.",
+    "Right now, those limits don't overlap. There's no time that works for everyone.",
+  ]
+
+  const suggestions: NoViableTimeResult["suggestions"] = []
+
+  const topHardBlocker = topBlockers.find((b) => b.blockingType === "HARD_BOUNDARY")
+  if (topHardBlocker) {
+    const member = team.find((m) => m.id === topHardBlocker!.memberId)!
+    const relaxRange = member.hardNoRanges[0]
+    suggestions.push({
+      id: "RELAX_HARD_BOUNDARY_1H",
+      title: "Relax one \"never\" time for one person",
+      description: `Temporarily allow one hour that's usually blocked for ${member.name} for this meeting plan. Their other "never" times still apply. Use this only when the team agrees.`,
+      impactSummary: `Opens up more options. ${member.name} may have one less blocked hour.`,
+      params: {
+        memberId: member.id,
+        memberName: member.name,
+        relaxRange: relaxRange ? { start: relaxRange.start, end: relaxRange.end } : undefined,
+      },
+    })
+  }
+
+  suggestions.push({
+    id: "ALLOW_OUTSIDE_WORKING_HOURS",
+    title: "Allow slightly earlier or later times",
+    description:
+      "Consider meeting times that fall slightly outside normal working hours. \"Never\" times still apply. This only affects this meeting plan.",
+    impactSummary: "Opens up more options. Some members may occasionally meet at less ideal times.",
+  })
+
+  return {
+    status: "NO_VIABLE_TIME",
+    reason: "HARD_BOUNDARIES_BLOCK_ALL_SLOTS",
+    diagnosis: {
+      blockers: topBlockers,
+      notes,
+    },
+    suggestions,
+  }
+}
+
 // --- Core rotation engine ---
 
 export function canGenerateRotation(
@@ -812,8 +934,15 @@ export function canGenerateRotation(
 export function generateRotation(
   team: TeamMember[],
   config: MeetingConfig
-): RotationWeekData[] {
+): RotationWeekData[] | NoViableTimeResult {
   if (team.length < 2) return []
+
+  const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+  const hardValidCandidates = findValidCandidates(utcStart, team)
+  if (hardValidCandidates.length === 0) {
+    if (DEBUG) console.log("[rotation] no hard-valid candidates, returning diagnosis")
+    return diagnoseNoViableTime(team, config)
+  }
 
   const modes: ConstraintMode[] = ["STRICT", "RELAXED", "FALLBACK"]
 
@@ -864,6 +993,13 @@ export function generateRotation(
 
   if (DEBUG) console.log("[rotation] all modes failed, returning []")
   return []
+}
+
+/** Type guard: result is NoViableTimeResult */
+export function isNoViableTimeResult(
+  r: RotationWeekData[] | NoViableTimeResult
+): r is NoViableTimeResult {
+  return Array.isArray(r) ? false : r.status === "NO_VIABLE_TIME"
 }
 
 function buildExplanation(

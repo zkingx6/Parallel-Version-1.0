@@ -9,15 +9,26 @@ import {
   dbMeetingToConfig,
   dbMemberToTeamMember,
 } from "@/lib/database.types"
-import { TIMEZONES, BASE_TIME_OPTIONS, RotationWeekData } from "@/lib/types"
+import { TIMEZONES, BASE_TIME_OPTIONS, RotationWeekData, type NoViableTimeResult } from "@/lib/types"
 import {
   generateRotation,
   canGenerateRotation,
   getBurdenCounts,
   hasConsecutiveStretch,
+  isNoViableTimeResult,
 } from "@/lib/rotation"
 import { RotationOutput } from "./rotation-output"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 const DAYS = [
@@ -111,6 +122,190 @@ function BurdenBar({
   )
 }
 
+function NoViableTimePanel({
+  result,
+  onApplySuggestion,
+}: {
+  result: NoViableTimeResult
+  onApplySuggestion: (suggestionId: string, params?: unknown) => void
+}) {
+  const [showBlockers, setShowBlockers] = useState(false)
+  const [modalSuggestion, setModalSuggestion] = useState<{
+    id: string
+    title: string
+    description: string
+    params?: unknown
+  } | null>(null)
+
+  const { diagnosis, suggestions } = result
+
+  const handleApplyClick = (s: (typeof suggestions)[0]) => {
+    setModalSuggestion({
+      id: s.id,
+      title: s.title,
+      description: s.description,
+      params: s.params,
+    })
+  }
+
+  const handleConfirmApply = () => {
+    if (modalSuggestion) {
+      onApplySuggestion(modalSuggestion.id, modalSuggestion.params)
+      setModalSuggestion(null)
+    }
+  }
+
+  return (
+    <>
+      <div className="rounded-xl border border-border/60 bg-card p-5 sm:p-6 space-y-6 animate-in fade-in-0 duration-300">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">
+            No shared time fits everyone&apos;s limits
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Everyone&apos;s limits overlap, so there&apos;s no overlap left.
+          </p>
+        </div>
+
+        <section>
+          <h4 className="text-sm font-medium text-foreground mb-2">
+            What&apos;s going on
+          </h4>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {diagnosis.notes[0]}
+          </p>
+          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+            {diagnosis.notes.slice(1).map((note, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="text-primary mt-0.5">·</span>
+                {note}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-sm font-medium text-foreground">
+              Who&apos;s limiting options?
+            </h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => setShowBlockers((b) => !b)}
+            >
+              {showBlockers ? "Hide conflicts" : "Show conflicts"}
+            </Button>
+          </div>
+          {showBlockers && (
+            <>
+              <p className="mt-2 text-xs text-muted-foreground">
+                These team members have the most impact on when the meeting can be scheduled:
+              </p>
+              <ul className="mt-3 space-y-2.5">
+              {diagnosis.blockers.map((b) => (
+                <li
+                  key={b.memberId}
+                  className="flex flex-wrap items-start gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-sm"
+                >
+                  <span className="font-medium text-foreground">{b.name}</span>
+                  <Badge
+                    variant="outline"
+                    className="text-xs font-normal"
+                  >
+                    {b.blockingType === "HARD_BOUNDARY"
+                      ? "Never times"
+                      : "Working hours"}
+                  </Badge>
+                  <span className="text-muted-foreground text-xs">
+                    UTC{b.timezone_offset >= 0 ? "+" : ""}{b.timezone_offset}
+                  </span>
+                  <p className="w-full text-muted-foreground text-xs mt-1">
+                    {b.localBlockedSummary}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            </>
+          )}
+        </section>
+
+        <section>
+          <h4 className="text-sm font-medium text-foreground mb-3">
+            Choose how to proceed
+          </h4>
+          <div className="space-y-3">
+            {suggestions.map((s) => (
+              <div
+                key={s.id}
+                className="rounded-lg border border-border/50 bg-muted/20 p-4 space-y-2"
+              >
+                <h5 className="text-sm font-medium text-foreground">
+                  {s.title}
+                </h5>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {s.description}
+                </p>
+                <p className="text-xs text-muted-foreground/80">
+                  {s.impactSummary}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => handleApplyClick(s)}
+                >
+                  Apply this option
+                </Button>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <Dialog open={!!modalSuggestion} onOpenChange={(o) => !o && setModalSuggestion(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {modalSuggestion?.id === "RELAX_HARD_BOUNDARY_1H"
+                ? "Relax one \"never\" time for this plan"
+                : modalSuggestion?.id === "ALLOW_OUTSIDE_WORKING_HOURS"
+                  ? "Allow slightly earlier or later times"
+                  : modalSuggestion?.title}
+            </DialogTitle>
+            <DialogDescription>
+              {modalSuggestion?.id === "RELAX_HARD_BOUNDARY_1H" ? (
+                <>
+                  We&apos;ll temporarily allow one hour that{" "}
+                  {(modalSuggestion?.params as { memberName?: string })?.memberName ?? "this person"}{" "}
+                  marked as &quot;never&quot; for this meeting plan. Their other &quot;never&quot;
+                  times still apply. Use this only when the team agrees. This only affects this
+                  meeting plan.
+                </>
+              ) : modalSuggestion?.id === "ALLOW_OUTSIDE_WORKING_HOURS" ? (
+                <>
+                  We&apos;ll consider meeting times that fall slightly outside your normal working
+                  hours. Your &quot;never&quot; times still apply. This only affects this meeting
+                  plan.
+                </>
+              ) : (
+                modalSuggestion?.description
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter showCloseButton={false}>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleConfirmApply}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 export function RotationSection({
   meeting: initialMeeting,
   members: initialMembers,
@@ -120,6 +315,7 @@ export function RotationSection({
 }) {
   const [meeting, setMeeting] = useState(initialMeeting)
   const [rotation, setRotation] = useState<RotationWeekData[] | null>(null)
+  const [noViableResult, setNoViableResult] = useState<NoViableTimeResult | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [rotationError, setRotationError] = useState<string | null>(null)
 
@@ -136,29 +332,64 @@ export function RotationSection({
   )
 
   const handleGenerate = () => {
+    console.log("[DEBUG] Plan button clicked")
+
     if (team.length < 2) {
+      console.log("[DEBUG] Early return triggered: team.length < 2")
       setRotationError("At least 2 members needed. Share the invite link.")
+      setNoViableResult(null)
       return
     }
     const validation = canGenerateRotation(team, config)
     if (!validation.valid) {
-      setRotationError(validation.reason || "No viable rotation.")
-      setRotation(null)
-      return
+      const reason = validation.reason ?? ""
+      const isInfeasible =
+        reason.includes("no viable") ||
+        reason.includes("never ranges") ||
+        reason.toLowerCase().includes("hard boundaries")
+      if (isInfeasible) {
+        console.log(
+          "[DEBUG] validation invalid but continuing to generateRotation due to infeasible case"
+        )
+      } else {
+        console.log("[DEBUG] Early return triggered: validation.valid=false", reason)
+        setRotationError(reason || "No viable rotation.")
+        setRotation(null)
+        setNoViableResult(null)
+        return
+      }
     }
+    console.log("[DEBUG] Team length:", team?.length)
     setIsGenerating(true)
     setRotation(null)
+    setNoViableResult(null)
     setRotationError(null)
+    console.log("[DEBUG] Calling generateRotation")
     setTimeout(() => {
-      const weeks = generateRotation(team, config)
-      if (weeks.length === 0) {
-        setRotationError("No viable rotation with current boundaries.")
-      } else {
-        setRotation(weeks)
+      try {
+        const result = generateRotation(team, config)
+        console.log("[DEBUG] generateRotation result:", result)
+        if (isNoViableTimeResult(result)) {
+          setNoViableResult(result)
+        } else if (result.length === 0) {
+          setRotationError("No viable rotation with current boundaries.")
+        } else {
+          setRotation(result)
+        }
+      } catch (error) {
+        console.error("[DEBUG] Error occurred:", error)
       }
       setIsGenerating(false)
     }, 1200)
   }
+
+  const handleApplySuggestion = useCallback(
+    (suggestionId: string, params?: unknown) => {
+      console.log("[NoViableTime] Apply suggestion:", suggestionId, params)
+      // Phase 1: no DB write, just log
+    },
+    []
+  )
 
   const burdenData = rotation ? getBurdenCounts(rotation, team) : null
   const maxCount = burdenData
@@ -175,6 +406,19 @@ export function RotationSection({
 
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
+      <div
+        style={{
+          position: "fixed",
+          bottom: 20,
+          right: 20,
+          background: "black",
+          color: "white",
+          padding: "6px 10px",
+          zIndex: 9999,
+        }}
+      >
+        DEBUG BUILD ACTIVE (RotationSection)
+      </div>
       <div className="mb-10">
         <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
           {meeting.title}
@@ -289,7 +533,14 @@ export function RotationSection({
           </div>
         )}
 
-        {rotationError && !isGenerating && (
+        {noViableResult && !isGenerating && (
+          <NoViableTimePanel
+            result={noViableResult}
+            onApplySuggestion={handleApplySuggestion}
+          />
+        )}
+
+        {rotationError && !noViableResult && !isGenerating && (
           <div className="rounded-xl border border-stretch/40 bg-stretch/15 p-4 text-center animate-in fade-in-0 duration-300">
             <p className="text-sm text-stretch-foreground">{rotationError}</p>
           </div>

@@ -13,6 +13,7 @@ import {
   canGenerateRotation,
   decodeShareData,
   getBurdenCounts,
+  isNoViableTimeResult,
 } from "@/lib/rotation"
 import { Header } from "./header"
 import { TeamSetup } from "./team-setup"
@@ -67,7 +68,9 @@ function ShareView({
   team: TeamMember[]
   config: MeetingConfig
 }) {
-  const weeks = generateRotation(team, config)
+  const result = generateRotation(team, config)
+  const weeks = isNoViableTimeResult(result) ? [] : result
+  const noViable = isNoViableTimeResult(result)
   const burdenData = getBurdenCounts(weeks, team)
   const maxCount = Math.max(...burdenData.map((d) => d.count), 1)
   const maxMemberCount = Math.max(...burdenData.map((d) => d.count))
@@ -100,12 +103,21 @@ function ShareView({
           </div>
         </div>
 
-        <RotationOutput
-          weeks={weeks}
-          team={team}
-          anchorOffset={config.anchorOffset}
-        />
+        {noViable ? (
+          <div className="rounded-xl border border-stretch/40 bg-stretch/15 p-4 text-center">
+            <p className="text-sm text-stretch-foreground">
+              No viable meeting time with current constraints.
+            </p>
+          </div>
+        ) : (
+          <RotationOutput
+            weeks={weeks}
+            team={team}
+            anchorOffset={config.anchorOffset}
+          />
+        )}
 
+        {!noViable && (
         <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 sm:p-6 space-y-5">
           <div>
             <h3 className="text-sm font-semibold mb-3">
@@ -144,6 +156,7 @@ function ShareView({
             ))}
           </div>
         </div>
+        )}
 
         <div className="text-center pt-4">
           <p className="text-xs text-muted-foreground/50">
@@ -200,24 +213,37 @@ export function ParallelApp() {
   const canGenerate = team.length >= 2 && team.every((m) => m.name.trim())
 
   const handleGenerate = () => {
+    console.log("[DEBUG] Plan button clicked (ParallelApp)")
+
     const validation = canGenerateRotation(team, config)
     if (!validation.valid) {
+      console.log("[DEBUG] Early return triggered: validation.valid=false", validation.reason)
       setRotationError(validation.reason || "No viable rotation.")
       setRotation(null)
       return
     }
-
+    console.log("[DEBUG] Team length:", team?.length)
     setIsGenerating(true)
     setRotation(null)
     setRotationError(null)
+    console.log("[DEBUG] Calling generateRotation")
     setTimeout(() => {
-      const weeks = generateRotation(team, config)
-      if (weeks.length === 0) {
-        setRotationError(
-          "Current constraints leave no viable rotation. Adjust hard boundary ranges."
-        )
-      } else {
-        setRotation(weeks)
+      try {
+        const result = generateRotation(team, config)
+        console.log("[DEBUG] generateRotation result:", result)
+        if (isNoViableTimeResult(result)) {
+          setRotationError(
+            "No viable meeting time. Adjust constraints or try suggested changes."
+          )
+        } else if (result.length === 0) {
+          setRotationError(
+            "Current constraints leave no viable rotation. Adjust hard boundary ranges."
+          )
+        } else {
+          setRotation(result)
+        }
+      } catch (error) {
+        console.error("[DEBUG] Error occurred:", error)
       }
       setIsGenerating(false)
     }, 1400)
@@ -237,6 +263,19 @@ export function ParallelApp() {
 
   return (
     <div className="min-h-screen">
+      <div
+        style={{
+          position: "fixed",
+          bottom: 20,
+          right: 20,
+          background: "black",
+          color: "white",
+          padding: "6px 10px",
+          zIndex: 9999,
+        }}
+      >
+        DEBUG BUILD ACTIVE (ParallelApp)
+      </div>
       <Header />
 
       <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">

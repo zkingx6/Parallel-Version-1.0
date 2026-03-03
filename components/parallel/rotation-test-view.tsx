@@ -12,7 +12,7 @@ import {
   dbMeetingToConfig,
   dbMemberToTeamMember,
 } from "@/lib/database.types"
-import { generateRotation, canGenerateRotation } from "@/lib/rotation"
+import { generateRotation, canGenerateRotation, isNoViableTimeResult } from "@/lib/rotation"
 import type { RotationWeekData } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -43,8 +43,13 @@ export function RotationTestView({
     }
     setError(null)
     const result = generateRotation(team, config)
-    setWeeks(result)
-    setSelectedMemberId((prev) => prev ?? team[0]?.id ?? null)
+    if (isNoViableTimeResult(result)) {
+      setError("无可行会议时间，请调整约束")
+      setWeeks(null)
+    } else {
+      setWeeks(result)
+      setSelectedMemberId((prev) => prev ?? team[0]?.id ?? null)
+    }
   }, [team, config])
 
   const memberMap = Object.fromEntries(team.map((m) => [m.id, m]))
