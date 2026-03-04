@@ -40,13 +40,16 @@ export function dbMeetingToConfig(m: DbMeeting): MeetingConfig {
 }
 
 export function dbMemberToTeamMember(s: DbMemberSubmission): TeamMember {
+  const hardNoRanges = Array.isArray(s.hard_no_ranges)
+    ? s.hard_no_ranges
+    : []
   return {
     id: s.id,
     name: s.name,
     utcOffset: s.timezone_offset,
     workStartHour: s.work_start_hour,
     workEndHour: s.work_end_hour,
-    hardNoRanges: Array.isArray(s.hard_no_ranges) ? s.hard_no_ranges : [],
+    hardNoRanges,
     initials: getInitials(s.name),
   }
 }

@@ -23,6 +23,15 @@ export type MeetingConfig = {
   rotationWeeks: number
   /** Base time preference in minutes from midnight (0–1439). null = auto fair mode. */
   baseTimeMinutes?: number | null
+  /** Fairness thresholds (optional; uses defaults if not set). */
+  fairnessThresholds?: Partial<FairnessThresholds>
+}
+
+/** Default fairness thresholds for shareable plans. */
+export const DEFAULT_FAIRNESS_THRESHOLDS: FairnessThresholds = {
+  spreadLimit: 3,
+  consecutiveMaxLimit: 2,
+  rotationThreshold: 0.6,
 }
 
 export type MemberTime = {
@@ -44,6 +53,75 @@ export type RotationWeekData = {
   utcHour: number
   memberTimes: MemberTime[]
   explanation: string
+}
+
+/** Per-week diagnostics for rotation explainability. */
+export type WeekExplain = {
+  week: number
+  hardValidCandidatesCount: number
+  totalCandidatesCount: number
+  rejectedBy: { burdenDiff: number; consecutiveMax: number }
+  failureReason: "NO_HARD_VALID" | "ALL_REJECTED" | null
+  primaryCause?: "BURDEN_DIFF" | "CONSECUTIVE_MAX" | "MIXED_REJECTIONS"
+  unavoidableMaxMemberId?: string
+  /** True when rotation was feasible but no alternative avoided 60% max; we fell back. */
+  rotationForced?: boolean
+  /** True if more than 1 candidate shares the best composite score (within epsilon). */
+  weekHasMultipleBestCandidates?: boolean
+}
+
+export type PlanMetrics = {
+  maxBurden: number
+  minBurden: number
+  spread: number
+  maxBurdenMemberIds: string[]
+  /** Max consecutive weeks same member is max-burden. */
+  consecutiveMax?: number
+  /** Sum of all weekly penalty scores. */
+  sumPenalty?: number
+}
+
+/** Fairness thresholds for shareable plans. */
+export type FairnessThresholds = {
+  spreadLimit: number
+  consecutiveMaxLimit: number
+  rotationThreshold: number
+}
+
+export type ForcedReason =
+  | "INSUFFICIENT_CANDIDATES"
+  | "SPREAD_IMPOSSIBLE"
+  | "CONSECUTIVE_MAX_IMPOSSIBLE"
+  | "HARD_CONSTRAINTS_TOO_TIGHT"
+
+export type ForcedPlanEvidence = {
+  perWeekHardValidCount: number[]
+  perWeekMaxMemberSets: string[][]
+  bestAchievableMetrics: PlanMetrics
+}
+
+export type RotationExplain = {
+  weeks: WeekExplain[]
+  /** Mode used for the whole plan. */
+  modeUsed: "FAIRNESS_GUARANTEE" | "STRICT" | "RELAXED" | "FALLBACK"
+  /** True if the plan satisfies shareable fairness thresholds. */
+  shareablePlanExists: boolean
+  /** True if current plan is not lexicographically best. */
+  betterPlanExists?: boolean
+  bestPlanMetrics?: PlanMetrics
+  currentPlanMetrics?: PlanMetrics
+  /** Only when shareablePlanExists=false. */
+  forcedReason?: ForcedReason
+  evidence?: ForcedPlanEvidence
+  /** Human-readable summary when forced. */
+  forcedSummary?: string
+}
+
+/** Successful rotation result with explainability. */
+export type RotationResult = {
+  weeks: RotationWeekData[]
+  modeUsed: "FAIRNESS_GUARANTEE" | "STRICT" | "RELAXED" | "FALLBACK"
+  explain: RotationExplain
 }
 
 /** Result when no viable meeting time exists. Used for conflict diagnosis and suggestions. */

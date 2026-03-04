@@ -14,6 +14,7 @@ import {
   decodeShareData,
   getBurdenCounts,
   isNoViableTimeResult,
+  isRotationResult,
 } from "@/lib/rotation"
 import { Header } from "./header"
 import { TeamSetup } from "./team-setup"
@@ -69,7 +70,13 @@ function ShareView({
   config: MeetingConfig
 }) {
   const result = generateRotation(team, config)
-  const weeks = isNoViableTimeResult(result) ? [] : result
+  const weeks = isNoViableTimeResult(result)
+    ? []
+    : isRotationResult(result)
+      ? result.weeks
+      : Array.isArray(result)
+        ? result
+        : []
   const noViable = isNoViableTimeResult(result)
   const burdenData = getBurdenCounts(weeks, team)
   const maxCount = Math.max(...burdenData.map((d) => d.count), 1)
@@ -235,12 +242,12 @@ export function ParallelApp() {
           setRotationError(
             "No viable meeting time. Adjust constraints or try suggested changes."
           )
-        } else if (result.length === 0) {
+        } else if (Array.isArray(result) && result.length === 0) {
           setRotationError(
             "Current constraints leave no viable rotation. Adjust hard boundary ranges."
           )
-        } else {
-          setRotation(result)
+        } else if (isRotationResult(result)) {
+          setRotation(result.weeks)
         }
       } catch (error) {
         console.error("[DEBUG] Error occurred:", error)

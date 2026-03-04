@@ -13,7 +13,7 @@ export default async function AppLayout({
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) redirect("/auth")
+  if (!user) redirect("/")
 
   return (
     <SetupProvider>

@@ -30,7 +30,7 @@ export function SettingsContent({
   const handleSignOut = async () => {
     if (!confirm("Are you sure you want to sign out?")) return
     await supabase.auth.signOut()
-    router.push("/auth")
+    router.push("/")
     router.refresh()
   }
 

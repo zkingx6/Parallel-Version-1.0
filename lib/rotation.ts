@@ -7,6 +7,14 @@ import {
   Discomfort,
   formatHourLabel,
   type NoViableTimeResult,
+  type RotationResult,
+  type RotationExplain,
+  type WeekExplain,
+  type PlanMetrics,
+  type FairnessThresholds,
+  type ForcedReason,
+  type ForcedPlanEvidence,
+  DEFAULT_FAIRNESS_THRESHOLDS,
 } from "./types"
 
 /**
@@ -313,6 +321,10 @@ function sortByBaseTimePreference(
 type ConstraintMode = "STRICT" | "RELAXED" | "FALLBACK"
 
 const DEBUG = typeof process !== "undefined" && process.env.NEXT_PUBLIC_ROTATION_DEBUG === "true"
+const DEBUG_ROTATION =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_DEBUG_ROTATION === "true"
+const DEBUG_VERIFY =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_DEBUG_ROTATION === "1"
 
 type WeekDebugStats = {
   totalCandidates: number
@@ -444,15 +456,56 @@ function utcHourToSlotIndex(utcHour: number): number {
   return Math.round(utcHour * 2)
 }
 
+function getMaxMemberId(memberTimes: MemberTime[]): string | null {
+  const maxScore = computeMaxIndividualScore(memberTimes)
+  if (maxScore === 0) return null
+  const maxMembers = memberTimes.filter((m) => (m.score ?? 0) === maxScore)
+  return maxMembers[0]?.memberId ?? null
+}
+
+/** All member IDs with max discomfort score (for rotation penalty). */
+function getMaxMemberIds(memberTimes: MemberTime[]): string[] {
+  const maxScore = computeMaxIndividualScore(memberTimes)
+  if (maxScore === 0) return []
+  return memberTimes
+    .filter((m) => (m.score ?? 0) === maxScore)
+    .map((m) => m.memberId)
+}
+
+function computeMaxRepeatPenalty(
+  maxMemberId: string | null,
+  lastMaxMemberIds: string[]
+): number {
+  if (!maxMemberId) return 0
+  const count = lastMaxMemberIds.filter((id) => id === maxMemberId).length
+  return count
+}
+
+function derivePrimaryCause(
+  rejectedBy: { burdenDiff: number; consecutiveMax: number },
+  hardValidCount: number
+): "BURDEN_DIFF" | "CONSECUTIVE_MAX" | "MIXED_REJECTIONS" {
+  if (rejectedBy.burdenDiff === hardValidCount) return "BURDEN_DIFF"
+  if (rejectedBy.consecutiveMax === hardValidCount) return "CONSECUTIVE_MAX"
+  return "MIXED_REJECTIONS"
+}
+
 function generateRotationWithMode(
   team: TeamMember[],
   config: MeetingConfig,
   mode: ConstraintMode
-): { weeks: RotationWeekData[]; modeUsed: ConstraintMode } {
+): { weeks: RotationWeekData[]; modeUsed: ConstraintMode; explain: RotationExplain } {
   const weeks: RotationWeekData[] = []
+  const explainWeeks: WeekExplain[] = []
   const burden: Record<string, number> = {}
   let lastWeekMaxMemberId: string | null = null
   let prevSlotIndex: number = -1
+  const lastMaxMemberIds: string[] = [] // Rolling window of last 4 weeks' max members
+  const STREAK_WINDOW = 4
+  const maxDiscomfortCounts: Record<string, number> = {}
+  for (const m of team) maxDiscomfortCounts[m.id] = 0
+  const ROTATION_PENALTY_WEIGHT = 500 // Significant penalty when member would exceed 60% as max
+  const ROTATION_THRESHOLD = 0.6 // Max 60% of weeks as max discomfort member
 
   const enforceBurdenDiff = mode === "STRICT" || mode === "RELAXED"
   const enforceConsecutiveMax = mode === "STRICT"
@@ -463,7 +516,7 @@ function generateRotationWithMode(
 
   // Debug: Log team configuration at start
   if (DEBUG) {
-    console.group("[rotation] Team configuration")
+    console.group("[ROTATION_DEBUG] Team configuration")
     console.table(
       team.map((m) => ({
         id: m.id.slice(0, 8),
@@ -499,9 +552,73 @@ function generateRotationWithMode(
 
     const rejectedBy = { burdenDiff: 0, consecutiveMax: 0 }
 
+    // Unavoidable sacrifice: same member max for every hard-valid candidate?
+    let unavoidableMaxMemberId: string | undefined
+    const maxMemberIds = new Set<string | null>()
+    for (const utcHour of hardValidCandidates) {
+      const mt = computeMemberTimes(utcDate, utcHour, team)
+      maxMemberIds.add(getMaxMemberId(mt))
+    }
+    const uniqueMaxIds = [...maxMemberIds].filter((id): id is string => id != null)
+    if (uniqueMaxIds.length === 1) {
+      unavoidableMaxMemberId = uniqueMaxIds[0]
+    }
+
+    // Rotation feasibility: >1 hard-valid slot AND different maxMember sets exist
+    const uniqueMaxSets = new Set<string>()
+    for (const utcHour of hardValidCandidates) {
+      const mt = computeMemberTimes(utcDate, utcHour, team)
+      uniqueMaxSets.add(getMaxMemberIds(mt).sort().join(","))
+    }
+    const rotationFeasible =
+      hardValidCandidates.length > 1 && uniqueMaxSets.size > 1
+
+    // Pre-pass: which candidates would exceed 60% max if selected?
+    const candidateWouldExceed60 = new Map<number, boolean>()
+    if (rotationFeasible) {
+      for (const utcHour of hardValidCandidates) {
+        const mt = computeMemberTimes(utcDate, utcHour, team)
+        const maxIds = getMaxMemberIds(mt)
+        const wouldExceed = maxIds.some(
+          (mid) =>
+            (maxDiscomfortCounts[mid] + 1) / (i + 1) > ROTATION_THRESHOLD
+        )
+        candidateWouldExceed60.set(utcHour, wouldExceed)
+      }
+    }
+    const hasRotationAlternative =
+      rotationFeasible &&
+      [...candidateWouldExceed60.values()].some((v) => !v)
+
+    if (DEBUG_ROTATION) {
+      console.group(`[ROTATION_DEBUG] Week ${i + 1}`)
+      console.log("hardValidCandidates.length:", hardValidCandidates.length)
+      console.log("uniqueMaxSetsCount:", uniqueMaxSets.size)
+      console.log("Candidates:")
+    }
+
     if (hardValidCandidates.length === 0) {
-      if (DEBUG) console.log("[rotation] week", i + 1, "no hard-valid candidates, aborting")
-      return { weeks: [], modeUsed: mode }
+      if (DEBUG_ROTATION) {
+        console.groupEnd()
+      }
+      explainWeeks.push({
+        week: i + 1,
+        hardValidCandidatesCount: 0,
+        totalCandidatesCount: totalCandidates,
+        rejectedBy,
+        failureReason: "NO_HARD_VALID",
+        weekHasMultipleBestCandidates: false,
+      })
+      if (DEBUG) console.log("[ROTATION_DEBUG] week", i + 1, "no hard-valid candidates, aborting")
+      return {
+        weeks: [],
+        modeUsed: mode,
+        explain: {
+          weeks: explainWeeks,
+          modeUsed: mode,
+          shareablePlanExists: false,
+        },
+      }
     }
 
     // Fairness weights (configurable)
@@ -509,6 +626,8 @@ function generateRotationWithMode(
     const EQUITY_WEIGHT = 100   // Secondary: penalize low-burden members staying at 0
     const GAP_WEIGHT = 10       // Tertiary: minimize spread
     const PAIN_WEIGHT = 1       // Quaternary: minimize total discomfort
+    const DIVERSITY_WEIGHT = 1  // Favor time slots that differ from previous week
+    const STREAK_PENALTY_WEIGHT = 5 // Soft penalty when same member is max too often in rolling window
 
     let bestHour: number | null = null
     let bestMemberTimes: MemberTime[] | null = null
@@ -532,6 +651,148 @@ function generateRotationWithMode(
       sumDiscomfort: number
       perMember: Record<string, { localTime: string; rawScore: number; adjustedScore: number }>
     }> = []
+
+    const candidateDebugLog: Array<{
+      candidateTime: string
+      maxMemberIds: string[]
+      compositeScore: number
+      wouldExceedRotationThreshold: boolean
+    }> = []
+
+    const SCORE_EPSILON = 1e-6
+    const passingCandidateScores: Array<{ utcHour: number; compositeScore: number }> = []
+
+    if (DEBUG_VERIFY && hardValidCandidates.length > 0) {
+      type CandidateReport = {
+        slotTimeUTC: number
+        compositeScore: number
+        maxMemberIds: string[]
+        wouldExceedRotationThreshold: boolean
+        rejectedByBurdenDiff: boolean
+        rejectedByConsecutiveMax: boolean
+        perMember: Array<{
+          memberId: string
+          name: string
+          localTime: string
+          penalty: number
+          violatesHardNo: boolean
+        }>
+        maxBurdenAfter: number
+        minBurdenAfter: number
+        spreadAfter: number
+        sumPenalty: number
+      }
+      const enumReports: CandidateReport[] = []
+      for (const utcHour of hardValidCandidates) {
+        const memberTimes = computeMemberTimes(utcDate, utcHour, team)
+        const memberScores = new Map<string, number>()
+        for (const mt of memberTimes) {
+          memberScores.set(mt.memberId, mt.score ?? 0)
+        }
+        const rejectedByBurdenDiff =
+          enforceBurdenDiff && wouldViolateBurdenDiff(team, burden, memberScores)
+        const rejectedByConsecutiveMax =
+          enforceConsecutiveMax &&
+          wouldBeConsecutiveMaxDiscomfort(memberTimes, lastWeekMaxMemberId)
+
+        const adjustedScores = computeFairnessAdjustedScores(memberTimes, burden)
+        const projectedBurden: Record<string, number> = { ...burden }
+        for (const mt of memberTimes) {
+          const adjScore = adjustedScores.get(mt.memberId) ?? 0
+          projectedBurden[mt.memberId] =
+            (projectedBurden[mt.memberId] ?? 0) + adjScore
+        }
+        const burdens = Object.values(projectedBurden)
+        const maxBurdenAfter = Math.max(...burdens, 0)
+        const minBurdenAfter = Math.min(...burdens, 0)
+        const spreadAfter = maxBurdenAfter - minBurdenAfter
+        const sumPenalty = computeTotalScore(memberTimes)
+        const wouldExceed60 = candidateWouldExceed60.get(utcHour) ?? false
+
+        const equityPenalty = computeEquityPenalty(memberTimes, burden)
+        const gap = maxBurdenAfter - minBurdenAfter
+        const slotIndex = utcHourToSlotIndex(utcHour)
+        const timeDiversity =
+          prevSlotIndex < 0 ? 0 : Math.abs(slotIndex - prevSlotIndex)
+        const candidateMaxMemberId = getMaxMemberId(memberTimes)
+        const streakPenalty =
+          computeMaxRepeatPenalty(candidateMaxMemberId, lastMaxMemberIds) *
+          STREAK_PENALTY_WEIGHT
+        const rotationPenalty =
+          hasRotationAlternative && wouldExceed60 ? ROTATION_PENALTY_WEIGHT : 0
+        const compositeScore =
+          maxBurdenAfter * FAIRNESS_WEIGHT +
+          equityPenalty * EQUITY_WEIGHT +
+          gap * GAP_WEIGHT +
+          sumPenalty * PAIN_WEIGHT +
+          DIVERSITY_WEIGHT * (-timeDiversity) +
+          streakPenalty +
+          rotationPenalty
+
+        const maxIds = getMaxMemberIds(memberTimes)
+        const perMember = memberTimes.map((mt) => {
+          const member = team.find((m) => m.id === mt.memberId)
+          const localHour = mt.localHour
+          const violatesHardNo = isInHardNoLocal(
+            localHour,
+            member?.hardNoRanges ?? []
+          )
+          return {
+            memberId: mt.memberId,
+            name: member?.name ?? "?",
+            localTime: mt.localTime,
+            penalty: mt.score ?? 0,
+            violatesHardNo,
+          }
+        })
+
+        enumReports.push({
+          slotTimeUTC: utcHour,
+          compositeScore,
+          maxMemberIds: maxIds.map(
+            (id) => team.find((m) => m.id === id)?.name ?? id
+          ),
+          wouldExceedRotationThreshold: wouldExceed60,
+          rejectedByBurdenDiff,
+          rejectedByConsecutiveMax,
+          perMember,
+          maxBurdenAfter,
+          minBurdenAfter,
+          spreadAfter,
+          sumPenalty,
+        })
+      }
+      enumReports.sort(
+        (a, b) =>
+          a.compositeScore - b.compositeScore || a.slotTimeUTC - b.slotTimeUTC
+      )
+      const top10 = enumReports.slice(0, 10)
+      const bestScoreVal = enumReports[0]?.compositeScore ?? Infinity
+      const tiesCount = enumReports.filter(
+        (r) => Math.abs(r.compositeScore - bestScoreVal) < SCORE_EPSILON
+      ).length
+      const weekHasMultipleBestCandidates = tiesCount > 1
+
+      console.group(`[ROTATION_DEBUG] Week ${i + 1} — candidate enumeration`)
+      console.log("hardValidCandidatesCount:", hardValidCandidates.length)
+      console.log("weekHasMultipleBestCandidates:", weekHasMultipleBestCandidates)
+      console.log("tiesInBestScore:", tiesCount)
+      console.log("Top 10 candidates:")
+      for (const c of top10) {
+        console.log(
+          `  UTC ${formatHourLabel(c.slotTimeUTC)}: compositeScore=${c.compositeScore.toFixed(1)} maxMembers=[${c.maxMemberIds.join(", ")}] wouldExceed60=${c.wouldExceedRotationThreshold} rejectedBurdenDiff=${c.rejectedByBurdenDiff} rejectedConsecutive=${c.rejectedByConsecutiveMax}`
+        )
+        for (const p of c.perMember) {
+          console.log(
+            `    ${p.name}: ${p.localTime} penalty=${p.penalty} violatesHardNo=${p.violatesHardNo}`
+          )
+        }
+        console.log(
+          `    → maxBurdenAfter=${c.maxBurdenAfter} minBurdenAfter=${c.minBurdenAfter} spreadAfter=${c.spreadAfter} sumPenalty=${c.sumPenalty}`
+        )
+      }
+      console.groupEnd()
+    }
 
     for (const utcHour of hardValidCandidates) {
       const memberTimes = computeMemberTimes(utcDate, utcHour, team)
@@ -576,16 +837,55 @@ function generateRotationWithMode(
             )
           : 0
 
+      const candidateMaxMemberId = getMaxMemberId(memberTimes)
+      const streakPenalty =
+        computeMaxRepeatPenalty(candidateMaxMemberId, lastMaxMemberIds) *
+        STREAK_PENALTY_WEIGHT
+
+      // Rotation penalty: when feasible and alternative exists, penalize slots that would
+      // cause any member to exceed 60% of weeks as max
+      const wouldExceed60 = candidateWouldExceed60.get(utcHour) ?? false
+      const rotationPenalty =
+        hasRotationAlternative && wouldExceed60
+          ? ROTATION_PENALTY_WEIGHT
+          : 0
+
       // Composite score: lower is better
       // Primary: minimax (maxProjected)
       // Secondary: equity penalty (penalize keeping low-burden members comfortable)
       // Tertiary: gap (spread)
       // Quaternary: sum discomfort
+      // Diversity: prefer slots that differ from previous week (-timeDiversity reduces score)
+      // Streak: soft penalty when same member is max too often in rolling window
+      // Rotation: penalize slots that would exceed 60% max when alternative exists
       const compositeScore =
         maxProjected * FAIRNESS_WEIGHT +
         equityPenalty * EQUITY_WEIGHT +
         gap * GAP_WEIGHT +
-        sumDiscomfort * PAIN_WEIGHT
+        sumDiscomfort * PAIN_WEIGHT +
+        DIVERSITY_WEIGHT * (-timeDiversity) +
+        streakPenalty +
+        rotationPenalty
+
+      passingCandidateScores.push({ utcHour, compositeScore })
+
+      if (DEBUG_ROTATION) {
+        const maxIds = getMaxMemberIds(memberTimes)
+        const maxNames = maxIds.map((id) => team.find((m) => m.id === id)?.name ?? id)
+        console.log("  candidate:", { utcStart: utcHour, compositeScore, maxMemberIds: maxNames })
+      }
+
+      if (DEBUG) {
+        const maxIds = getMaxMemberIds(memberTimes)
+        candidateDebugLog.push({
+          candidateTime: `UTC ${formatHourLabel(utcHour)}`,
+          maxMemberIds: maxIds.map(
+            (id) => team.find((m) => m.id === id)?.name ?? id
+          ),
+          compositeScore,
+          wouldExceedRotationThreshold: wouldExceed60,
+        })
+      }
 
       // Debug: record candidate evaluation
       if (DEBUG && i === 0) {
@@ -658,7 +958,7 @@ function generateRotationWithMode(
     // Debug: log top 5 candidates for week 1
     if (DEBUG && i === 0 && candidateEvaluations.length > 0) {
       candidateEvaluations.sort((a, b) => a.score - b.score)
-      console.group("[rotation] Week 1 - Top 5 candidates")
+      console.group("[ROTATION_DEBUG] Week 1 - Top 5 candidates")
       for (const cand of candidateEvaluations.slice(0, 5)) {
         console.log(
           `UTC ${formatHourLabel(cand.utcHour)}: score=${cand.score.toFixed(1)}`,
@@ -675,15 +975,74 @@ function generateRotationWithMode(
       console.groupEnd()
     }
 
+    // Debug: detailed per-week rotation log
+    if (DEBUG && bestHour != null && bestMemberTimes) {
+      const rotationForced = rotationFeasible && !hasRotationAlternative
+      console.group(`[ROTATION_DEBUG] Week ${i + 1} — selection`)
+      console.log("hardValidCandidatesCount:", hardValidCandidates.length)
+      console.log("Candidates:")
+      for (const c of candidateDebugLog) {
+        console.log(
+          `  ${c.candidateTime} | maxMembers: [${c.maxMemberIds.join(", ")}] | compositeScore: ${c.compositeScore.toFixed(1)} | wouldExceedRotationThreshold: ${c.wouldExceedRotationThreshold}`
+        )
+      }
+      console.log("rotationFeasible:", rotationFeasible)
+      console.log("hasRotationAlternative:", hasRotationAlternative)
+      console.log(
+        "selectedSlotTime:",
+        `UTC ${formatHourLabel(bestHour)}`
+      )
+      console.log(
+        "selectedSlotMaxMembers:",
+        getMaxMemberIds(bestMemberTimes).map(
+          (id) => team.find((m) => m.id === id)?.name ?? id
+        )
+      )
+      if (rotationForced) {
+        console.log("rotationForced: true")
+      }
+      console.groupEnd()
+    }
+
     if (bestHour === null || !bestMemberTimes) {
+      if (DEBUG_ROTATION) console.groupEnd()
+      const primaryCause = derivePrimaryCause(rejectedBy, hardValidCandidates.length)
+      explainWeeks.push({
+        week: i + 1,
+        hardValidCandidatesCount: hardValidCandidates.length,
+        totalCandidatesCount: totalCandidates,
+        rejectedBy,
+        failureReason: "ALL_REJECTED",
+        primaryCause,
+        weekHasMultipleBestCandidates: false,
+      })
       if (DEBUG) {
-        console.log("[rotation] week", i + 1, "mode", mode, "no acceptable candidate", {
+        console.log("[ROTATION_DEBUG] week", i + 1, "mode", mode, "no acceptable candidate", {
           totalCandidates,
           hardValidCandidates: hardValidCandidates.length,
           rejectedBy,
+          primaryCause,
         })
       }
-      return { weeks: [], modeUsed: mode }
+      return {
+        weeks: [],
+        modeUsed: mode,
+        explain: {
+          weeks: explainWeeks,
+          modeUsed: mode,
+          shareablePlanExists: false,
+        },
+      }
+    }
+
+    if (DEBUG_ROTATION) {
+      const chosenMaxIds = getMaxMemberIds(bestMemberTimes)
+      const chosenMaxNames = chosenMaxIds.map((id) => team.find((m) => m.id === id)?.name ?? id)
+      console.log("chosen candidate:", {
+        utcStart: bestHour,
+        maxMemberIds: chosenMaxNames,
+      })
+      console.groupEnd()
     }
 
     const projectedBurden: Record<string, number> = { ...burden }
@@ -719,7 +1078,7 @@ function generateRotationWithMode(
       const spread = maxBurden - minBurden
       const sumPenalty = computeTotalScore(bestMemberTimes)
 
-      console.group(`[rotation] Week ${i + 1} — mode: ${mode}`)
+      console.group(`[ROTATION_DEBUG] Week ${i + 1} — mode: ${mode}`)
       console.log(`Candidates: ${hardValidCandidates.length}/${totalCandidates} valid`)
       console.log(`Rejected: burdenDiff=${rejectedBy.burdenDiff}, consecutiveMax=${rejectedBy.consecutiveMax}`)
       console.log(`Chosen: ${baseTimeStr} (slot ${slotIndex})`)
@@ -738,12 +1097,18 @@ function generateRotationWithMode(
 
     prevSlotIndex = slotIndex
 
-    lastWeekMaxMemberId = (() => {
-      const maxScore = computeMaxIndividualScore(bestMemberTimes)
-      if (maxScore === 0) return null
-      const maxMembers = bestMemberTimes.filter((m) => (m.score ?? 0) === maxScore)
-      return maxMembers[0]?.memberId ?? null
-    })()
+    lastWeekMaxMemberId = getMaxMemberId(bestMemberTimes)
+
+    for (const mid of getMaxMemberIds(bestMemberTimes)) {
+      maxDiscomfortCounts[mid] = (maxDiscomfortCounts[mid] ?? 0) + 1
+    }
+
+    if (lastWeekMaxMemberId) {
+      lastMaxMemberIds.push(lastWeekMaxMemberId)
+      if (lastMaxMemberIds.length > STREAK_WINDOW) {
+        lastMaxMemberIds.shift()
+      }
+    }
 
     for (const mt of bestMemberTimes) {
       burden[mt.memberId] += mt.score ?? 0
@@ -769,6 +1134,22 @@ function generateRotationWithMode(
         ? "Everyone meets within working hours this week."
         : buildExplanation(stretchers, protectedNames)
 
+    const weekHasMultipleBestCandidates =
+      passingCandidateScores.filter(
+        (c) => Math.abs(c.compositeScore - bestScore) < SCORE_EPSILON
+      ).length > 1
+
+    explainWeeks.push({
+      week: i + 1,
+      hardValidCandidatesCount: hardValidCandidates.length,
+      totalCandidatesCount: totalCandidates,
+      rejectedBy,
+      failureReason: null,
+      ...(unavoidableMaxMemberId && { unavoidableMaxMemberId }),
+      ...(rotationFeasible && !hasRotationAlternative && { rotationForced: true }),
+      weekHasMultipleBestCandidates,
+    })
+
     weeks.push({
       week: i + 1,
       date: formatDate(utcDate),
@@ -778,7 +1159,28 @@ function generateRotationWithMode(
     })
   }
 
-  return { weeks, modeUsed: mode }
+  if (DEBUG) {
+    console.group("[ROTATION_DEBUG] Post-loop summary")
+    const maxDiscomfortByName: Record<string, number> = {}
+    for (const [mid, count] of Object.entries(maxDiscomfortCounts)) {
+      const name = team.find((m) => m.id === mid)?.name ?? mid
+      maxDiscomfortByName[name] = count
+    }
+    console.log("maxDiscomfortCounts per member:", maxDiscomfortByName)
+    console.log("totalWeeks:", config.rotationWeeks)
+    console.log("rotationThreshold:", ROTATION_THRESHOLD)
+    console.groupEnd()
+  }
+
+  return {
+    weeks,
+    modeUsed: mode,
+    explain: {
+      weeks: explainWeeks,
+      modeUsed: mode,
+      shareablePlanExists: false, // overwritten by caller with computed value
+    },
+  }
 }
 
 // --- No viable time: diagnosis and suggestions ---
@@ -902,6 +1304,696 @@ export function diagnoseNoViableTime(
   }
 }
 
+// --- Fairness Guarantee: plan-level beam search ---
+
+const FAIRNESS_BEAM_K = 8
+const FAIRNESS_BEAM_WIDTH = 200
+
+function getThresholds(config: MeetingConfig): FairnessThresholds {
+  return {
+    ...DEFAULT_FAIRNESS_THRESHOLDS,
+    ...config.fairnessThresholds,
+  }
+}
+
+/** Compute max consecutive weeks same member is max-burden. */
+function computeConsecutiveMax(
+  maxMemberIdsPerWeek: string[]
+): number {
+  if (maxMemberIdsPerWeek.length === 0) return 0
+  let best = 1
+  let run = 1
+  for (let i = 1; i < maxMemberIdsPerWeek.length; i++) {
+    if (maxMemberIdsPerWeek[i] === maxMemberIdsPerWeek[i - 1]) {
+      run++
+      best = Math.max(best, run)
+    } else {
+      run = 1
+    }
+  }
+  return best
+}
+
+function debugLogPlanMetrics(
+  team: TeamMember[],
+  burden: Record<string, number>,
+  label: string
+): void {
+  if (!DEBUG_VERIFY) return
+  const memberIdsUsed = Object.keys(burden)
+  const teamIds = new Set(team.map((m) => m.id))
+  const missing = team.filter((m) => !memberIdsUsed.includes(m.id))
+  console.log(`[ROTATION_DEBUG] PlanMetrics (${label}):`, {
+    teamLength: team.length,
+    memberIdsUsedForMetrics: memberIdsUsed,
+    memberCountUsedForMetrics: memberIdsUsed.length,
+    burdenPerMember: memberIdsUsed.map((id) => {
+      const m = team.find((t) => t.id === id)
+      return { id, name: m?.name ?? "?", burden: burden[id] ?? 0 }
+    }),
+  })
+  if (missing.length > 0) {
+    console.error(
+      `[ROTATION_DEBUG] ERROR: memberIdsUsedForMetrics does not include all team members. Missing:`,
+      missing.map((m) => ({ id: m.id, name: m.name }))
+    )
+  }
+}
+
+function computeFullPlanMetrics(
+  team: TeamMember[],
+  plan: Array<{ utcHour: number; memberTimes: MemberTime[] }>
+): PlanMetrics & { consecutiveMax: number; sumPenalty: number } {
+  const burden: Record<string, number> = {}
+  for (const m of team) burden[m.id] = 0
+  const maxMemberIdsPerWeek: string[] = []
+  let sumPenalty = 0
+  for (const week of plan) {
+    for (const mt of week.memberTimes) {
+      burden[mt.memberId] = (burden[mt.memberId] ?? 0) + (mt.score ?? 0)
+      sumPenalty += mt.score ?? 0
+    }
+    const maxId = getMaxMemberId(week.memberTimes)
+    maxMemberIdsPerWeek.push(maxId ?? "")
+  }
+  debugLogPlanMetrics(team, burden, "computeFullPlanMetrics")
+  const values = Object.values(burden)
+  const maxBurden = Math.max(...values, 0)
+  const minBurden = Math.min(...values, 0)
+  const spread = maxBurden - minBurden
+  const maxBurdenMemberIds = team
+    .filter((m) => (burden[m.id] ?? 0) === maxBurden)
+    .map((m) => m.id)
+  const consecutiveMax = computeConsecutiveMax(maxMemberIdsPerWeek)
+  return {
+    maxBurden,
+    minBurden,
+    spread,
+    maxBurdenMemberIds,
+    consecutiveMax,
+    sumPenalty,
+  }
+}
+
+type FairnessBeamState = {
+  weeks: Array<{ utcHour: number; memberTimes: MemberTime[] }>
+  burden: Record<string, number>
+  lastWeekMaxMemberId: string | null
+  maxMemberIdsPerWeek: string[]
+  totalPenalty: number
+  totalSlotDeviation: number
+}
+
+function fairnessGuaranteeBeamSearch(
+  team: TeamMember[],
+  config: MeetingConfig
+): {
+  plan: RotationWeekData[] | null
+  metrics: PlanMetrics & { consecutiveMax: number; sumPenalty: number }
+  shareable: boolean
+  allPlansExceededThresholds: boolean
+  perWeekHardValidCount: number[]
+  perWeekMaxMemberSets: string[][]
+} {
+  const thresholds = getThresholds(config)
+  const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+  const baseTimeMinutes = config.baseTimeMinutes
+  const anchorOffset = config.anchorOffset
+
+  const perWeekHardValidCount: number[] = []
+  const perWeekMaxMemberSets: string[][] = []
+
+  const initialBurden: Record<string, number> = {}
+  for (const m of team) initialBurden[m.id] = 0
+
+  let beam: FairnessBeamState[] = [
+    {
+      weeks: [],
+      burden: { ...initialBurden },
+      lastWeekMaxMemberId: null,
+      maxMemberIdsPerWeek: [],
+      totalPenalty: 0,
+      totalSlotDeviation: 0,
+    },
+  ]
+
+  for (let i = 0; i < config.rotationWeeks; i++) {
+    const utcDate = utcStart.plus({ weeks: i })
+    let hardValid = findValidCandidates(utcDate, team)
+    perWeekHardValidCount.push(hardValid.length)
+
+    if (baseTimeMinutes != null) {
+      hardValid = sortByBaseTimePreference(
+        hardValid,
+        baseTimeMinutes,
+        anchorOffset
+      )
+    }
+    const topK = hardValid.slice(0, FAIRNESS_BEAM_K)
+    if (topK.length === 0) {
+      perWeekMaxMemberSets.push([])
+      return {
+        plan: null,
+        metrics: {
+          maxBurden: 0,
+          minBurden: 0,
+          spread: 0,
+          maxBurdenMemberIds: [],
+          consecutiveMax: 0,
+          sumPenalty: 0,
+        },
+        shareable: false,
+        allPlansExceededThresholds: true,
+        perWeekHardValidCount,
+        perWeekMaxMemberSets,
+      }
+    }
+
+    const weekMaxMemberSets = new Set<string>()
+    for (const utcHour of topK) {
+      const mt = computeMemberTimes(utcDate, utcHour, team)
+      const ids = getMaxMemberIds(mt)
+      weekMaxMemberSets.add(ids.sort().join(","))
+    }
+    perWeekMaxMemberSets.push([...weekMaxMemberSets])
+
+    const nextBeam: FairnessBeamState[] = []
+    for (const state of beam) {
+      for (const utcHour of topK) {
+        const memberTimes = computeMemberTimes(utcDate, utcHour, team)
+        const memberScores = new Map<string, number>()
+        for (const mt of memberTimes) {
+          memberScores.set(mt.memberId, mt.score ?? 0)
+        }
+        if (wouldViolateBurdenDiff(team, state.burden, memberScores)) continue
+        if (
+          wouldBeConsecutiveMaxDiscomfort(memberTimes, state.lastWeekMaxMemberId)
+        ) {
+          continue
+        }
+
+        const newBurden: Record<string, number> = {}
+        for (const m of team) {
+          newBurden[m.id] =
+            (state.burden[m.id] ?? 0) +
+            (memberTimes.find((mt) => mt.memberId === m.id)?.score ?? 0)
+        }
+        const maxId = getMaxMemberId(memberTimes)
+        const newMaxIds = [...state.maxMemberIdsPerWeek, maxId ?? ""]
+        const newConsecutiveMax = computeConsecutiveMax(newMaxIds)
+        const vals = Object.values(newBurden)
+        const spread = Math.max(...vals, 0) - Math.min(...vals, 0)
+        const weekPenalty = memberTimes.reduce((s, mt) => s + (mt.score ?? 0), 0)
+        const slotDev =
+          baseTimeMinutes != null
+            ? distanceMinutes(
+                utcHourToDisplayMinutes(utcHour, anchorOffset),
+                baseTimeMinutes
+              )
+            : 0
+
+        if (spread > thresholds.spreadLimit) continue
+        if (newConsecutiveMax > thresholds.consecutiveMaxLimit) continue
+
+        nextBeam.push({
+          weeks: [...state.weeks, { utcHour, memberTimes }],
+          burden: newBurden,
+          lastWeekMaxMemberId: maxId,
+          maxMemberIdsPerWeek: newMaxIds,
+          totalPenalty: state.totalPenalty + weekPenalty,
+          totalSlotDeviation: state.totalSlotDeviation + slotDev,
+        })
+      }
+    }
+
+    if (DEBUG_VERIFY) {
+      const numPlansExpanded = beam.length * topK.length
+      const numPlansKeptInBeam = Math.min(nextBeam.length, FAIRNESS_BEAM_WIDTH)
+      console.log(`[ROTATION_DEBUG] fairnessGuaranteeBeamSearch week ${i + 1}:`, {
+        numPlansExpanded,
+        numPlansKeptInBeam,
+      })
+    }
+
+    if (nextBeam.length === 0) {
+      const fallbackBeam = runFallbackBeamNoPruning(team, config)
+      const bestMetrics = fallbackBeam
+        ? computeFullPlanMetrics(team, fallbackBeam.weeks)
+        : {
+            maxBurden: 0,
+            minBurden: 0,
+            spread: Infinity,
+            maxBurdenMemberIds: [] as string[],
+            consecutiveMax: 0,
+            sumPenalty: 0,
+          }
+      return {
+        plan: fallbackBeam
+          ? buildRotationWeeks(team, utcStart, fallbackBeam)
+          : null,
+        metrics: bestMetrics,
+        shareable: false,
+        allPlansExceededThresholds: true,
+        perWeekHardValidCount,
+        perWeekMaxMemberSets,
+      }
+    }
+
+    nextBeam.sort((a, b) => {
+      const spreadA =
+        Math.max(...Object.values(a.burden), 0) -
+        Math.min(...Object.values(a.burden), 0)
+      const spreadB =
+        Math.max(...Object.values(b.burden), 0) -
+        Math.min(...Object.values(b.burden), 0)
+      if (spreadA !== spreadB) return spreadA - spreadB
+      const maxA = Math.max(...Object.values(a.burden), 0)
+      const maxB = Math.max(...Object.values(b.burden), 0)
+      if (maxA !== maxB) return maxA - maxB
+      const concA = computeConsecutiveMax(a.maxMemberIdsPerWeek)
+      const concB = computeConsecutiveMax(b.maxMemberIdsPerWeek)
+      if (concA !== concB) return concA - concB
+      if (a.totalPenalty !== b.totalPenalty) return a.totalPenalty - b.totalPenalty
+      if (a.totalSlotDeviation !== b.totalSlotDeviation)
+        return a.totalSlotDeviation - b.totalSlotDeviation
+      const lastA = a.weeks[a.weeks.length - 1]?.utcHour ?? 0
+      const lastB = b.weeks[b.weeks.length - 1]?.utcHour ?? 0
+      return lastA - lastB
+    })
+    beam = nextBeam.slice(0, FAIRNESS_BEAM_WIDTH)
+  }
+
+  if (beam.length === 0) {
+    const fallbackBeam = runFallbackBeamNoPruning(team, config)
+    const bestMetrics = fallbackBeam
+      ? computeFullPlanMetrics(team, fallbackBeam.weeks)
+      : {
+          maxBurden: 0,
+          minBurden: 0,
+          spread: Infinity,
+          maxBurdenMemberIds: [] as string[],
+          consecutiveMax: 0,
+          sumPenalty: 0,
+        }
+    return {
+      plan: fallbackBeam
+        ? buildRotationWeeks(team, utcStart, fallbackBeam)
+        : null,
+      metrics: bestMetrics,
+      shareable: false,
+      allPlansExceededThresholds: true,
+      perWeekHardValidCount,
+      perWeekMaxMemberSets,
+    }
+  }
+
+  const best = beam[0]
+  const metrics = computeFullPlanMetrics(team, best.weeks)
+  const shareable =
+    metrics.spread <= thresholds.spreadLimit &&
+    metrics.consecutiveMax <= thresholds.consecutiveMaxLimit
+
+  if (DEBUG_VERIFY) {
+    const numFinalPlans = beam.length
+    const numShareablePlansFound = beam.filter((s) => {
+      const spread =
+        Math.max(...Object.values(s.burden), 0) -
+        Math.min(...Object.values(s.burden), 0)
+      const conc = computeConsecutiveMax(s.maxMemberIdsPerWeek)
+      return spread <= thresholds.spreadLimit && conc <= thresholds.consecutiveMaxLimit
+    }).length
+    console.log("[ROTATION_DEBUG] fairnessGuaranteeBeamSearch final:", {
+      numFinalPlans,
+      numShareablePlansFound,
+      bestPlanWeekSlotUtcTimes: best.weeks.map((w) => w.utcHour),
+    })
+  }
+
+  return {
+    plan: buildRotationWeeks(team, utcStart, best),
+    metrics,
+    shareable,
+    allPlansExceededThresholds: false,
+    perWeekHardValidCount,
+    perWeekMaxMemberSets,
+  }
+}
+
+function runFallbackBeamNoPruning(
+  team: TeamMember[],
+  config: MeetingConfig
+): FairnessBeamState | null {
+  const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+  const baseTimeMinutes = config.baseTimeMinutes
+  const anchorOffset = config.anchorOffset
+  const initialBurden: Record<string, number> = {}
+  for (const m of team) initialBurden[m.id] = 0
+
+  let beam: FairnessBeamState[] = [
+    {
+      weeks: [],
+      burden: { ...initialBurden },
+      lastWeekMaxMemberId: null,
+      maxMemberIdsPerWeek: [],
+      totalPenalty: 0,
+      totalSlotDeviation: 0,
+    },
+  ]
+
+  for (let i = 0; i < config.rotationWeeks; i++) {
+    const utcDate = utcStart.plus({ weeks: i })
+    let hardValid = findValidCandidates(utcDate, team)
+    if (baseTimeMinutes != null) {
+      hardValid = sortByBaseTimePreference(
+        hardValid,
+        baseTimeMinutes,
+        anchorOffset
+      )
+    }
+    const topK = hardValid.slice(0, FAIRNESS_BEAM_K)
+    if (topK.length === 0) return null
+
+    const nextBeam: FairnessBeamState[] = []
+    for (const state of beam) {
+      for (const utcHour of topK) {
+        const memberTimes = computeMemberTimes(utcDate, utcHour, team)
+        const memberScores = new Map<string, number>()
+        for (const mt of memberTimes) {
+          memberScores.set(mt.memberId, mt.score ?? 0)
+        }
+        if (wouldViolateBurdenDiff(team, state.burden, memberScores)) continue
+        if (
+          wouldBeConsecutiveMaxDiscomfort(memberTimes, state.lastWeekMaxMemberId)
+        ) {
+          continue
+        }
+
+        const newBurden: Record<string, number> = {}
+        for (const m of team) {
+          newBurden[m.id] =
+            (state.burden[m.id] ?? 0) +
+            (memberTimes.find((mt) => mt.memberId === m.id)?.score ?? 0)
+        }
+        const maxId = getMaxMemberId(memberTimes)
+        const newMaxIds = [...state.maxMemberIdsPerWeek, maxId ?? ""]
+        const weekPenalty = memberTimes.reduce((s, mt) => s + (mt.score ?? 0), 0)
+        const slotDev =
+          baseTimeMinutes != null
+            ? distanceMinutes(
+                utcHourToDisplayMinutes(utcHour, anchorOffset),
+                baseTimeMinutes
+              )
+            : 0
+
+        nextBeam.push({
+          weeks: [...state.weeks, { utcHour, memberTimes }],
+          burden: newBurden,
+          lastWeekMaxMemberId: maxId,
+          maxMemberIdsPerWeek: newMaxIds,
+          totalPenalty: state.totalPenalty + weekPenalty,
+          totalSlotDeviation: state.totalSlotDeviation + slotDev,
+        })
+      }
+    }
+
+    nextBeam.sort((a, b) => {
+      const spreadA =
+        Math.max(...Object.values(a.burden), 0) -
+        Math.min(...Object.values(a.burden), 0)
+      const spreadB =
+        Math.max(...Object.values(b.burden), 0) -
+        Math.min(...Object.values(b.burden), 0)
+      if (spreadA !== spreadB) return spreadA - spreadB
+      const maxA = Math.max(...Object.values(a.burden), 0)
+      const maxB = Math.max(...Object.values(b.burden), 0)
+      if (maxA !== maxB) return maxA - maxB
+      const concA = computeConsecutiveMax(a.maxMemberIdsPerWeek)
+      const concB = computeConsecutiveMax(b.maxMemberIdsPerWeek)
+      if (concA !== concB) return concA - concB
+      if (a.totalPenalty !== b.totalPenalty) return a.totalPenalty - b.totalPenalty
+      if (a.totalSlotDeviation !== b.totalSlotDeviation)
+        return a.totalSlotDeviation - b.totalSlotDeviation
+      const lastA = a.weeks[a.weeks.length - 1]?.utcHour ?? 0
+      const lastB = b.weeks[b.weeks.length - 1]?.utcHour ?? 0
+      return lastA - lastB
+    })
+    beam = nextBeam.slice(0, FAIRNESS_BEAM_WIDTH)
+  }
+
+  return beam.length > 0 ? beam[0] : null
+}
+
+function buildRotationWeeks(
+  team: TeamMember[],
+  utcStart: DateTime,
+  state: FairnessBeamState
+): RotationWeekData[] {
+  return state.weeks.map((w, idx) => {
+    const utcDate = utcStart.plus({ weeks: idx })
+    const stretchers = w.memberTimes
+      .filter((m) => m.discomfort !== "comfortable")
+      .map((m) => {
+        const member = team.find((t) => t.id === m.memberId)!
+        return {
+          firstName: member.name.split(" ")[0],
+          burden: state.burden[m.memberId] ?? 0,
+        }
+      })
+    const protectedNames = w.memberTimes
+      .filter((m) => m.discomfort === "comfortable")
+      .filter((m) => (state.burden[m.memberId] ?? 0) > 0)
+      .map((m) => team.find((t) => t.id === m.memberId)!.name.split(" ")[0])
+    const explanation =
+      stretchers.length === 0
+        ? "Everyone meets within working hours this week."
+        : buildExplanation(stretchers, protectedNames)
+    return {
+      week: idx + 1,
+      date: formatDate(utcDate),
+      utcHour: w.utcHour,
+      memberTimes: w.memberTimes,
+      explanation,
+    }
+  })
+}
+
+function computePlanMetrics(
+  team: TeamMember[],
+  plan: Array<{ utcHour: number; memberTimes: MemberTime[] }>
+): PlanMetrics {
+  const burden: Record<string, number> = {}
+  for (const m of team) burden[m.id] = 0
+  for (const week of plan) {
+    for (const mt of week.memberTimes) {
+      burden[mt.memberId] = (burden[mt.memberId] ?? 0) + (mt.score ?? 0)
+    }
+  }
+  debugLogPlanMetrics(team, burden, "computePlanMetrics")
+  const values = Object.values(burden)
+  const maxBurden = Math.max(...values, 0)
+  const minBurden = Math.min(...values, 0)
+  const spread = maxBurden - minBurden
+  const maxBurdenMemberIds = team
+    .filter((m) => (burden[m.id] ?? 0) === maxBurden)
+    .map((m) => m.id)
+  return { maxBurden, minBurden, spread, maxBurdenMemberIds }
+}
+
+function beamSearchBetterPlan(
+  team: TeamMember[],
+  config: MeetingConfig,
+  currentPlan: RotationWeekData[],
+  mode: ConstraintMode
+): { plan: RotationWeekData[]; metrics: PlanMetrics } | null {
+  const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+  const baseTimeMinutes = config.baseTimeMinutes
+  const anchorOffset = config.anchorOffset
+  const enforceBurdenDiff = mode === "STRICT" || mode === "RELAXED"
+  const enforceConsecutiveMax = mode === "STRICT"
+
+  type BeamState = {
+    weeks: Array<{ utcHour: number; memberTimes: MemberTime[] }>
+    burden: Record<string, number>
+    lastWeekMaxMemberId: string | null
+  }
+
+  const initialBurden: Record<string, number> = {}
+  for (const m of team) initialBurden[m.id] = 0
+
+  let beam: BeamState[] = [{ weeks: [], burden: { ...initialBurden }, lastWeekMaxMemberId: null }]
+
+  for (let i = 0; i < config.rotationWeeks; i++) {
+    const utcDate = utcStart.plus({ weeks: i })
+    let hardValid = findValidCandidates(utcDate, team)
+    if (baseTimeMinutes != null) {
+      hardValid = sortByBaseTimePreference(
+        hardValid,
+        baseTimeMinutes,
+        anchorOffset
+      )
+    }
+    const topK = hardValid.slice(0, FAIRNESS_BEAM_K)
+    if (topK.length === 0) return null
+
+    const nextBeam: BeamState[] = []
+    for (const state of beam) {
+      for (const utcHour of topK) {
+        const memberTimes = computeMemberTimes(utcDate, utcHour, team)
+        const memberScores = new Map<string, number>()
+        for (const mt of memberTimes) {
+          memberScores.set(mt.memberId, mt.score ?? 0)
+        }
+        if (
+          enforceBurdenDiff &&
+          wouldViolateBurdenDiff(team, state.burden, memberScores)
+        ) {
+          continue
+        }
+        if (
+          enforceConsecutiveMax &&
+          wouldBeConsecutiveMaxDiscomfort(memberTimes, state.lastWeekMaxMemberId)
+        ) {
+          continue
+        }
+
+        const newBurden: Record<string, number> = {}
+        for (const m of team) {
+          newBurden[m.id] =
+            (state.burden[m.id] ?? 0) +
+            (memberTimes.find((mt) => mt.memberId === m.id)?.score ?? 0)
+        }
+        nextBeam.push({
+          weeks: [...state.weeks, { utcHour, memberTimes }],
+          burden: newBurden,
+          lastWeekMaxMemberId: getMaxMemberId(memberTimes),
+        })
+      }
+    }
+
+    nextBeam.sort((a, b) => {
+      const spreadA =
+        Math.max(...Object.values(a.burden), 0) -
+        Math.min(...Object.values(a.burden), 0)
+      const spreadB =
+        Math.max(...Object.values(b.burden), 0) -
+        Math.min(...Object.values(b.burden), 0)
+      if (spreadA !== spreadB) return spreadA - spreadB
+      const maxA = Math.max(...Object.values(a.burden), 0)
+      const maxB = Math.max(...Object.values(b.burden), 0)
+      return maxA - maxB
+    })
+    beam = nextBeam.slice(0, FAIRNESS_BEAM_WIDTH)
+  }
+
+  if (beam.length === 0) return null
+  const best = beam[0]
+  const metrics = computePlanMetrics(team, best.weeks)
+  const plan: RotationWeekData[] = best.weeks.map((w, idx) => {
+    const utcDate = utcStart.plus({ weeks: idx })
+    const stretchers = w.memberTimes
+      .filter((m) => m.discomfort !== "comfortable")
+      .map((m) => {
+        const member = team.find((t) => t.id === m.memberId)!
+        return { firstName: member.name.split(" ")[0], burden: best.burden[m.memberId] ?? 0 }
+      })
+    const protectedNames = w.memberTimes
+      .filter((m) => m.discomfort === "comfortable")
+      .filter((m) => (best.burden[m.memberId] ?? 0) > 0)
+      .map((m) => team.find((t) => t.id === m.memberId)!.name.split(" ")[0])
+    const explanation =
+      stretchers.length === 0
+        ? "Everyone meets within working hours this week."
+        : buildExplanation(stretchers, protectedNames)
+    return {
+      week: idx + 1,
+      date: formatDate(utcDate),
+      utcHour: w.utcHour,
+      memberTimes: w.memberTimes,
+      explanation,
+    }
+  })
+  return { plan, metrics }
+}
+
+// --- Input integrity verification (DEBUG_VERIFY only) ---
+
+export function verifyInputIntegrity(
+  team: TeamMember[],
+  config: MeetingConfig
+): void {
+  if (!DEBUG_VERIFY) return
+
+  const inputLog: {
+    team: Array<{
+      id: string
+      name: string
+      utcOffset: number
+      workStart: number
+      workEnd: number
+      hardNoRanges: { start: number; end: number }[]
+    }>
+    config: {
+      dayOfWeek: number
+      rotationWeeks: number
+      baseTimeMinutes: number | null
+      anchorOffset: number
+      rotationThreshold: number
+      burdenDiffThreshold: number
+    }
+  } = {
+    team: team.map((m) => ({
+      id: m.id,
+      name: m.name,
+      utcOffset: m.utcOffset,
+      workStart: m.workStartHour,
+      workEnd: m.workEndHour,
+      hardNoRanges: m.hardNoRanges ?? [],
+    })),
+    config: {
+      dayOfWeek: config.dayOfWeek,
+      rotationWeeks: config.rotationWeeks,
+      baseTimeMinutes: config.baseTimeMinutes ?? null,
+      anchorOffset: config.anchorOffset,
+      rotationThreshold: 0.6,
+      burdenDiffThreshold: 2,
+    },
+  }
+
+  console.log("[ROTATION_DEBUG] Input integrity:", JSON.stringify(inputLog, null, 2))
+
+  for (const m of team) {
+    const ranges = m.hardNoRanges ?? []
+    if (!ranges || ranges.length === 0) {
+      console.warn(`[ROTATION_DEBUG] WARNING: Member ${m.name} has missing/empty hardNoRanges`)
+    }
+    const ws = m.workStartHour
+    const we = m.workEndHour
+    if (ws >= we && !(ws > 12 && we < 12)) {
+      console.warn(
+        `[ROTATION_DEBUG] WARNING: Member ${m.name} workStart (${ws}) >= workEnd (${we}) - may be invalid unless overnight`
+      )
+    }
+    if (ws < 0 || ws > 24 || we < 0 || we > 24) {
+      console.warn(
+        `[ROTATION_DEBUG] WARNING: Member ${m.name} workStart/workEnd out of 0-24 range: ${ws}, ${we}`
+      )
+    }
+  }
+
+  const rangeStrings = team.map((m) =>
+    JSON.stringify((m.hardNoRanges ?? []).sort((a, b) => a.start - b.start))
+  )
+  const allSame = rangeStrings.every((s) => s === rangeStrings[0])
+  if (allSame && team.length > 1) {
+    console.warn(
+      "[ROTATION_DEBUG] WARNING: All members share identical hardNoRanges (likely mapping bug).",
+      "Source: each member's hardNoRanges from dbMemberToTeamMember(s.hard_no_ranges).",
+      "Member ids:",
+      team.map((m) => ({ id: m.id, name: m.name, hardNoRanges: m.hardNoRanges }))
+    )
+  }
+}
+
 // --- Core rotation engine ---
 
 export function canGenerateRotation(
@@ -926,31 +2018,182 @@ export function canGenerateRotation(
 }
 
 /**
- * Generate rotation with 3-level constraint degradation:
- * Mode A (STRICT): hard boundaries + burden diff <= 2 + no consecutive max
- * Mode B (RELAXED): hard boundaries + burden diff <= 2 (ignore consecutive)
- * Mode C (FALLBACK): hard boundaries only (fairness-first with equity weighting)
+ * Generate rotation with Fairness Guarantee:
+ * 1. Try plan-level beam search (FAIRNESS_GUARANTEE) first — lexicographic: spread, maxBurden, consecutiveMax, sumPenalty, slotDeviation
+ * 2. If beam yields shareable plan → return it
+ * 3. If beam yields forced plan (no shareable) → return with evidence
+ * 4. If beam yields nothing → fallback to greedy (STRICT/RELAXED/FALLBACK)
  */
 export function generateRotation(
   team: TeamMember[],
   config: MeetingConfig
-): RotationWeekData[] | NoViableTimeResult {
+): RotationResult | NoViableTimeResult | RotationWeekData[] {
   if (team.length < 2) return []
 
   const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
   const hardValidCandidates = findValidCandidates(utcStart, team)
   if (hardValidCandidates.length === 0) {
-    if (DEBUG) console.log("[rotation] no hard-valid candidates, returning diagnosis")
+    if (DEBUG) console.log("[ROTATION_DEBUG] no hard-valid candidates, returning diagnosis")
     return diagnoseNoViableTime(team, config)
+  }
+
+  if (DEBUG_VERIFY) {
+    const memberIdToNameTz: Record<string, { name: string; timezone: number }> = {}
+    for (const m of team) {
+      memberIdToNameTz[m.id] = { name: m.name, timezone: m.utcOffset }
+    }
+    console.log("[ROTATION_DEBUG] memberId -> (name, timezone):", memberIdToNameTz)
+  }
+
+  const beamResult = fairnessGuaranteeBeamSearch(team, config)
+
+  if (beamResult.plan && beamResult.plan.length === config.rotationWeeks) {
+    const weeks = beamResult.plan
+    const metrics = beamResult.metrics
+    const thresholds = getThresholds(config)
+
+    const currentPlanMetrics: PlanMetrics = {
+      maxBurden: metrics.maxBurden,
+      minBurden: metrics.minBurden,
+      spread: metrics.spread,
+      maxBurdenMemberIds: metrics.maxBurdenMemberIds,
+      consecutiveMax: metrics.consecutiveMax,
+      sumPenalty: metrics.sumPenalty,
+    }
+
+    const shareablePlanExists =
+      beamResult.shareable &&
+      metrics.spread <= thresholds.spreadLimit &&
+      metrics.consecutiveMax <= thresholds.consecutiveMaxLimit
+
+    let forcedReason: ForcedReason | undefined
+    let evidence: ForcedPlanEvidence | undefined
+    let forcedSummary: string | undefined
+
+    if (!shareablePlanExists) {
+      if (beamResult.allPlansExceededThresholds) {
+        if (metrics.spread > thresholds.spreadLimit) {
+          forcedReason = "SPREAD_IMPOSSIBLE"
+        } else if (metrics.consecutiveMax > thresholds.consecutiveMaxLimit) {
+          forcedReason = "CONSECUTIVE_MAX_IMPOSSIBLE"
+        } else {
+          forcedReason = "HARD_CONSTRAINTS_TOO_TIGHT"
+        }
+      } else {
+        forcedReason = "SPREAD_IMPOSSIBLE"
+      }
+      if (beamResult.perWeekHardValidCount.some((c) => c === 0)) {
+        forcedReason = "INSUFFICIENT_CANDIDATES"
+      }
+      evidence = {
+        perWeekHardValidCount: beamResult.perWeekHardValidCount,
+        perWeekMaxMemberSets: beamResult.perWeekMaxMemberSets,
+        bestAchievableMetrics: currentPlanMetrics,
+      }
+      const maxMemberName =
+        team.find((m) => m.id === metrics.maxBurdenMemberIds[0])?.name ?? "one member"
+      forcedSummary = `Rotation could not be shared without violating limits; the only feasible slots repeatedly place ${maxMemberName} at the edge due to ${forcedReason}.`
+    }
+
+    const explainWeeks: WeekExplain[] = weeks.map((w, i) => ({
+      week: w.week,
+      hardValidCandidatesCount: beamResult.perWeekHardValidCount[i] ?? 0,
+      totalCandidatesCount: getCandidateUtcHours().length,
+      rejectedBy: { burdenDiff: 0, consecutiveMax: 0 },
+      failureReason: null,
+      weekHasMultipleBestCandidates: false,
+    }))
+
+    const fullExplain: RotationExplain = {
+      weeks: explainWeeks,
+      modeUsed: "FAIRNESS_GUARANTEE",
+      shareablePlanExists,
+      currentPlanMetrics,
+      bestPlanMetrics: currentPlanMetrics,
+      betterPlanExists: false,
+      ...(forcedReason && { forcedReason }),
+      ...(evidence && { evidence }),
+      ...(forcedSummary && { forcedSummary }),
+    }
+
+    if (DEBUG_VERIFY) {
+      console.log("[ROTATION_DEBUG] currentPlan (FAIRNESS_GUARANTEE) week slot UTC times:", weeks.map((w) => w.utcHour))
+      console.log("[ROTATION_DEBUG] explain:", JSON.stringify(fullExplain, null, 2))
+    }
+
+    return {
+      weeks,
+      modeUsed: "FAIRNESS_GUARANTEE",
+      explain: fullExplain,
+    }
+  }
+
+  if (beamResult.plan === null && beamResult.allPlansExceededThresholds) {
+    const fallbackBeam = runFallbackBeamNoPruning(team, config)
+    if (fallbackBeam) {
+      const weeks = buildRotationWeeks(team, utcStart, fallbackBeam)
+      const metrics = computeFullPlanMetrics(team, fallbackBeam.weeks)
+      const thresholds = getThresholds(config)
+      const shareablePlanExists =
+        metrics.spread <= thresholds.spreadLimit &&
+        metrics.consecutiveMax <= thresholds.consecutiveMaxLimit
+
+      const forcedReason: ForcedReason = "HARD_CONSTRAINTS_TOO_TIGHT"
+      const evidence: ForcedPlanEvidence = {
+        perWeekHardValidCount: beamResult.perWeekHardValidCount,
+        perWeekMaxMemberSets: beamResult.perWeekMaxMemberSets,
+        bestAchievableMetrics: {
+          ...metrics,
+          maxBurdenMemberIds: metrics.maxBurdenMemberIds,
+        },
+      }
+      const maxMemberName =
+        team.find((m) => m.id === metrics.maxBurdenMemberIds[0])?.name ?? "one member"
+      const forcedSummary = `Rotation could not be shared without violating limits; the only feasible slots repeatedly place ${maxMemberName} at the edge due to ${forcedReason}.`
+
+      const explainWeeks: WeekExplain[] = weeks.map((w, i) => ({
+        week: w.week,
+        hardValidCandidatesCount: beamResult.perWeekHardValidCount[i] ?? 0,
+        totalCandidatesCount: getCandidateUtcHours().length,
+        rejectedBy: { burdenDiff: 0, consecutiveMax: 0 },
+        failureReason: null,
+        weekHasMultipleBestCandidates: false,
+      }))
+
+      if (DEBUG_VERIFY) {
+        console.log("[ROTATION_DEBUG] currentPlan (FAIRNESS_GUARANTEE fallback) week slot UTC times:", weeks.map((w) => w.utcHour))
+      }
+
+      return {
+        weeks,
+        modeUsed: "FAIRNESS_GUARANTEE",
+        explain: {
+          weeks: explainWeeks,
+          modeUsed: "FAIRNESS_GUARANTEE",
+          shareablePlanExists,
+          currentPlanMetrics: {
+            ...metrics,
+            maxBurdenMemberIds: metrics.maxBurdenMemberIds,
+          },
+          bestPlanMetrics: {
+            ...metrics,
+            maxBurdenMemberIds: metrics.maxBurdenMemberIds,
+          },
+          forcedReason,
+          evidence,
+          forcedSummary,
+        },
+      }
+    }
   }
 
   const modes: ConstraintMode[] = ["STRICT", "RELAXED", "FALLBACK"]
 
   for (const mode of modes) {
-    const { weeks } = generateRotationWithMode(team, config, mode)
+    const { weeks, modeUsed, explain } = generateRotationWithMode(team, config, mode)
     if (weeks.length === config.rotationWeeks) {
       if (DEBUG) {
-        console.log("[rotation] succeeded with mode", mode)
+        console.log("[ROTATION_DEBUG] succeeded with mode", mode)
 
         // Final burden distribution summary
         const finalBurden: Record<string, number> = {}
@@ -965,7 +2208,7 @@ export function generateRotation(
         const minBurden = Math.min(...burdenValues, 0)
         const spread = maxBurden - minBurden
 
-        console.group("[rotation] Final burden distribution")
+        console.group("[ROTATION_DEBUG] Final burden distribution")
         console.table(
           team.map((m) => ({
             name: m.name,
@@ -985,21 +2228,159 @@ export function generateRotation(
         console.groupEnd()
       }
       if (mode !== "STRICT") {
-        console.warn("[rotation] modeUsed:", mode)
+        console.warn("[ROTATION_DEBUG] modeUsed:", mode)
       }
-      return weeks
+
+      if (DEBUG_VERIFY) {
+        console.log("[ROTATION_DEBUG] currentPlan (greedy) week slot UTC times:", weeks.map((w) => w.utcHour))
+      }
+
+      const currentPlanMetrics: PlanMetrics = (() => {
+        const b: Record<string, number> = {}
+        for (const m of team) b[m.id] = 0
+        const maxIdsPerWeek: string[] = []
+        let sumPenalty = 0
+        for (const week of weeks) {
+          for (const mt of week.memberTimes) {
+            b[mt.memberId] = (b[mt.memberId] ?? 0) + (mt.score ?? 0)
+            sumPenalty += mt.score ?? 0
+          }
+          const mid = getMaxMemberId(week.memberTimes)
+          maxIdsPerWeek.push(mid ?? "")
+        }
+        debugLogPlanMetrics(team, b, "currentPlanMetrics (greedy)")
+        const vals = Object.values(b)
+        const maxB = Math.max(...vals, 0)
+        const minB = Math.min(...vals, 0)
+        const maxIds = team
+          .filter((m) => (b[m.id] ?? 0) === maxB)
+          .map((m) => m.id)
+        return {
+          maxBurden: maxB,
+          minBurden: minB,
+          spread: maxB - minB,
+          maxBurdenMemberIds: maxIds,
+          consecutiveMax: computeConsecutiveMax(maxIdsPerWeek),
+          sumPenalty,
+        }
+      })()
+
+      let betterPlanExists = false
+      let bestPlanMetrics: PlanMetrics | undefined
+
+      if (DEBUG_VERIFY) {
+        const beamResult = beamSearchBetterPlan(team, config, weeks, mode)
+        if (beamResult) {
+          bestPlanMetrics = beamResult.metrics
+          const curr = currentPlanMetrics
+          const best = beamResult.metrics
+          const strictlyBetter =
+            best.spread < curr.spread ||
+            (best.spread === curr.spread && best.maxBurden < curr.maxBurden)
+          if (strictlyBetter) {
+            betterPlanExists = true
+            console.log(
+              "[ROTATION_DEBUG] BETTER PLAN EXISTS — beam search found strictly better plan"
+            )
+            console.log("[ROTATION_DEBUG] Current plan:", {
+              currentPlanMetrics,
+              maxBurdenMembers: curr.maxBurdenMemberIds.map(
+                (id) => team.find((m) => m.id === id)?.name ?? id
+              ),
+            })
+            console.log("[ROTATION_DEBUG] Best plan:", {
+              bestPlanMetrics,
+              maxBurdenMembers: best.maxBurdenMemberIds.map(
+                (id) => team.find((m) => m.id === id)?.name ?? id
+              ),
+            })
+          }
+        }
+      }
+
+      const thresholds = getThresholds(config)
+      const shareablePlanExists =
+        currentPlanMetrics.spread <= thresholds.spreadLimit &&
+        (currentPlanMetrics.consecutiveMax ?? 0) <= thresholds.consecutiveMaxLimit
+
+      let forcedReason: ForcedReason | undefined
+      let evidence: ForcedPlanEvidence | undefined
+      let forcedSummary: string | undefined
+
+      if (!shareablePlanExists) {
+        if (currentPlanMetrics.spread > thresholds.spreadLimit) {
+          forcedReason = "SPREAD_IMPOSSIBLE"
+        } else if (
+          (currentPlanMetrics.consecutiveMax ?? 0) > thresholds.consecutiveMaxLimit
+        ) {
+          forcedReason = "CONSECUTIVE_MAX_IMPOSSIBLE"
+        } else {
+          forcedReason = "HARD_CONSTRAINTS_TOO_TIGHT"
+        }
+        const perWeekHardValidCount: number[] = []
+        const perWeekMaxMemberSets: string[][] = []
+        const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+        for (let i = 0; i < config.rotationWeeks; i++) {
+          const utcDate = utcStart.plus({ weeks: i })
+          const hardValid = findValidCandidates(utcDate, team)
+          perWeekHardValidCount.push(hardValid.length)
+          const sets = new Set<string>()
+          for (const h of hardValid.slice(0, FAIRNESS_BEAM_K)) {
+            const mt = computeMemberTimes(utcDate, h, team)
+            sets.add(getMaxMemberIds(mt).sort().join(","))
+          }
+          perWeekMaxMemberSets.push([...sets])
+        }
+        evidence = {
+          perWeekHardValidCount,
+          perWeekMaxMemberSets,
+          bestAchievableMetrics: currentPlanMetrics,
+        }
+        const maxMemberName =
+          team.find((m) => m.id === currentPlanMetrics.maxBurdenMemberIds[0])
+            ?.name ?? "one member"
+        forcedSummary = `Rotation could not be shared without violating limits; the only feasible slots repeatedly place ${maxMemberName} at the edge due to ${forcedReason}.`
+      }
+
+      const fullExplain: RotationExplain = {
+        ...explain,
+        modeUsed,
+        shareablePlanExists,
+        ...(betterPlanExists && { betterPlanExists: true }),
+        ...(bestPlanMetrics && { bestPlanMetrics }),
+        currentPlanMetrics,
+        ...(forcedReason && { forcedReason }),
+        ...(evidence && { evidence }),
+        ...(forcedSummary && { forcedSummary }),
+      }
+
+      return { weeks, modeUsed, explain: fullExplain }
     }
   }
 
-  if (DEBUG) console.log("[rotation] all modes failed, returning []")
+  if (DEBUG) console.log("[ROTATION_DEBUG] all modes failed, returning []")
   return []
 }
 
 /** Type guard: result is NoViableTimeResult */
 export function isNoViableTimeResult(
-  r: RotationWeekData[] | NoViableTimeResult
+  r: RotationResult | NoViableTimeResult | RotationWeekData[]
 ): r is NoViableTimeResult {
-  return Array.isArray(r) ? false : r.status === "NO_VIABLE_TIME"
+  return typeof r === "object" && r !== null && "status" in r && r.status === "NO_VIABLE_TIME"
+}
+
+/** Type guard: result is RotationResult */
+export function isRotationResult(
+  r: RotationResult | NoViableTimeResult | RotationWeekData[]
+): r is RotationResult {
+  return (
+    typeof r === "object" &&
+    r !== null &&
+    "weeks" in r &&
+    "modeUsed" in r &&
+    "explain" in r &&
+    Array.isArray((r as RotationResult).weeks)
+  )
 }
 
 function buildExplanation(

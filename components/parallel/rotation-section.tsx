@@ -9,13 +9,20 @@ import {
   dbMeetingToConfig,
   dbMemberToTeamMember,
 } from "@/lib/database.types"
-import { TIMEZONES, BASE_TIME_OPTIONS, RotationWeekData, type NoViableTimeResult } from "@/lib/types"
+import {
+  TIMEZONES,
+  BASE_TIME_OPTIONS,
+  type NoViableTimeResult,
+  type RotationResult,
+} from "@/lib/types"
 import {
   generateRotation,
   canGenerateRotation,
   getBurdenCounts,
   hasConsecutiveStretch,
   isNoViableTimeResult,
+  isRotationResult,
+  verifyInputIntegrity,
 } from "@/lib/rotation"
 import { RotationOutput } from "./rotation-output"
 import { Button } from "@/components/ui/button"
@@ -314,10 +321,13 @@ export function RotationSection({
   members: DbMemberSubmission[]
 }) {
   const [meeting, setMeeting] = useState(initialMeeting)
-  const [rotation, setRotation] = useState<RotationWeekData[] | null>(null)
+  const [rotationResult, setRotationResult] = useState<RotationResult | null>(null)
   const [noViableResult, setNoViableResult] = useState<NoViableTimeResult | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [rotationError, setRotationError] = useState<string | null>(null)
+  const [showExplainDetails, setShowExplainDetails] = useState(false)
+
+  const rotation = rotationResult?.weeks ?? null
 
   const team = initialMembers.map(dbMemberToTeamMember)
   const config = dbMeetingToConfig(meeting)
@@ -325,7 +335,7 @@ export function RotationSection({
   const handleConfigChange = useCallback(
     async (updates: Record<string, number | string | null>) => {
       setMeeting((prev) => ({ ...prev, ...updates }))
-      setRotation(null)
+      setRotationResult(null)
       await updateMeetingConfig(meeting.id, updates)
     },
     [meeting.id]
@@ -333,6 +343,13 @@ export function RotationSection({
 
   const handleGenerate = () => {
     console.log("[DEBUG] Plan button clicked")
+
+    if (
+      typeof process !== "undefined" &&
+      process.env.NEXT_PUBLIC_DEBUG_ROTATION === "1"
+    ) {
+      verifyInputIntegrity(team, config)
+    }
 
     if (team.length < 2) {
       console.log("[DEBUG] Early return triggered: team.length < 2")
@@ -354,14 +371,14 @@ export function RotationSection({
       } else {
         console.log("[DEBUG] Early return triggered: validation.valid=false", reason)
         setRotationError(reason || "No viable rotation.")
-        setRotation(null)
+        setRotationResult(null)
         setNoViableResult(null)
         return
       }
     }
     console.log("[DEBUG] Team length:", team?.length)
     setIsGenerating(true)
-    setRotation(null)
+    setRotationResult(null)
     setNoViableResult(null)
     setRotationError(null)
     console.log("[DEBUG] Calling generateRotation")
@@ -371,10 +388,16 @@ export function RotationSection({
         console.log("[DEBUG] generateRotation result:", result)
         if (isNoViableTimeResult(result)) {
           setNoViableResult(result)
-        } else if (result.length === 0) {
+        } else if (Array.isArray(result) && result.length === 0) {
           setRotationError("No viable rotation with current boundaries.")
-        } else {
-          setRotation(result)
+        } else if (isRotationResult(result)) {
+          setRotationResult(result)
+          if (
+            typeof process !== "undefined" &&
+            process.env.NEXT_PUBLIC_DEBUG_ROTATION === "1"
+          ) {
+            console.log("[ROTATION_DEBUG] explain:", JSON.stringify(result.explain, null, 2))
+          }
         }
       } catch (error) {
         console.error("[DEBUG] Error occurred:", error)
@@ -406,19 +429,6 @@ export function RotationSection({
 
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-      <div
-        style={{
-          position: "fixed",
-          bottom: 20,
-          right: 20,
-          background: "black",
-          color: "white",
-          padding: "6px 10px",
-          zIndex: 9999,
-        }}
-      >
-        DEBUG BUILD ACTIVE (RotationSection)
-      </div>
       <div className="mb-10">
         <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
           {meeting.title}
@@ -554,6 +564,37 @@ export function RotationSection({
               anchorOffset={meeting.anchor_offset}
               useBaseTime={meeting.base_time_minutes != null}
             />
+            {rotationResult && rotationResult.modeUsed !== "STRICT" && (
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Rotation constraints were relaxed to produce a viable plan.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowExplainDetails((d) => !d)}
+                  className="text-xs text-primary hover:text-primary/80"
+                >
+                  {showExplainDetails ? "Hide details" : "See details"}
+                </button>
+                {showExplainDetails && rotationResult.explain && (
+                  <pre className="mt-2 p-2 rounded bg-muted/40 text-xs overflow-auto max-h-48">
+                    {JSON.stringify(rotationResult.explain, null, 2)}
+                  </pre>
+                )}
+              </div>
+            )}
+            {rotationResult?.explain?.weeks?.some((w) => w.unavoidableMaxMemberId) && (
+              <p className="text-sm text-muted-foreground">
+                Given the current hard limits, at least one member had to take a
+                late/early meeting in some weeks.
+              </p>
+            )}
+            {rotationResult?.explain?.weeks?.some((w) => w.rotationForced) && (
+              <p className="text-sm text-muted-foreground">
+                In some weeks, rotation was not possible without exceeding limits —
+                the same member had to take the late/early slot.
+              </p>
+            )}
             <section className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both">
               <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 sm:p-6 space-y-5">
                 <div>
