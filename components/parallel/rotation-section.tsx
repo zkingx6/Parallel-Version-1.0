@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import Link from "next/link"
 import { updateMeetingConfig } from "@/lib/actions"
 import {
@@ -10,11 +10,17 @@ import {
   dbMemberToTeamMember,
 } from "@/lib/database.types"
 import {
-  TIMEZONES,
   BASE_TIME_OPTIONS,
   type NoViableTimeResult,
   type RotationResult,
 } from "@/lib/types"
+import { DateTime } from "luxon"
+import {
+  getIanaShortLabel,
+  getTimezoneDisplayLabel,
+  getTimezoneOptions,
+  resolveToStandardTimezone,
+} from "@/lib/timezone"
 import {
   generateRotation,
   canGenerateRotation,
@@ -59,28 +65,27 @@ const ROTATION_WEEKS = [
   { label: "10 weeks", value: 10 },
   { label: "12 weeks", value: 12 },
 ]
-const TIMEZONE_OPTIONS = TIMEZONES.map((tz) => ({
-  label: tz.label,
-  value: tz.value,
-}))
-
-function InlineSelect({
+function InlineSelect<T extends number | string>({
   value,
   onChange,
   options,
 }: {
-  value: number
-  onChange: (v: number) => void
-  options: { label: string; value: number }[]
+  value: T
+  onChange: (v: T) => void
+  options: { label: string; value: T }[]
 }) {
   return (
     <select
       value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
+      onChange={(e) =>
+        onChange(
+          (typeof value === "number" ? Number(e.target.value) : e.target.value) as T
+        )
+      }
       className="bg-card border border-border/60 rounded-lg px-2.5 py-1.5 text-sm font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 appearance-none shadow-sm transition-colors hover:border-primary/30"
     >
       {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
+        <option key={String(opt.value)} value={opt.value}>
           {opt.label}
         </option>
       ))}
@@ -226,7 +231,7 @@ function NoViableTimePanel({
                       : "Working hours"}
                   </Badge>
                   <span className="text-muted-foreground text-xs">
-                    UTC{b.timezone_offset >= 0 ? "+" : ""}{b.timezone_offset}
+                    {getTimezoneDisplayLabel(b.timezone)}
                   </span>
                   <p className="w-full text-muted-foreground text-xs mt-1">
                     {b.localBlockedSummary}
@@ -313,6 +318,12 @@ function NoViableTimePanel({
   )
 }
 
+function getOwnerTimezoneIana(members: DbMemberSubmission[]): string | null {
+  const owner = members.find((m) => m.is_owner_participant === true)
+  if (!owner) return null
+  return resolveToStandardTimezone(owner.timezone)
+}
+
 export function RotationSection({
   meeting: initialMeeting,
   members: initialMembers,
@@ -321,6 +332,39 @@ export function RotationSection({
   members: DbMemberSubmission[]
 }) {
   const [meeting, setMeeting] = useState(initialMeeting)
+  const ownerTimezoneIana = getOwnerTimezoneIana(initialMembers)
+  const displayTimezoneInitial = (() => {
+    if (initialMeeting.display_timezone && resolveToStandardTimezone(initialMeeting.display_timezone) === initialMeeting.display_timezone) {
+      return initialMeeting.display_timezone
+    }
+    return ownerTimezoneIana ?? "America/New_York"
+  })()
+  const [displayTimezoneIana, setDisplayTimezoneIana] = useState<string>(displayTimezoneInitial)
+
+  useEffect(() => {
+    const ownerTz = getOwnerTimezoneIana(initialMembers)
+    const initial =
+      initialMeeting.display_timezone &&
+      resolveToStandardTimezone(initialMeeting.display_timezone) === initialMeeting.display_timezone
+        ? initialMeeting.display_timezone
+        : ownerTz ?? "America/New_York"
+    setDisplayTimezoneIana(initial)
+    // Only re-init when loading a different meeting; never when toggling or re-planning
+  }, [initialMeeting.id])
+
+  const lastPersistedMeetingId = useRef<string | null>(null)
+  useEffect(() => {
+    if (
+      lastPersistedMeetingId.current === initialMeeting.id ||
+      initialMeeting.display_timezone != null ||
+      !ownerTimezoneIana
+    )
+      return
+    lastPersistedMeetingId.current = initialMeeting.id
+    updateMeetingConfig(initialMeeting.id, { display_timezone: ownerTimezoneIana }).then(() => {
+      setMeeting((prev) => ({ ...prev, display_timezone: ownerTimezoneIana }))
+    })
+  }, [initialMeeting.id, initialMeeting.display_timezone, ownerTimezoneIana])
   const [rotationResult, setRotationResult] = useState<RotationResult | null>(null)
   const [noViableResult, setNoViableResult] = useState<NoViableTimeResult | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -330,7 +374,25 @@ export function RotationSection({
   const rotation = rotationResult?.weeks ?? null
 
   const team = initialMembers.map(dbMemberToTeamMember)
-  const config = dbMeetingToConfig(meeting)
+  const useFixedBaseTime = meeting.base_time_minutes != null
+  const effectiveAnchorOffset = useFixedBaseTime ? meeting.anchor_offset : 0
+  if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+    console.log("[rotation-section] display timezone state:", {
+      ownerTimezoneIana,
+      meetingDisplayTimezone: meeting.display_timezone,
+      displayTimezoneIana,
+      useFixedBaseTime,
+      effectiveAnchorOffset,
+    })
+  }
+  const baseConfig = dbMeetingToConfig(meeting)
+  const config = useFixedBaseTime
+    ? baseConfig
+    : {
+        ...baseConfig,
+        baseTimeMinutes: null,
+        anchorOffset: meeting.anchor_offset,
+      }
 
   const handleConfigChange = useCallback(
     async (updates: Record<string, number | string | null>) => {
@@ -340,6 +402,17 @@ export function RotationSection({
     },
     [meeting.id]
   )
+
+  useEffect(() => {
+    if (
+      meeting.base_time_minutes == null &&
+      meeting.anchor_offset !== 0
+    ) {
+      updateMeetingConfig(meeting.id, { anchor_offset: 0 }).then(() => {
+        setMeeting((prev) => ({ ...prev, anchor_offset: 0 }))
+      })
+    }
+  }, [meeting.id, meeting.base_time_minutes, meeting.anchor_offset])
 
   const handleGenerate = () => {
     console.log("[DEBUG] Plan button clicked")
@@ -381,6 +454,7 @@ export function RotationSection({
     setRotationResult(null)
     setNoViableResult(null)
     setRotationError(null)
+    console.log("Rotation config:", config)
     console.log("[DEBUG] Calling generateRotation")
     setTimeout(() => {
       try {
@@ -482,20 +556,48 @@ export function RotationSection({
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-3 text-sm text-muted-foreground leading-relaxed">
               <span>displayed in</span>
               <InlineSelect
-                value={meeting.anchor_offset}
-                onChange={(v) => handleConfigChange({ anchor_offset: v })}
-                options={TIMEZONE_OPTIONS}
+                value={displayTimezoneIana}
+                onChange={(v) => {
+                  setDisplayTimezoneIana(v)
+                  const updates: Record<string, number | string | null> = {
+                    display_timezone: v,
+                  }
+                  if (useFixedBaseTime) {
+                    updates.anchor_offset =
+                      DateTime.now().setZone(v).offset / 60
+                  }
+                  handleConfigChange(updates)
+                }}
+                options={getTimezoneOptions()}
               />
             </div>
+            {!useFixedBaseTime && (
+              <p className="text-xs text-muted-foreground/70">
+                Times displayed in {getIanaShortLabel(displayTimezoneIana)}. Algorithm runs in UTC.
+              </p>
+            )}
             <label className="flex items-center gap-2.5 cursor-pointer pt-2">
               <input
                 type="checkbox"
                 checked={meeting.base_time_minutes != null}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+                    console.log("[rotation-section] before toggle fixed base time:", {
+                      displayTimezoneIana,
+                      willBeChecked: checked,
+                    })
+                  }
                   handleConfigChange({
-                    base_time_minutes: e.target.checked ? 540 : null,
+                    base_time_minutes: checked ? 540 : null,
+                    anchor_offset: checked
+                      ? DateTime.now().setZone(displayTimezoneIana).offset / 60
+                      : 0,
                   })
-                }
+                  if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+                    console.log("[rotation-section] after toggle (displayTimezoneIana unchanged):", displayTimezoneIana)
+                  }
+                }}
                 className="rounded border-border/60 text-primary focus:ring-primary/20"
               />
               <span className="text-sm text-foreground/90">
@@ -561,8 +663,8 @@ export function RotationSection({
             <RotationOutput
               weeks={rotation}
               team={team}
-              anchorOffset={meeting.anchor_offset}
-              useBaseTime={meeting.base_time_minutes != null}
+              displayTimezone={displayTimezoneIana}
+              useBaseTime={useFixedBaseTime}
             />
             {rotationResult && rotationResult.modeUsed !== "STRICT" && (
               <div className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">

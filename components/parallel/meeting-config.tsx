@@ -1,6 +1,9 @@
 "use client"
 
-import { MeetingConfig, TIMEZONES } from "@/lib/types"
+import { useMemo } from "react"
+import { DateTime } from "luxon"
+import { MeetingConfig } from "@/lib/types"
+import { getTimezoneOptions, resolveToStandardTimezone } from "@/lib/timezone"
 
 const DAYS = [
   { label: "Monday", value: 1 },
@@ -26,24 +29,53 @@ const ROTATION_WEEKS = [
   { label: "12 weeks", value: 12 },
 ]
 
-const TIMEZONE_OPTIONS = TIMEZONES.map((tz) => ({
-  label: tz.label,
-  value: tz.value,
-}))
+function MeetingTimezoneSelect({
+  config,
+  onConfigChange,
+}: {
+  config: MeetingConfig
+  onConfigChange: (config: MeetingConfig) => void
+}) {
+  const options = useMemo(() => getTimezoneOptions(), [])
+  const value = useMemo(
+    () => resolveToStandardTimezone(config.displayTimezone ?? "America/New_York"),
+    [config.displayTimezone]
+  )
+  return (
+    <InlineSelect
+      value={value}
+      onChange={(iana) => {
+        const resolved = resolveToStandardTimezone(iana)
+        onConfigChange({
+          ...config,
+          displayTimezone: resolved,
+          anchorOffset: DateTime.now().setZone(resolved).offset / 60,
+        })
+      }}
+      options={options}
+    />
+  )
+}
 
-function InlineSelect({
+function InlineSelect<T extends number | string>({
   value,
   onChange,
   options,
 }: {
-  value: number
-  onChange: (v: number) => void
-  options: { label: string; value: number }[]
+  value: T
+  onChange: (v: T) => void
+  options: { label: string; value: T }[]
 }) {
   return (
     <select
       value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
+      onChange={(e) =>
+        onChange(
+          (typeof value === "number"
+            ? Number(e.target.value)
+            : e.target.value) as T
+        )
+      }
       className="bg-card border border-border/60 rounded-lg px-2.5 py-1.5 text-sm font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 appearance-none shadow-sm transition-colors hover:border-primary/30"
     >
       {options.map((opt) => (
@@ -95,10 +127,9 @@ export function MeetingConfiguration({
 
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-3 text-sm text-muted-foreground leading-relaxed">
           <span>displayed in</span>
-          <InlineSelect
-            value={config.anchorOffset}
-            onChange={(v) => onConfigChange({ ...config, anchorOffset: v })}
-            options={TIMEZONE_OPTIONS}
+          <MeetingTimezoneSelect
+            config={config}
+            onConfigChange={onConfigChange}
           />
         </div>
 

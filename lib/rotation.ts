@@ -1,4 +1,5 @@
-import { DateTime, FixedOffsetZone } from "luxon"
+import { DateTime } from "luxon"
+import { resolveToStandardTimezone } from "./timezone"
 import {
   TeamMember,
   MeetingConfig,
@@ -32,45 +33,9 @@ import {
  * - Fairness: burden diff <= BURDEN_DIFF_THRESHOLD, no consecutive max
  */
 
-// --- IANA timezone mapping (backward compat: offset → IANA for DST-safe zones) ---
-// When DB stores only offset, we map to common IANA zones. DST handled by Luxon.
-const OFFSET_TO_IANA: Record<number, string> = {
-  [-10]: "Pacific/Honolulu",
-  [-9]: "America/Anchorage",
-  [-8]: "America/Los_Angeles",
-  [-7]: "America/Denver",
-  [-6]: "America/Chicago",
-  [-5]: "America/New_York",
-  [-4]: "America/Halifax",
-  [-3]: "America/Sao_Paulo",
-  [-2]: "America/Noronha",
-  [-1]: "Atlantic/Azores",
-  0: "Europe/London",
-  1: "Europe/Berlin",
-  2: "Africa/Cairo",
-  3: "Europe/Moscow",
-  4: "Asia/Dubai",
-  5: "Asia/Karachi",
-  5.5: "Asia/Kolkata",
-  6: "Asia/Dhaka",
-  7: "Asia/Bangkok",
-  8: "Asia/Singapore",
-  9: "Asia/Tokyo",
-  9.5: "Australia/Adelaide",
-  10: "Australia/Sydney",
-  11: "Pacific/Noumea",
-  12: "Pacific/Auckland",
-}
-
-/** Resolve IANA zone for member. Uses timezone if present, else maps from offset. */
-function getMemberZone(member: TeamMember): string | FixedOffsetZone {
-  if ("timezone" in member && typeof (member as { timezone?: string }).timezone === "string") {
-    return (member as { timezone: string }).timezone
-  }
-  const tz = OFFSET_TO_IANA[member.utcOffset]
-  if (tz) return tz
-  // Fallback: fixed offset (no DST) for unlisted offsets
-  return FixedOffsetZone.instance(Math.round(member.utcOffset * 60))
+/** Resolve IANA zone for member. All members have timezone (IANA). */
+function getMemberZone(member: TeamMember): string {
+  return member.timezone
 }
 
 // --- UTC baseline: all scheduling in UTC ---
@@ -228,7 +193,9 @@ function getCandidateUtcHours(): number[] {
 
 /**
  * Check if candidate UTC time is valid for all members.
- * Rejects if any member has hard boundary violation in their local time.
+ * A candidate is allowed only if for EVERY member:
+ * - localHour within working hours (supports cross-midnight)
+ * - localHour NOT in any hardNo range (supports cross-midnight)
  */
 function isCandidateValid(
   utcDate: DateTime,
@@ -237,6 +204,8 @@ function isCandidateValid(
 ): boolean {
   for (const m of team) {
     const localHour = utcToLocalHour(utcDate, utcHour, m)
+    if (!isWithinWorkingHours(localHour, m.workStartHour, m.workEndHour))
+      return false
     if (isInHardNoLocal(localHour, m.hardNoRanges)) return false
   }
   return true
@@ -521,7 +490,7 @@ function generateRotationWithMode(
       team.map((m) => ({
         id: m.id.slice(0, 8),
         name: m.name,
-        utcOffset: m.utcOffset,
+        timezone: m.timezone,
         workStart: m.workStartHour,
         workEnd: m.workEndHour,
         hardNoRanges: JSON.stringify(m.hardNoRanges),
@@ -1153,6 +1122,7 @@ function generateRotationWithMode(
     weeks.push({
       week: i + 1,
       date: formatDate(utcDate),
+      utcDateIso: utcDate.toISODate() ?? undefined,
       utcHour: bestHour,
       memberTimes: bestMemberTimes,
       explanation,
@@ -1251,7 +1221,7 @@ export function diagnoseNoViableTime(
     blockers.push({
       memberId: member.id,
       name: member.name,
-      timezone_offset: member.utcOffset,
+      timezone: member.timezone,
       blockingType,
       localBlockedSummary: localBlockedSummary || "No availability",
       overlapImpact,
@@ -1414,6 +1384,7 @@ function fairnessGuaranteeBeamSearch(
   allPlansExceededThresholds: boolean
   perWeekHardValidCount: number[]
   perWeekMaxMemberSets: string[][]
+  perWeekFeasibleUtcHours: number[][]
 } {
   const thresholds = getThresholds(config)
   const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
@@ -1422,6 +1393,7 @@ function fairnessGuaranteeBeamSearch(
 
   const perWeekHardValidCount: number[] = []
   const perWeekMaxMemberSets: string[][] = []
+  const perWeekFeasibleUtcHours: number[][] = []
 
   const initialBurden: Record<string, number> = {}
   for (const m of team) initialBurden[m.id] = 0
@@ -1441,6 +1413,7 @@ function fairnessGuaranteeBeamSearch(
     const utcDate = utcStart.plus({ weeks: i })
     let hardValid = findValidCandidates(utcDate, team)
     perWeekHardValidCount.push(hardValid.length)
+    perWeekFeasibleUtcHours.push([...hardValid])
 
     if (baseTimeMinutes != null) {
       hardValid = sortByBaseTimePreference(
@@ -1466,6 +1439,7 @@ function fairnessGuaranteeBeamSearch(
         allPlansExceededThresholds: true,
         perWeekHardValidCount,
         perWeekMaxMemberSets,
+        perWeekFeasibleUtcHours,
       }
     }
 
@@ -1556,6 +1530,7 @@ function fairnessGuaranteeBeamSearch(
         allPlansExceededThresholds: true,
         perWeekHardValidCount,
         perWeekMaxMemberSets,
+        perWeekFeasibleUtcHours,
       }
     }
 
@@ -1604,6 +1579,7 @@ function fairnessGuaranteeBeamSearch(
       allPlansExceededThresholds: true,
       perWeekHardValidCount,
       perWeekMaxMemberSets,
+      perWeekFeasibleUtcHours,
     }
   }
 
@@ -1636,6 +1612,7 @@ function fairnessGuaranteeBeamSearch(
     allPlansExceededThresholds: false,
     perWeekHardValidCount,
     perWeekMaxMemberSets,
+    perWeekFeasibleUtcHours,
   }
 }
 
@@ -1770,6 +1747,7 @@ function buildRotationWeeks(
     return {
       week: idx + 1,
       date: formatDate(utcDate),
+      utcDateIso: utcDate.toISODate() ?? undefined,
       utcHour: w.utcHour,
       memberTimes: w.memberTimes,
       explanation,
@@ -1907,6 +1885,7 @@ function beamSearchBetterPlan(
     return {
       week: idx + 1,
       date: formatDate(utcDate),
+      utcDateIso: utcDate.toISODate() ?? undefined,
       utcHour: w.utcHour,
       memberTimes: w.memberTimes,
       explanation,
@@ -1927,7 +1906,7 @@ export function verifyInputIntegrity(
     team: Array<{
       id: string
       name: string
-      utcOffset: number
+      timezone: string
       workStart: number
       workEnd: number
       hardNoRanges: { start: number; end: number }[]
@@ -1944,7 +1923,7 @@ export function verifyInputIntegrity(
     team: team.map((m) => ({
       id: m.id,
       name: m.name,
-      utcOffset: m.utcOffset,
+      timezone: m.timezone,
       workStart: m.workStartHour,
       workEnd: m.workEndHour,
       hardNoRanges: m.hardNoRanges ?? [],
@@ -2038,9 +2017,9 @@ export function generateRotation(
   }
 
   if (DEBUG_VERIFY) {
-    const memberIdToNameTz: Record<string, { name: string; timezone: number }> = {}
+    const memberIdToNameTz: Record<string, { name: string; timezone: string }> = {}
     for (const m of team) {
-      memberIdToNameTz[m.id] = { name: m.name, timezone: m.utcOffset }
+      memberIdToNameTz[m.id] = { name: m.name, timezone: m.timezone }
     }
     console.log("[ROTATION_DEBUG] memberId -> (name, timezone):", memberIdToNameTz)
   }
@@ -2083,16 +2062,20 @@ export function generateRotation(
         forcedReason = "SPREAD_IMPOSSIBLE"
       }
       if (beamResult.perWeekHardValidCount.some((c) => c === 0)) {
-        forcedReason = "INSUFFICIENT_CANDIDATES"
+        forcedReason = "NO_FEASIBLE_TIME"
       }
       evidence = {
         perWeekHardValidCount: beamResult.perWeekHardValidCount,
         perWeekMaxMemberSets: beamResult.perWeekMaxMemberSets,
+        perWeekFeasibleUtcHours: beamResult.perWeekFeasibleUtcHours,
         bestAchievableMetrics: currentPlanMetrics,
       }
       const maxMemberName =
         team.find((m) => m.id === metrics.maxBurdenMemberIds[0])?.name ?? "one member"
-      forcedSummary = `Rotation could not be shared without violating limits; the only feasible slots repeatedly place ${maxMemberName} at the edge due to ${forcedReason}.`
+      forcedSummary =
+        forcedReason === "NO_FEASIBLE_TIME"
+          ? "No feasible time: no UTC hour fits all members' work windows and hard-no ranges."
+          : `Rotation could not be shared without violating limits; the only feasible slots repeatedly place ${maxMemberName} at the edge due to ${forcedReason}.`
     }
 
     const explainWeeks: WeekExplain[] = weeks.map((w, i) => ({
@@ -2114,6 +2097,14 @@ export function generateRotation(
       ...(forcedReason && { forcedReason }),
       ...(evidence && { evidence }),
       ...(forcedSummary && { forcedSummary }),
+      ...(shareablePlanExists && {
+        evidence: {
+          perWeekHardValidCount: beamResult.perWeekHardValidCount,
+          perWeekMaxMemberSets: beamResult.perWeekMaxMemberSets,
+          perWeekFeasibleUtcHours: beamResult.perWeekFeasibleUtcHours,
+          bestAchievableMetrics: currentPlanMetrics,
+        },
+      }),
     }
 
     if (DEBUG_VERIFY) {
@@ -2138,10 +2129,15 @@ export function generateRotation(
         metrics.spread <= thresholds.spreadLimit &&
         metrics.consecutiveMax <= thresholds.consecutiveMaxLimit
 
-      const forcedReason: ForcedReason = "HARD_CONSTRAINTS_TOO_TIGHT"
+      const hasNoFeasible =
+        beamResult.perWeekHardValidCount.some((c) => c === 0)
+      const forcedReason: ForcedReason = hasNoFeasible
+        ? "NO_FEASIBLE_TIME"
+        : "HARD_CONSTRAINTS_TOO_TIGHT"
       const evidence: ForcedPlanEvidence = {
         perWeekHardValidCount: beamResult.perWeekHardValidCount,
         perWeekMaxMemberSets: beamResult.perWeekMaxMemberSets,
+        perWeekFeasibleUtcHours: beamResult.perWeekFeasibleUtcHours,
         bestAchievableMetrics: {
           ...metrics,
           maxBurdenMemberIds: metrics.maxBurdenMemberIds,
@@ -2149,7 +2145,10 @@ export function generateRotation(
       }
       const maxMemberName =
         team.find((m) => m.id === metrics.maxBurdenMemberIds[0])?.name ?? "one member"
-      const forcedSummary = `Rotation could not be shared without violating limits; the only feasible slots repeatedly place ${maxMemberName} at the edge due to ${forcedReason}.`
+      const forcedSummary =
+        hasNoFeasible
+          ? "No feasible time: no UTC hour fits all members' work windows and hard-no ranges."
+          : `Rotation could not be shared without violating limits; the only feasible slots repeatedly place ${maxMemberName} at the edge due to ${forcedReason}.`
 
       const explainWeeks: WeekExplain[] = weeks.map((w, i) => ({
         week: w.week,
@@ -2319,11 +2318,13 @@ export function generateRotation(
         }
         const perWeekHardValidCount: number[] = []
         const perWeekMaxMemberSets: string[][] = []
+        const perWeekFeasibleUtcHours: number[][] = []
         const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
         for (let i = 0; i < config.rotationWeeks; i++) {
           const utcDate = utcStart.plus({ weeks: i })
           const hardValid = findValidCandidates(utcDate, team)
           perWeekHardValidCount.push(hardValid.length)
+          perWeekFeasibleUtcHours.push([...hardValid])
           const sets = new Set<string>()
           for (const h of hardValid.slice(0, FAIRNESS_BEAM_K)) {
             const mt = computeMemberTimes(utcDate, h, team)
@@ -2334,12 +2335,20 @@ export function generateRotation(
         evidence = {
           perWeekHardValidCount,
           perWeekMaxMemberSets,
+          perWeekFeasibleUtcHours,
           bestAchievableMetrics: currentPlanMetrics,
         }
-        const maxMemberName =
-          team.find((m) => m.id === currentPlanMetrics.maxBurdenMemberIds[0])
-            ?.name ?? "one member"
-        forcedSummary = `Rotation could not be shared without violating limits; the only feasible slots repeatedly place ${maxMemberName} at the edge due to ${forcedReason}.`
+        const hasNoFeasible = perWeekHardValidCount.some((c) => c === 0)
+        if (hasNoFeasible) {
+          forcedReason = "NO_FEASIBLE_TIME"
+          forcedSummary =
+            "No feasible time: no UTC hour fits all members' work windows and hard-no ranges."
+        } else {
+          const maxMemberName =
+            team.find((m) => m.id === currentPlanMetrics.maxBurdenMemberIds[0])
+              ?.name ?? "one member"
+          forcedSummary = `Rotation could not be shared without violating limits; the only feasible slots repeatedly place ${maxMemberName} at the edge due to ${forcedReason}.`
+        }
       }
 
       const fullExplain: RotationExplain = {
@@ -2461,7 +2470,8 @@ export function hasConsecutiveStretch(
 export type ShareData = {
   t: {
     n: string
-    o: number
+    o?: number
+    tz?: string
     s: number
     e: number
     hr?: [number, number][]
@@ -2475,17 +2485,19 @@ export type ShareData = {
     dur: number
     w: number
     h?: number
+    dt?: string
   }
 }
 
 export function encodeShareData(
   team: TeamMember[],
-  config: MeetingConfig
+  config: MeetingConfig,
+  displayTimezone?: string
 ): string {
   const data: ShareData = {
     t: team.map((m) => ({
       n: m.name,
-      o: m.utcOffset,
+      tz: m.timezone,
       s: m.workStartHour,
       e: m.workEndHour,
       ...(m.hardNoRanges.length > 0
@@ -2498,6 +2510,7 @@ export function encodeShareData(
       ao: config.anchorOffset,
       dur: config.durationMinutes,
       w: config.rotationWeeks,
+      ...(displayTimezone ? { dt: displayTimezone } : {}),
     },
   }
   return btoa(JSON.stringify(data))
@@ -2522,10 +2535,14 @@ export function decodeShareData(
         hardNoRanges = [{ start: m.ns, end: m.ne }]
       }
 
+      const timezone =
+        m.tz && (m.tz as string).includes("/")
+          ? resolveToStandardTimezone(m.tz)
+          : "America/New_York"
       return {
         id: `m-${i}`,
         name: m.n,
-        utcOffset: m.o,
+        timezone,
         workStartHour: m.s,
         workEndHour: m.e,
         hardNoRanges,
@@ -2538,6 +2555,7 @@ export function decodeShareData(
       anchorOffset: data.m.ao ?? 0,
       durationMinutes: data.m.dur,
       rotationWeeks: data.m.w,
+      displayTimezone: data.m.dt ?? undefined,
     }
     return { team, config }
   } catch {

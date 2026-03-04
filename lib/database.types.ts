@@ -1,4 +1,5 @@
 import { TeamMember, MeetingConfig, HardNoRange, getInitials } from "./types"
+import { resolveToStandardTimezone } from "./timezone"
 
 export type DbMeeting = {
   id: string
@@ -8,6 +9,8 @@ export type DbMeeting = {
   duration_minutes: number
   rotation_weeks: number
   anchor_offset: number
+  /** IANA timezone for display (e.g. America/New_York). When set, used for DST-aware header. */
+  display_timezone?: string | null
   /** Base time in minutes from midnight (0–1439). null = auto fair mode. */
   base_time_minutes?: number | null
   invite_token: string
@@ -18,7 +21,8 @@ export type DbMemberSubmission = {
   id: string
   meeting_id: string
   name: string
-  timezone_offset: number
+  /** IANA timezone (e.g. America/New_York). Required. */
+  timezone: string
   work_start_hour: number
   work_end_hour: number
   hard_no_ranges: HardNoRange[]
@@ -43,10 +47,11 @@ export function dbMemberToTeamMember(s: DbMemberSubmission): TeamMember {
   const hardNoRanges = Array.isArray(s.hard_no_ranges)
     ? s.hard_no_ranges
     : []
+  const timezone = resolveToStandardTimezone(s.timezone) ?? "America/New_York"
   return {
     id: s.id,
     name: s.name,
-    utcOffset: s.timezone_offset,
+    timezone,
     workStartHour: s.work_start_hour,
     workEndHour: s.work_end_hour,
     hardNoRanges,

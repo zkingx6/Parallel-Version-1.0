@@ -130,6 +130,7 @@ export default function JoinPage() {
         </div>
 
         <ParticipantForm
+          defaultTimezone={meeting.anchor_offset}
           onSubmit={handleSubmit}
           submitLabel={
             existingId ? "Update my availability" : "Save my availability"

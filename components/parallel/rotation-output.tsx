@@ -2,31 +2,37 @@ import {
   TeamMember,
   RotationWeekData,
   formatHourLabel,
-  getAnchorLabel,
 } from "@/lib/types"
 import { cn } from "@/lib/utils"
-
-function toLocalHour(utcHour: number, offset: number): number {
-  return (((utcHour + offset) % 24) + 24) % 24
-}
+import {
+  utcToLocalInZone,
+  convertUtcToLocal,
+  getIanaShortLabel,
+} from "@/lib/timezone"
 
 function WeekCard({
   week,
   team,
   index,
-  anchorOffset,
+  displayTimezone,
 }: {
   week: RotationWeekData
   team: TeamMember[]
   index: number
-  anchorOffset: number
+  displayTimezone: string
 }) {
   const memberMap = Object.fromEntries(team.map((m) => [m.id, m]))
   const hasDiscomfort = week.memberTimes.some(
     (mt) => mt.discomfort !== "comfortable"
   )
-  const anchorLocalHour = toLocalHour(week.utcHour, anchorOffset)
-  const anchorLabel = getAnchorLabel(anchorOffset)
+  const anchorDisplay =
+    week.utcDateIso
+      ? utcToLocalInZone(week.utcDateIso, week.utcHour, displayTimezone)
+      : null
+  const anchorLocalHour =
+    anchorDisplay?.localHour ??
+    convertUtcToLocal(week.utcDateIso ?? "2025-03-05", week.utcHour, displayTimezone)
+  const anchorLabel = getIanaShortLabel(displayTimezone)
 
   return (
     <div
@@ -118,12 +124,13 @@ function WeekCard({
 export function RotationOutput({
   weeks,
   team,
-  anchorOffset,
+  displayTimezone,
   useBaseTime,
 }: {
   weeks: RotationWeekData[]
   team: TeamMember[]
-  anchorOffset: number
+  /** IANA timezone for header display (DST-aware). */
+  displayTimezone: string
   useBaseTime?: boolean
 }) {
   return (
@@ -150,7 +157,7 @@ export function RotationOutput({
             week={week}
             team={team}
             index={i}
-            anchorOffset={anchorOffset}
+            displayTimezone={displayTimezone}
           />
         ))}
       </div>

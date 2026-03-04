@@ -1,3 +1,5 @@
+import { getTimezoneDisplayLabel } from "./timezone"
+
 export type Discomfort = "comfortable" | "stretch" | "sacrifice"
 
 export type HardNoRange = {
@@ -8,7 +10,8 @@ export type HardNoRange = {
 export type TeamMember = {
   id: string
   name: string
-  utcOffset: number
+  /** IANA timezone (e.g. America/New_York). Required for all fairness calculations. */
+  timezone: string
   workStartHour: number
   workEndHour: number
   hardNoRanges: HardNoRange[]
@@ -25,6 +28,8 @@ export type MeetingConfig = {
   baseTimeMinutes?: number | null
   /** Fairness thresholds (optional; uses defaults if not set). */
   fairnessThresholds?: Partial<FairnessThresholds>
+  /** IANA display timezone (e.g. America/New_York). Used for share links. */
+  displayTimezone?: string
 }
 
 /** Default fairness thresholds for shareable plans. */
@@ -50,6 +55,8 @@ export type MemberTime = {
 export type RotationWeekData = {
   week: number
   date: string
+  /** ISO date (YYYY-MM-DD) for DST-aware timezone conversion. */
+  utcDateIso?: string
   utcHour: number
   memberTimes: MemberTime[]
   explanation: string
@@ -90,6 +97,7 @@ export type FairnessThresholds = {
 
 export type ForcedReason =
   | "INSUFFICIENT_CANDIDATES"
+  | "NO_FEASIBLE_TIME"
   | "SPREAD_IMPOSSIBLE"
   | "CONSECUTIVE_MAX_IMPOSSIBLE"
   | "HARD_CONSTRAINTS_TOO_TIGHT"
@@ -97,6 +105,8 @@ export type ForcedReason =
 export type ForcedPlanEvidence = {
   perWeekHardValidCount: number[]
   perWeekMaxMemberSets: string[][]
+  /** Debug: actual feasible UTC hours per week (e.g. week1 = index 0). */
+  perWeekFeasibleUtcHours?: number[][]
   bestAchievableMetrics: PlanMetrics
 }
 
@@ -132,7 +142,7 @@ export type NoViableTimeResult = {
     blockers: Array<{
       memberId: string
       name: string
-      timezone_offset: number
+      timezone: string
       blockingType: "HARD_BOUNDARY" | "WORKING_HOURS"
       localBlockedSummary: string
       overlapImpact: number
@@ -220,9 +230,7 @@ export function getHardNoEndOptions(
   })
 }
 
-export function getAnchorLabel(offset: number): string {
-  const tz = TIMEZONES.find((t) => t.value === offset)
-  if (!tz) return "UTC"
-  const match = tz.label.match(/\((.+)\)/)
-  return match ? match[1] : tz.label
+/** Format IANA timezone for display. Use getTimezoneDisplayLabel(iana) directly. */
+export function getAnchorLabel(iana: string): string {
+  return getTimezoneDisplayLabel(iana)
 }

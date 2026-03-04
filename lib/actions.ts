@@ -29,6 +29,7 @@ export async function updateMeetingConfig(
     duration_minutes?: number
     rotation_weeks?: number
     anchor_offset?: number
+    display_timezone?: string | null
     base_time_minutes?: number | null
   }
 ) {
@@ -74,7 +75,7 @@ export async function upsertOwnerParticipant(
   meetingId: string,
   payload: {
     name: string
-    timezone_offset: number
+    timezone: string
     work_start_hour: number
     work_end_hour: number
     hard_no_ranges: HardNoRange[]
@@ -160,7 +161,7 @@ export async function submitMember(
   token: string,
   input: {
     name: string
-    timezone_offset: number
+    timezone: string
     work_start_hour: number
     work_end_hour: number
     hard_no_ranges: HardNoRange[]

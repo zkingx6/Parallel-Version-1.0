@@ -10,7 +10,7 @@ import { DEFAULT_FAIRNESS_THRESHOLDS } from "./types"
 function makeMember(
   id: string,
   name: string,
-  utcOffset: number,
+  timezone: string,
   workStart = 9,
   workEnd = 18,
   hardNoRanges: { start: number; end: number }[] = []
@@ -18,7 +18,7 @@ function makeMember(
   return {
     id,
     name,
-    utcOffset,
+    timezone,
     workStartHour: workStart,
     workEndHour: workEnd,
     hardNoRanges,
@@ -39,9 +39,9 @@ const defaultConfig: MeetingConfig = {
 describe("Fairness Guarantee", () => {
   it("when a shareable plan exists, chosen plan spread <= spreadLimit and consecutiveMax <= consecutiveMaxLimit", () => {
     const team: TeamMember[] = [
-      makeMember("a", "Alice", -5, 9, 18, []),
-      makeMember("b", "Bob", 0, 9, 18, []),
-      makeMember("c", "Carol", 5, 9, 18, []),
+      makeMember("a", "Alice", "America/New_York", 9, 18, []),
+      makeMember("b", "Bob", "Europe/London", 9, 18, []),
+      makeMember("c", "Carol", "Africa/Cairo", 9, 18, []),
     ]
     const result = generateRotation(team, defaultConfig)
     expect(isRotationResult(result)).toBe(true)
@@ -59,9 +59,9 @@ describe("Fairness Guarantee", () => {
 
   it("beam search finds shareable alternative when greedy would repeat same max member", () => {
     const team: TeamMember[] = [
-      makeMember("a", "Alice", -5, 9, 18, [{ start: 0, end: 8 }]),
-      makeMember("b", "Bob", 0, 9, 18, []),
-      makeMember("c", "Carol", 5, 9, 18, [{ start: 18, end: 24 }]),
+      makeMember("a", "Alice", "America/New_York", 9, 18, [{ start: 0, end: 8 }]),
+      makeMember("b", "Bob", "Europe/London", 9, 18, []),
+      makeMember("c", "Carol", "Africa/Cairo", 9, 18, [{ start: 18, end: 24 }]),
     ]
     const result = generateRotation(team, defaultConfig)
     expect(isRotationResult(result)).toBe(true)
@@ -77,8 +77,8 @@ describe("Fairness Guarantee", () => {
 
   it("when NO shareable plan exists: returns forced plan with shareablePlanExists=false, forcedReason and evidence", () => {
     const team: TeamMember[] = [
-      makeMember("a", "Alice", -5, 9, 12, [{ start: 12, end: 24 }]),
-      makeMember("b", "Bob", 0, 9, 12, [{ start: 12, end: 24 }]),
+      makeMember("a", "Alice", "America/New_York", 9, 12, [{ start: 12, end: 24 }]),
+      makeMember("b", "Bob", "Europe/London", 9, 12, [{ start: 12, end: 24 }]),
     ]
     const config: MeetingConfig = {
       ...defaultConfig,

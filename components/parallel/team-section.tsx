@@ -13,7 +13,8 @@ import {
   DbMemberSubmission,
   dbMemberToTeamMember,
 } from "@/lib/database.types"
-import { formatHourLabel, getAnchorLabel } from "@/lib/types"
+import { formatHourLabel } from "@/lib/types"
+import { getTimezoneDisplayLabel } from "@/lib/timezone"
 import { ParticipantForm } from "./participant-form"
 import {
   Dialog,
@@ -157,8 +158,8 @@ export function TeamSection({
                 ""
               }
               defaultTimezone={
-                members.find((m) => m.is_owner_participant)?.timezone_offset ??
-                meeting.anchor_offset
+                members.find((m) => m.is_owner_participant)?.timezone ??
+                "America/New_York"
               }
               defaultWorkStart={
                 members.find((m) => m.is_owner_participant)?.work_start_hour ?? 9
@@ -291,7 +292,7 @@ export function TeamSection({
                             )}
                           </div>
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground pl-9">
-                            <span>{getAnchorLabel(m.timezone_offset)}</span>
+                            <span>{getTimezoneDisplayLabel(dbMemberToTeamMember(m).timezone)}</span>
                             <span>
                               {formatHourLabel(m.work_start_hour)} –{" "}
                               {formatHourLabel(m.work_end_hour)}

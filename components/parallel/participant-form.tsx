@@ -1,18 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
-  TIMEZONES,
   WORK_HOURS,
   FULL_DAY_HOURS,
   getHardNoEndOptions,
   HardNoRange,
 } from "@/lib/types"
+import { getTimezoneOptions, resolveToStandardTimezone } from "@/lib/timezone"
 import { Button } from "@/components/ui/button"
 
 export type ParticipantFormPayload = {
   name: string
-  timezone_offset: number
+  timezone: string
   work_start_hour: number
   work_end_hour: number
   hard_no_ranges: HardNoRange[]
@@ -21,7 +21,8 @@ export type ParticipantFormPayload = {
 
 type ParticipantFormProps = {
   defaultName?: string
-  defaultTimezone?: number
+  /** IANA timezone string (e.g. America/New_York) */
+  defaultTimezone?: string
   defaultWorkStart?: number
   defaultWorkEnd?: number
   defaultHardNoRanges?: HardNoRange[]
@@ -37,9 +38,14 @@ const inputClasses =
 const selectClasses =
   "bg-transparent border-none text-muted-foreground cursor-pointer focus:outline-none focus:text-foreground p-0 text-[11px] appearance-none"
 
+function resolveDefaultTimezone(v: string | undefined): string {
+  if (v) return resolveToStandardTimezone(v)
+  return "America/New_York"
+}
+
 export function ParticipantForm({
   defaultName = "",
-  defaultTimezone = 0,
+  defaultTimezone,
   defaultWorkStart = 9,
   defaultWorkEnd = 18,
   defaultHardNoRanges = [],
@@ -48,8 +54,16 @@ export function ParticipantForm({
   submitLabel = "Save my availability",
   saving = false,
 }: ParticipantFormProps) {
+  const resolvedDefault = useMemo(
+    () => resolveDefaultTimezone(defaultTimezone),
+    [defaultTimezone]
+  )
   const [name, setName] = useState(defaultName)
-  const [timezone, setTimezone] = useState(defaultTimezone)
+  const [timezone, setTimezone] = useState(resolvedDefault)
+  useEffect(() => {
+    setName(defaultName)
+    setTimezone(resolvedDefault)
+  }, [defaultName, resolvedDefault])
   const [workStart, setWorkStart] = useState(defaultWorkStart)
   const [workEnd, setWorkEnd] = useState(defaultWorkEnd)
   const [hardNoRanges, setHardNoRanges] = useState<HardNoRange[]>(
@@ -81,13 +95,15 @@ export function ParticipantForm({
     setHardNoRanges(ranges)
   }
 
+  const timezoneOptions = useMemo(() => getTimezoneOptions(), [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     try {
       await onSubmit({
         name: name.trim(),
-        timezone_offset: timezone,
+        timezone,
         work_start_hour: workStart,
         work_end_hour: workEnd,
         hard_no_ranges: hardNoRanges,
@@ -135,10 +151,10 @@ export function ParticipantForm({
         <select
           required
           value={timezone}
-          onChange={(e) => setTimezone(Number(e.target.value))}
+          onChange={(e) => setTimezone(e.target.value)}
           className={`${inputClasses} appearance-none cursor-pointer`}
         >
-          {TIMEZONES.map((tz) => (
+          {timezoneOptions.map((tz) => (
             <option key={tz.value} value={tz.value}>
               {tz.label}
             </option>

@@ -1,37 +1,32 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import {
   TeamMember,
   HardNoRange,
-  TIMEZONES,
   WORK_HOURS,
   FULL_DAY_HOURS,
   getInitials,
   getHardNoEndOptions,
 } from "@/lib/types"
+import { DateTime } from "luxon"
+import { getTimezoneOptions } from "@/lib/timezone"
 import { cn } from "@/lib/utils"
 
-function LiveTime({ utcOffset }: { utcOffset: number }) {
+function LiveTime({ timezone }: { timezone: string }) {
   const [time, setTime] = useState("")
 
   useEffect(() => {
     const update = () => {
-      const now = new Date()
-      const utc = now.getTime() + now.getTimezoneOffset() * 60000
-      const local = new Date(utc + utcOffset * 3600000)
+      const local = DateTime.now().setZone(timezone)
       setTime(
-        local.toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        })
+        local.toLocaleString(DateTime.TIME_SIMPLE, { hour12: true })
       )
     }
     update()
     const interval = setInterval(update, 30000)
     return () => clearInterval(interval)
-  }, [utcOffset])
+  }, [timezone])
 
   if (!time) return <span className="text-xs text-muted-foreground/40">--:--</span>
   return (
@@ -93,11 +88,13 @@ function MemberCard({
   onUpdate,
   onRemove,
   canRemove,
+  timezoneOptions,
 }: {
   member: TeamMember
   onUpdate: (updated: TeamMember) => void
   onRemove: () => void
   canRemove: boolean
+  timezoneOptions: { value: string; label: string }[]
 }) {
   const handleNameChange = useCallback(
     (name: string) => {
@@ -154,17 +151,21 @@ function MemberCard({
               placeholder="Name"
               className="bg-transparent text-sm font-medium outline-none w-full min-w-0 placeholder:text-muted-foreground/40 focus:bg-muted/30 rounded px-1 -mx-1 py-0.5 transition-colors"
             />
-            <LiveTime utcOffset={member.utcOffset} />
+            <LiveTime timezone={member.timezone} />
           </div>
 
           <select
-            value={member.utcOffset}
-            onChange={(e) =>
-              onUpdate({ ...member, utcOffset: Number(e.target.value) })
-            }
+            value={member.timezone}
+            onChange={(e) => {
+              const iana = e.target.value
+              onUpdate({
+                ...member,
+                timezone: iana,
+              })
+            }}
             className="bg-transparent border-none text-xs text-muted-foreground cursor-pointer focus:outline-none focus:text-foreground p-0 appearance-none w-full"
           >
-            {TIMEZONES.map((tz) => (
+            {timezoneOptions.map((tz) => (
               <option key={tz.value} value={tz.value}>
                 {tz.label}
               </option>
@@ -292,6 +293,8 @@ export function TeamSetup({
   team: TeamMember[]
   onTeamChange: (team: TeamMember[]) => void
 }) {
+  const timezoneOptions = useMemo(() => getTimezoneOptions(), [])
+
   const handleUpdate = (index: number, updated: TeamMember) => {
     const next = [...team]
     next[index] = updated
@@ -309,7 +312,7 @@ export function TeamSetup({
       {
         id,
         name: "",
-        utcOffset: 0,
+        timezone: "America/New_York",
         workStartHour: 9,
         workEndHour: 18,
         hardNoRanges: [],
@@ -335,6 +338,7 @@ export function TeamSetup({
             onUpdate={(updated) => handleUpdate(index, updated)}
             onRemove={() => handleRemove(index)}
             canRemove={team.length > 2}
+            timezoneOptions={timezoneOptions}
           />
         ))}
       </div>

@@ -73,7 +73,9 @@ export function FairnessSummary({
     burdenCarriers > 0 && burdenCarriers < team.length && !isEven
 
   const handleShare = async () => {
-    const encoded = encodeShareData(team, config)
+    const displayTz =
+      config.displayTimezone ?? team[0]?.timezone ?? "America/New_York"
+    const encoded = encodeShareData(team, config, displayTz)
     const url = `${window.location.origin}${window.location.pathname}?d=${encoded}`
     try {
       await navigator.clipboard.writeText(url)

@@ -6,8 +6,8 @@ import {
   TeamMember,
   MeetingConfig,
   RotationWeekData,
-  getAnchorLabel,
 } from "@/lib/types"
+import { getTimezoneDisplayLabel } from "@/lib/timezone"
 import {
   generateRotation,
   canGenerateRotation,
@@ -20,6 +20,7 @@ import { Header } from "./header"
 import { TeamSetup } from "./team-setup"
 import { MeetingConfiguration } from "./meeting-config"
 import { RotationOutput } from "./rotation-output"
+import { resolveToStandardTimezone } from "@/lib/timezone"
 import { FairnessSummary } from "./fairness-summary"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -28,7 +29,7 @@ const defaultTeam: TeamMember[] = [
   {
     id: "m-1",
     name: "Alex Rivera",
-    utcOffset: -8,
+    timezone: "America/Los_Angeles",
     workStartHour: 9,
     workEndHour: 18,
     hardNoRanges: [],
@@ -37,7 +38,7 @@ const defaultTeam: TeamMember[] = [
   {
     id: "m-2",
     name: "Maria Weber",
-    utcOffset: 1,
+    timezone: "Europe/Berlin",
     workStartHour: 9,
     workEndHour: 18,
     hardNoRanges: [],
@@ -46,7 +47,7 @@ const defaultTeam: TeamMember[] = [
   {
     id: "m-3",
     name: "Kenji Tanaka",
-    utcOffset: 9,
+    timezone: "Asia/Tokyo",
     workStartHour: 10,
     workEndHour: 19,
     hardNoRanges: [],
@@ -60,6 +61,7 @@ const defaultConfig: MeetingConfig = {
   anchorOffset: -5,
   durationMinutes: 60,
   rotationWeeks: 8,
+  displayTimezone: "America/New_York",
 }
 
 function ShareView({
@@ -103,7 +105,7 @@ function ShareView({
                   <span className="text-sm font-medium">{m.name}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {getAnchorLabel(m.utcOffset)}
+                  {getTimezoneDisplayLabel(m.timezone)}
                 </span>
               </div>
             ))}
@@ -120,7 +122,9 @@ function ShareView({
           <RotationOutput
             weeks={weeks}
             team={team}
-            anchorOffset={config.anchorOffset}
+            displayTimezone={resolveToStandardTimezone(
+              config.displayTimezone ?? "America/New_York"
+            )}
           />
         )}
 
@@ -346,7 +350,9 @@ export function ParallelApp() {
               <RotationOutput
                 weeks={rotation}
                 team={team}
-                anchorOffset={config.anchorOffset}
+                displayTimezone={resolveToStandardTimezone(
+                  config.displayTimezone ?? "America/New_York"
+                )}
               />
               <FairnessSummary
                 team={team}

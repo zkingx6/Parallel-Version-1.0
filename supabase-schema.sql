@@ -17,7 +17,7 @@ create table if not exists public.member_submissions (
   id uuid primary key default gen_random_uuid(),
   meeting_id uuid references public.meetings(id) on delete cascade not null,
   name text not null,
-  timezone_offset float not null default 0,
+  timezone text not null default 'America/New_York',
   work_start_hour int not null default 9,
   work_end_hour int not null default 18,
   hard_no_ranges jsonb not null default '[]'::jsonb,
