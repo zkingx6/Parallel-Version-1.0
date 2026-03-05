@@ -22,10 +22,11 @@ import {
   resolveToStandardTimezone,
 } from "@/lib/timezone"
 import {
-  generateRotation,
+  generateRotationGuarded,
   canGenerateRotation,
   getBurdenCounts,
   hasConsecutiveStretch,
+  isInputContractViolation,
   isNoViableTimeResult,
   isRotationResult,
   verifyInputIntegrity,
@@ -455,12 +456,20 @@ export function RotationSection({
     setNoViableResult(null)
     setRotationError(null)
     console.log("Rotation config:", config)
-    console.log("[DEBUG] Calling generateRotation")
+    console.log("[DEBUG] Calling generateRotationGuarded")
     setTimeout(() => {
       try {
-        const result = generateRotation(team, config)
-        console.log("[DEBUG] generateRotation result:", result)
-        if (isNoViableTimeResult(result)) {
+        const result = generateRotationGuarded(team, config)
+        console.log("[DEBUG] generateRotationGuarded result:", result)
+        if (isInputContractViolation(result)) {
+          const msg =
+            result.error.details
+              ?.map((d) => d.reason || `${d.field}: invalid`)
+              .join("; ") ?? result.error.message
+          setRotationError(msg)
+          setRotationResult(null)
+          setNoViableResult(null)
+        } else if (isNoViableTimeResult(result)) {
           setNoViableResult(result)
         } else if (Array.isArray(result) && result.length === 0) {
           setRotationError("No viable rotation with current boundaries.")

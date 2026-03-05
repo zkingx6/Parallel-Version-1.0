@@ -9,10 +9,11 @@ import {
 } from "@/lib/types"
 import { getTimezoneDisplayLabel } from "@/lib/timezone"
 import {
-  generateRotation,
+  generateRotationGuarded,
   canGenerateRotation,
   decodeShareData,
   getBurdenCounts,
+  isInputContractViolation,
   isNoViableTimeResult,
   isRotationResult,
 } from "@/lib/rotation"
@@ -71,7 +72,23 @@ function ShareView({
   team: TeamMember[]
   config: MeetingConfig
 }) {
-  const result = generateRotation(team, config)
+  const result = generateRotationGuarded(team, config)
+  if (isInputContractViolation(result)) {
+    const msg =
+      result.error.details
+        ?.map((d) => `${d.name ?? "Member"}: ${d.reason}`)
+        .join("; ") ?? result.error.message
+    return (
+      <div className="min-h-screen">
+        <Header isShareView />
+        <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8 flex items-center justify-center">
+          <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-center">
+            <p className="text-sm text-destructive">Invalid share link: {msg}</p>
+          </div>
+        </main>
+      </div>
+    )
+  }
   const weeks = isNoViableTimeResult(result)
     ? []
     : isRotationResult(result)
@@ -237,12 +254,18 @@ export function ParallelApp() {
     setIsGenerating(true)
     setRotation(null)
     setRotationError(null)
-    console.log("[DEBUG] Calling generateRotation")
+    console.log("[DEBUG] Calling generateRotationGuarded")
     setTimeout(() => {
       try {
-        const result = generateRotation(team, config)
-        console.log("[DEBUG] generateRotation result:", result)
-        if (isNoViableTimeResult(result)) {
+        const result = generateRotationGuarded(team, config)
+        console.log("[DEBUG] generateRotationGuarded result:", result)
+        if (isInputContractViolation(result)) {
+          const msg =
+            result.error.details
+              ?.map((d) => d.reason || `${d.field}: invalid`)
+              .join("; ") ?? result.error.message
+          setRotationError(msg)
+        } else if (isNoViableTimeResult(result)) {
           setRotationError(
             "No viable meeting time. Adjust constraints or try suggested changes."
           )

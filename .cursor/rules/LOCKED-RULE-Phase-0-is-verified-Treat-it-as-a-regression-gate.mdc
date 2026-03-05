@@ -1,0 +1,22 @@
+---
+alwaysApply: true
+---
+
+From now on, you MUST NOT change or refactor any code related to:
+- lib/rotation.ts (scoring/beam search/selection)
+- timezone conversion / displayTimezone defaults
+- determinism/invariant test routes and helpers
+
+UNLESS you follow this process:
+
+1) Propose the smallest change set (list exact files + functions + why).
+2) Confirm you will not modify Phase 0 behavior (0.1/0.2/0.3).
+3) After changes, you MUST run and paste results for:
+   - GET /api/dev/run-determinism-test (10 runs) → identical outputs
+   - Invariants: HardNo / WorkHours(duration) / spread <= maxSpread / maxBurden consistency → zero violations
+   - Edge cases: team size 0 and 1 → blocked, no crash
+4) If ANY regression appears, revert and fix before continuing.
+
+If the request is UI-only, do not touch algorithm/timezone logic.
+If the request is algorithm-only, do not touch UI.
+Ask if unclear, but do not "clean up" or "improve" unrelated code.

@@ -82,6 +82,14 @@ export function resolveToStandardTimezone(
   return "America/New_York"
 }
 
+/** Canonicalize IANA if in STANDARD_TIMEZONES. Returns null if not (no fallback). */
+export function tryResolveToStandardTimezone(
+  iana: string | null | undefined
+): string | null {
+  if (iana && STANDARD_TIMEZONES.includes(iana)) return iana
+  return null
+}
+
 /** Resolve display timezone. IANA only. Default America/New_York when null. */
 export function getDisplayTimezone(
   displayTimezoneIana: string | null | undefined

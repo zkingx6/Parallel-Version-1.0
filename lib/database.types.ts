@@ -1,5 +1,5 @@
 import { TeamMember, MeetingConfig, HardNoRange, getInitials } from "./types"
-import { resolveToStandardTimezone } from "./timezone"
+import { tryResolveToStandardTimezone } from "./timezone"
 
 export type DbMeeting = {
   id: string
@@ -47,7 +47,7 @@ export function dbMemberToTeamMember(s: DbMemberSubmission): TeamMember {
   const hardNoRanges = Array.isArray(s.hard_no_ranges)
     ? s.hard_no_ranges
     : []
-  const timezone = resolveToStandardTimezone(s.timezone) ?? "America/New_York"
+  const timezone = tryResolveToStandardTimezone(s.timezone) ?? s.timezone ?? ""
   return {
     id: s.id,
     name: s.name,

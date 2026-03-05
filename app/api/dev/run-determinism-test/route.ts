@@ -28,6 +28,7 @@ import {
   validateMaxBurdenConsistency,
   type ResultInvariantViolation,
 } from "@/lib/run-determinism-invariants"
+import { validateTeamInput } from "@/lib/contract/validateTeamInput"
 
 const MEETING_ID = "363b08dc-3b9f-4914-bc78-02c1c470ccd4"
 
@@ -159,9 +160,20 @@ export async function GET() {
     )
   }
 
-  const team = (members ?? []).map((m: DbMemberSubmission) =>
+  const rawTeam = (members ?? []).map((m: DbMemberSubmission) =>
     dbMemberToTeamMember(m)
   )
+  const validation = validateTeamInput(rawTeam)
+  if (!validation.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: validation.error,
+      },
+      { status: 422 }
+    )
+  }
+  const team = validation.team
   const useFixedBaseTime = meeting.base_time_minutes != null
 
   let meetingForConfig = meeting as DbMeeting

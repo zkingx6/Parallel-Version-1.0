@@ -1,0 +1,47 @@
+---
+alwaysApply: true
+---
+
+CHANGE CONTROL (MUST FOLLOW):
+- Do not refactor or rename existing functions that already passed tests.
+- Do not modify lib/rotation.ts algorithm behavior unless explicitly instructed.
+- Any change must be minimal and localized to the specified files only.
+- Provide a diff-style summary: files changed + what lines/sections changed + why.
+- If you think a refactor is needed, STOP and propose it first (do not do it).
+
+Timezone Architecture Rule (Non-negotiable)
+Parallel must use IANA timezones as the single source of truth.
+Rules:
+1. All members must store timezone as an IANA string
+   Example:
+   America/New_York
+   Europe/London
+   Asia/Tokyo
+2. timezone_offset must NOT be used for any logic.
+   It may exist temporarily for legacy migration only.
+3. All time calculations must follow this pipeline:
+    UTC time
+   → convert using member.timezone (IANA)
+   → produce localStart / localEnd
+   → compute burden / fairness
+4. UI display timezone must default to owner.timezone.
+5. displayTimezone must never change automatically when toggling UI states
+   (e.g. enabling/disabling fixed base time).
+6. Offsets must NEVER be stored or trusted as the source of truth.
+   Offsets can only be derived dynamically from IANA timezone when needed for display.
+7. Any function converting timezone must accept IANA timezone only.
+
+Code Stability Rule
+Do NOT modify the following systems unless explicitly instructed:
+
+- rotation scoring algorithm
+- beam search logic
+- fairness spread calculation
+- invariant validation logic
+
+Changes in this phase must ONLY affect:
+- timezone data model
+- timezone conversion helpers
+- UI display timezone default behavior
+
+All algorithm outputs must remain identical before and after this change.

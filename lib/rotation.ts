@@ -1,5 +1,6 @@
 import { DateTime } from "luxon"
-import { resolveToStandardTimezone } from "./timezone"
+import { validateTeamInput } from "./contract/validateTeamInput"
+import type { ValidateTeamInputError } from "./contract/validateTeamInput"
 import {
   TeamMember,
   MeetingConfig,
@@ -2371,6 +2372,45 @@ export function generateRotation(
   return []
 }
 
+/** Error shape when input contract validation fails. */
+export type InputContractViolationResult = {
+  ok: false
+  error: ValidateTeamInputError["error"]
+}
+
+export type GenerateRotationGuardedResult =
+  | RotationResult
+  | NoViableTimeResult
+  | InputContractViolationResult
+
+/** Type guard: result is input contract violation. */
+export function isInputContractViolation(
+  r: GenerateRotationGuardedResult
+): r is InputContractViolationResult {
+  return (
+    typeof r === "object" &&
+    r !== null &&
+    "ok" in r &&
+    (r as InputContractViolationResult).ok === false &&
+    "error" in r &&
+    (r as InputContractViolationResult).error?.code === "INPUT_CONTRACT_VIOLATION"
+  )
+}
+
+/**
+ * Phase 1: Safe wrapper that validates team input before generateRotation.
+ * On validation failure: returns INPUT_CONTRACT_VIOLATION (no silent default).
+ * On success: calls generateRotation unchanged.
+ */
+export function generateRotationGuarded(
+  team: TeamMember[],
+  config: MeetingConfig
+): GenerateRotationGuardedResult {
+  const validation = validateTeamInput(team)
+  if (!validation.ok) return { ok: false, error: validation.error }
+  return generateRotation(validation.team, config) as GenerateRotationGuardedResult
+}
+
 /** Type guard: result is NoViableTimeResult */
 export function isNoViableTimeResult(
   r: RotationResult | NoViableTimeResult | RotationWeekData[]
@@ -2535,10 +2575,11 @@ export function decodeShareData(
         hardNoRanges = [{ start: m.ns, end: m.ne }]
       }
 
+      // No silent default. Pass through tz as-is; validateTeamInput blocks if missing/invalid.
       const timezone =
-        m.tz && (m.tz as string).includes("/")
-          ? resolveToStandardTimezone(m.tz)
-          : "America/New_York"
+        typeof m.tz === "string" && m.tz.trim().includes("/")
+          ? m.tz.trim()
+          : ""
       return {
         id: `m-${i}`,
         name: m.n,
