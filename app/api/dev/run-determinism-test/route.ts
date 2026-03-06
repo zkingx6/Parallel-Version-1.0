@@ -2,7 +2,11 @@
  * DEV ONLY: Determinism test for rotation algorithm.
  * GET /api/dev/run-determinism
  * - Fetches meeting + member_submissions, runs generateRotation 10x, compares results.
- * - No auth, read-only, uses service role.
+ * - No auth, read-only for member_submissions, uses service role.
+ *
+ * SAFEGUARD: This route must NEVER write to member_submissions.
+ * - Only reads member_submissions; only updates meetings.anchor_offset when needed.
+ * - hard_no_ranges must never be derived from overlap/selected time or persisted here.
  */
 import { NextResponse } from "next/server"
 import { createServiceSupabase } from "@/lib/supabase-server"
@@ -18,9 +22,12 @@ import {
   isNoViableTimeResult,
 } from "@/lib/rotation"
 import type { TeamMember } from "@/lib/types"
+import { DateTime } from "luxon"
 import {
+  ensureDisplayTimezoneIana,
   getMemberTimezone,
-  resolveToStandardTimezone,
+  getOffsetLabelForLocalDateTime,
+  getTimezoneDisplayLabelNow,
   utcToLocalInZone,
 } from "@/lib/timezone"
 import {
@@ -186,6 +193,7 @@ export async function GET() {
   }
 
   const baseConfig = dbMeetingToConfig(meetingForConfig)
+  // Config uses meeting.base_time_minutes (same as UI anchor time) when useFixedBaseTime
   const config = useFixedBaseTime
     ? baseConfig
     : {
@@ -194,9 +202,46 @@ export async function GET() {
         anchorOffset: meetingForConfig.anchor_offset,
       }
 
+  // --- DST debug: before generateRotation ---
+  const displayTimezoneRaw = (meeting as DbMeeting).display_timezone ?? null
+  const startDateRaw = (meeting as DbMeeting).start_date ?? null
+  const week1DateIso =
+    startDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(startDateRaw.trim())
+      ? startDateRaw
+      : (() => {
+          const now = DateTime.utc()
+          const current = now.weekday
+          const dayOfWeek = meeting.day_of_week
+          let daysUntil = dayOfWeek - current
+          if (daysUntil <= 0) daysUntil += 7
+          return now.plus({ days: daysUntil }).toISODate() ?? ""
+        })()
+  const displayTimezoneIana = ensureDisplayTimezoneIana(displayTimezoneRaw)
+  const week1DtAtNoon = DateTime.fromISO(week1DateIso, {
+    zone: displayTimezoneIana,
+  }).set({ hour: 12, minute: 0, second: 0, millisecond: 0 })
+  const week1OffsetMinutes = week1DtAtNoon.offset
+  const labelFromNow = getTimezoneDisplayLabelNow(displayTimezoneIana)
+  const labelForWeek1 = getOffsetLabelForLocalDateTime(
+    displayTimezoneIana,
+    week1DateIso,
+    12,
+    0
+  )
+
+  console.log("[run-determinism] DST debug:")
+  console.log("  displayTimezone (raw):", JSON.stringify(displayTimezoneRaw))
+  console.log("  startDate (raw):", JSON.stringify(startDateRaw))
+  console.log("  week1Date (computed):", week1DateIso)
+  console.log("  displayTimezone (IANA resolved):", displayTimezoneIana)
+  console.log("  week1OffsetMinutes:", week1OffsetMinutes)
+  console.log("  labelFromNow:", JSON.stringify(labelFromNow))
+  console.log("  labelForWeek1:", JSON.stringify(labelForWeek1))
+
   // --- Debug: before generateRotation ---
   const debugMeetingConfig = {
     day_of_week: meeting.day_of_week,
+    start_date: (meeting as DbMeeting).start_date ?? null,
     duration_minutes: meeting.duration_minutes,
     rotation_weeks: meeting.rotation_weeks,
     anchor_offset: meetingForConfig.anchor_offset,
@@ -220,6 +265,10 @@ export async function GET() {
   }))
 
   console.log("[run-determinism] meeting:", debugMeetingConfig)
+  console.log(
+    "[run-determinism] chosen start_date:",
+    (meeting as DbMeeting).start_date ?? `next occurrence of weekday ${meeting.day_of_week}`
+  )
   console.log("[run-determinism] raw member_submissions:", JSON.stringify(debugRawMembers, null, 2))
   console.log("[run-determinism] computed TeamMembers:", JSON.stringify(debugTeamMembers, null, 2))
 
@@ -271,6 +320,10 @@ export async function GET() {
     firstRotationResult.weeks.length > 0
   ) {
     const w1 = firstRotationResult.weeks[0]
+    const weekDates = firstRotationResult.weeks
+      .map((w) => w.utcDateIso ?? "?")
+      .filter((d) => d !== "?")
+    console.log("[run-determinism] week dates (for DST testing):", weekDates)
     console.log("[run-determinism] week1 selectedTime UTC hour:", w1.utcHour)
     console.log(
       "[run-determinism] week1 per-member:",
@@ -304,7 +357,7 @@ export async function GET() {
   }
 
   // --- Display timezone match (legacy) ---
-  let displayTzMatchViolations: Array<{
+  const displayTzMatchViolations: Array<{
     memberName: string
     memberTimezone: string
     displayTimezone: string
@@ -318,7 +371,7 @@ export async function GET() {
     firstRotationResult.weeks.length > 0
   ) {
     const w1 = firstRotationResult.weeks[0]
-    const displayTimezone = resolveToStandardTimezone(
+    const displayTimezone = ensureDisplayTimezoneIana(
       (meeting as DbMeeting).display_timezone ?? "America/New_York"
     )
     const utcDateIso = w1.utcDateIso
@@ -366,6 +419,14 @@ export async function GET() {
     isRotationResult(firstRotationResult) &&
     firstRotationResult.explain.evidence?.perWeekFeasibleUtcHours?.[0]
 
+  const weekDates =
+    firstRotationResult &&
+    isRotationResult(firstRotationResult)
+      ? firstRotationResult.weeks
+          .map((w) => w.utcDateIso ?? "?")
+          .filter((d) => d !== "?")
+      : []
+
   return NextResponse.json({
     ok,
     ...(uniqueDiffs.length > 0 && { differingFields: uniqueDiffs }),
@@ -378,6 +439,18 @@ export async function GET() {
     runs,
     debug: {
       meetingConfig: debugMeetingConfig,
+      chosenStartDate: (meeting as DbMeeting).start_date ?? `next occurrence of weekday ${meeting.day_of_week}`,
+      weekDates,
+      dstDebug: {
+        displayTimezoneRaw,
+        startDateRaw,
+        week1DateIso,
+        displayTimezoneIana,
+        week1OffsetMinutes,
+        week1OffsetHours: week1OffsetMinutes / 60,
+        labelFromNow,
+        labelForWeek1,
+      },
       rawMemberSubmissions: debugRawMembers,
       computedTeamMembers: debugTeamMembers,
       week1: debugWeek1,

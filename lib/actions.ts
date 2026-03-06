@@ -3,6 +3,8 @@
 import { createServerSupabase, createServiceSupabase } from "./supabase-server"
 import { revalidatePath } from "next/cache"
 import type { HardNoRange } from "./types"
+import type { WeeklyHours, WeeklyHardNo } from "./availability"
+import { isComplementOfOverlapPattern } from "./hard-no-ranges"
 
 export async function createMeeting(title: string) {
   const supabase = await createServerSupabase()
@@ -31,6 +33,7 @@ export async function updateMeetingConfig(
     anchor_offset?: number
     display_timezone?: string | null
     base_time_minutes?: number | null
+    start_date?: string | null
   }
 ) {
   const supabase = await createServerSupabase()
@@ -88,6 +91,17 @@ export async function upsertOwnerParticipant(
   } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
 
+  const userDefined = Array.isArray(payload.hard_no_ranges)
+    ? payload.hard_no_ranges
+    : []
+  if (isComplementOfOverlapPattern(userDefined)) {
+    return {
+      error:
+        "Invalid hard boundaries: pattern looks like corrupted data. Please set your availability again.",
+    }
+  }
+  const persistPayload = { ...payload, hard_no_ranges: userDefined }
+
   const { data: existing } = await supabase
     .from("member_submissions")
     .select("id")
@@ -99,7 +113,7 @@ export async function upsertOwnerParticipant(
     const { data, error } = await supabase
       .from("member_submissions")
       .update({
-        ...payload,
+        ...persistPayload,
         updated_at: new Date().toISOString(),
       })
       .eq("id", existing.id)
@@ -117,7 +131,7 @@ export async function upsertOwnerParticipant(
     .insert({
       meeting_id: meetingId,
       is_owner_participant: true,
-      ...payload,
+      ...persistPayload,
     })
     .select()
     .single()
@@ -179,11 +193,22 @@ export async function submitMember(
 
   if (!meeting) return { error: "Invalid invite link." }
 
+  const userDefined = Array.isArray(input.hard_no_ranges)
+    ? input.hard_no_ranges
+    : []
+  if (isComplementOfOverlapPattern(userDefined)) {
+    return {
+      error:
+        "Invalid hard boundaries: pattern looks like corrupted data. Please set your availability again.",
+    }
+  }
+  const persistInput = { ...input, hard_no_ranges: userDefined }
+
   if (existingId) {
     const { data, error } = await supabase
       .from("member_submissions")
       .update({
-        ...input,
+        ...persistInput,
         updated_at: new Date().toISOString(),
       })
       .eq("id", existingId)
@@ -200,11 +225,25 @@ export async function submitMember(
     .from("member_submissions")
     .insert({
       meeting_id: meeting.id,
-      ...input,
+      ...persistInput,
     })
     .select()
     .single()
 
   if (error) return { error: error.message }
   return { data }
+}
+
+export async function saveAvailabilityTemplate(payload: {
+  timezone: string
+  weekly_hours: WeeklyHours
+  weekly_hard_no: WeeklyHardNo
+}) {
+  const supabase = await createServerSupabase()
+  const { saveDefaultTemplate } = await import("./availability")
+  const result = await saveDefaultTemplate(supabase, payload)
+  if (result.error) return { error: result.error }
+  revalidatePath("/availability")
+  revalidatePath("/availability/default")
+  return { success: true }
 }

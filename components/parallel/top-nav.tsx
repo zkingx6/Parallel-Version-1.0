@@ -31,11 +31,13 @@ export function TopNav() {
     if (pathname?.startsWith("/team/rotation-settings")) return "meetings"
     if (pathname?.startsWith("/team/")) return "team"
     if (pathname?.startsWith("/rotation/")) return "rotation"
+    if (pathname?.startsWith("/availability")) return "availability"
     return null
   })()
   const isMeetings = activeTab === "meetings"
   const isTeam = activeTab === "team"
   const isRotation = activeTab === "rotation"
+  const isAvailability = activeTab === "availability"
   const isAccount = pathname?.startsWith("/settings")
 
   const tabBase =
@@ -66,7 +68,7 @@ export function TopNav() {
           </Link>
         </div>
 
-        {/* Center: Tabs (Meetings | Team | Rotation) */}
+        {/* Center: Tabs (Meetings | Team | Rotation | Availability) */}
         <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 text-sm">
           <Link
             href="/meetings"
@@ -95,6 +97,12 @@ export function TopNav() {
               <span className={cn(tabBase, tabDisabled)}>Rotation</span>
             </>
           )}
+          <Link
+            href="/availability"
+            className={getTabClass(isAvailability)}
+          >
+            Availability
+          </Link>
         </nav>
 
         {/* Right: Account */}

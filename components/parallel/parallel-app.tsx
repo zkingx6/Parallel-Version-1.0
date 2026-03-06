@@ -7,7 +7,7 @@ import {
   MeetingConfig,
   RotationWeekData,
 } from "@/lib/types"
-import { getTimezoneDisplayLabel } from "@/lib/timezone"
+import { getTimezoneDisplayLabelNow } from "@/lib/timezone"
 import {
   generateRotationGuarded,
   canGenerateRotation,
@@ -21,7 +21,7 @@ import { Header } from "./header"
 import { TeamSetup } from "./team-setup"
 import { MeetingConfiguration } from "./meeting-config"
 import { RotationOutput } from "./rotation-output"
-import { resolveToStandardTimezone } from "@/lib/timezone"
+import { ensureDisplayTimezoneIana } from "@/lib/timezone"
 import { FairnessSummary } from "./fairness-summary"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -122,7 +122,7 @@ function ShareView({
                   <span className="text-sm font-medium">{m.name}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {getTimezoneDisplayLabel(m.timezone)}
+                  {getTimezoneDisplayLabelNow(m.timezone)}
                 </span>
               </div>
             ))}
@@ -139,7 +139,7 @@ function ShareView({
           <RotationOutput
             weeks={weeks}
             team={team}
-            displayTimezone={resolveToStandardTimezone(
+            displayTimezone={ensureDisplayTimezoneIana(
               config.displayTimezone ?? "America/New_York"
             )}
           />
@@ -373,7 +373,7 @@ export function ParallelApp() {
               <RotationOutput
                 weeks={rotation}
                 team={team}
-                displayTimezone={resolveToStandardTimezone(
+                displayTimezone={ensureDisplayTimezoneIana(
                   config.displayTimezone ?? "America/New_York"
                 )}
               />

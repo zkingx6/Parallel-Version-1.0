@@ -75,9 +75,9 @@ describe("run-determinism-invariants", () => {
     expect(violations.some((v) => v.reason.includes("hardNo"))).toBe(true)
   })
 
-  it("fails when meeting end is outside work window", () => {
+  it("passes when meeting is outside work window (work window is soft, burden only)", () => {
     const team: TeamMember[] = [
-      makeMember("a", "Alice", 9, 10, []),
+      makeMember("a", "Alice", 9, 18, []),
     ]
     const weeks: RotationWeekData[] = [
       {
@@ -85,14 +85,13 @@ describe("run-determinism-invariants", () => {
         date: "Wed",
         utcHour: 14,
         memberTimes: [
-          { memberId: "a", localHour: 9.5, localTime: "9:30 AM", discomfort: "comfortable", score: 0 },
+          { memberId: "a", localHour: 19, localTime: "7:00 PM", discomfort: "sacrifice", score: 3 },
         ],
         explanation: "",
       },
     ]
     const violations = validateResultInvariants(weeks, team, config, 0)
-    expect(violations.length).toBeGreaterThan(0)
-    expect(violations.some((v) => v.reason.includes("outside work window"))).toBe(true)
+    expect(violations).toHaveLength(0)
   })
 
   it("validateMaxBurdenConsistency passes when metrics match", () => {

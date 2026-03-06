@@ -47,18 +47,6 @@ function isInHardNoLocal(
   return false
 }
 
-function isWithinWorkingHours(
-  localHour: number,
-  workStart: number,
-  workEnd: number
-): boolean {
-  const h = ((localHour % 24) + 24) % 24
-  if (workStart < workEnd) {
-    return h >= workStart && h < workEnd
-  }
-  return h >= workStart || h < workEnd
-}
-
 /**
  * Compute plan metrics from weeks (same logic as rotation's computePlanMetrics).
  */
@@ -133,47 +121,6 @@ function checkHardNo(
 }
 
 /**
- * 2) WorkHours + duration: meeting must fully fit inside each member's work window.
- */
-function checkWorkHoursAndDuration(
-  member: TeamMember,
-  localStart: number,
-  localEnd: number,
-  runIndex: number,
-  weekIndex: number,
-  selectedUtcHour: number
-): ResultInvariantViolation | null {
-  const workWindow = `${formatHourLabel(member.workStartHour)}–${formatHourLabel(member.workEndHour)}`
-  if (!isWithinWorkingHours(localStart, member.workStartHour, member.workEndHour)) {
-    return {
-      runIndex,
-      weekIndex,
-      memberName: member.name,
-      selectedUtcHour,
-      localStart,
-      localEnd,
-      workWindow,
-      hardNoRanges: member.hardNoRanges,
-      reason: `Meeting start (local ${formatHourLabel(localStart)}) outside work window [${workWindow})`,
-    }
-  }
-  if (!isWithinWorkingHours(localEnd, member.workStartHour, member.workEndHour)) {
-    return {
-      runIndex,
-      weekIndex,
-      memberName: member.name,
-      selectedUtcHour,
-      localStart,
-      localEnd,
-      workWindow,
-      hardNoRanges: member.hardNoRanges,
-      reason: `Meeting end (local ${formatHourLabel(localEnd)}) outside work window [${workWindow})`,
-    }
-  }
-  return null
-}
-
-/**
  * Validate all result invariants for a single run.
  * Uses exact localHour from rotation output (memberTimes) — no recomputation.
  */
@@ -214,15 +161,7 @@ export function validateResultInvariants(
       )
       if (hardNoViolation) violations.push(hardNoViolation)
 
-      const workViolation = checkWorkHoursAndDuration(
-        member,
-        localStart,
-        localEnd,
-        runIndex,
-        weekIdx,
-        selectedUtcHour
-      )
-      if (workViolation) violations.push(workViolation)
+      // Work window is SOFT (burden only). Do NOT add workViolation — outside work hours is allowed.
     }
   }
 

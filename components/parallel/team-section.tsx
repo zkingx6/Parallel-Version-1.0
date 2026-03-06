@@ -13,8 +13,9 @@ import {
   DbMemberSubmission,
   dbMemberToTeamMember,
 } from "@/lib/database.types"
+import { isComplementOfOverlapPattern } from "@/lib/hard-no-ranges"
 import { formatHourLabel } from "@/lib/types"
-import { getTimezoneDisplayLabel } from "@/lib/timezone"
+import { getTimezoneDisplayLabelNow } from "@/lib/timezone"
 import { ParticipantForm } from "./participant-form"
 import {
   Dialog,
@@ -170,9 +171,9 @@ export function TeamSection({
               defaultHardNoRanges={
                 (() => {
                   const o = members.find((m) => m.is_owner_participant)
-                  return o && Array.isArray(o.hard_no_ranges)
-                    ? o.hard_no_ranges
-                    : []
+                  const raw =
+                    o && Array.isArray(o.hard_no_ranges) ? o.hard_no_ranges : []
+                  return isComplementOfOverlapPattern(raw) ? [] : raw
                 })()
               }
               defaultRole={
@@ -252,9 +253,12 @@ export function TeamSection({
                 )
                 .map((m) => {
                   const isExpanded = expandedMemberId === m.id
-                  const ranges = Array.isArray(m.hard_no_ranges)
+                  const rawRanges = Array.isArray(m.hard_no_ranges)
                     ? m.hard_no_ranges
                     : []
+                  const ranges = isComplementOfOverlapPattern(rawRanges)
+                    ? []
+                    : rawRanges
                   const hasRanges = ranges.length > 0
 
                   return (
@@ -292,7 +296,7 @@ export function TeamSection({
                             )}
                           </div>
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground pl-9">
-                            <span>{getTimezoneDisplayLabel(dbMemberToTeamMember(m).timezone)}</span>
+                            <span>{getTimezoneDisplayLabelNow(dbMemberToTeamMember(m).timezone)}</span>
                             <span>
                               {formatHourLabel(m.work_start_hour)} –{" "}
                               {formatHourLabel(m.work_end_hour)}

@@ -1,0 +1,91 @@
+---
+description: 
+alwaysApply: true
+---
+
+Context
+Phase 5 and Phase 6 testing are complete and validated.
+These behaviors are now LOCKED and must not be changed unless explicitly requested.
+
+Validated scope
+1. DST conversion correctness
+2. US / Europe DST mismatch handling
+3. Non-integer timezone offsets (+05:30, +05:45)
+4. Cross-day local date labeling
+5. Fixed base time hard-boundary guard
+6. Shareable vs non-shareable plan detection
+7. Fallback plan generation when spread is impossible
+8. Forced explanation pipeline:
+   - shareablePlanExists
+   - forcedReason
+   - evidence
+   - fallback UI messaging
+
+Locked behavior
+- IANA timezones are the single source of truth
+- UTC conversion must remain deterministic
+- Fractional offsets must never be rounded away
+- India must preserve :30
+- Nepal must preserve :45
+- Cross-day labels must remain accurate
+- US DST and Europe DST must be handled independently and correctly
+- Fixed base time guard must run BEFORE scoring / generation
+- Hard boundaries are absolute constraints
+- Working hours remain soft constraints only
+- shareablePlanExists=false must be triggered when spread is mathematically impossible
+- forcedReason="SPREAD_IMPOSSIBLE" path must remain intact
+- Fallback mode must remain explainable in both logs and UI
+
+Do NOT change
+- fairness scoring model
+- burden scoring rules
+- spread calculation logic
+- consecutiveMaxLimit behavior
+- beam search / candidate ranking behavior
+- feasibility detection behavior
+- hard boundary exclusion semantics
+- fallback explanation structure
+- validated timezone conversion pipeline
+
+Allowed changes
+Only make changes if they are explicitly requested and strictly limited to:
+- UI wording / copy
+- visual presentation
+- layout / styling
+- non-logic display refinements
+
+Regression requirements
+Any future change touching scheduling, timezone, displayTimezone, conversion helpers, fallback, or fixed base time must preserve:
+
+A. DST correctness
+- No 1-hour drift bug across weeks
+- US and Europe DST transitions remain correct
+- London/Berlin transition behavior remains correct
+
+B. Fractional offset correctness
+- India remains :30
+- Nepal remains :45
+- No rounding to whole hour
+
+C. Cross-day correctness
+- Next-day / previous-day labels remain accurate
+
+D. Fixed base time guard
+- If converted local time lands inside hard boundary, generation must be blocked
+- Guard must trigger before scoring
+
+E. Feasibility / fallback correctness
+- shareablePlanExists=false when spread is impossible
+- forcedReason and evidence remain available
+- UI must not silently pretend an impossible fair plan is fully fair
+
+Change control
+- No refactors
+- No renames of tested functions
+- No cleanup unrelated to the requested task
+- Minimal localized edits only
+- Preserve all validated Phase 0–6 behavior
+
+If uncertain
+Do not modify scheduling logic.
+Ask for confirmation before touching any validated Phase 5 / 6 behavior.

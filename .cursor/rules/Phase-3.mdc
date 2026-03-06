@@ -1,0 +1,66 @@
+---
+description: 
+alwaysApply: true
+---
+
+Phase 3.1 Verified Behavior (Timezone & Day Shift)
+Status: Verified and locked after Phase 3.1 testing.
+The scheduling system must preserve the following behavior:
+
+1. Anchor Time Stability
+- The anchor timezone (e.g. America/New_York) is the source of truth for meeting date and time.
+- Anchor date and time must remain stable across all generated weeks.
+- DST transitions must not cause anchor local time to drift.
+
+Example:
+- NY 09:00 must always remain 09:00 in NY,
+- even when UTC offset changes (UTC-05 → UTC-04).
+2. Correct Local Day Conversion
+For every participant:
+- UTC → IANA timezone → local time → local date
+- If the local time crosses midnight relative to the anchor date:
+- Next day must be labeled (+1 day)
+- Previous day must be labeled (-1 day)
+
+Example:
+- NY: Fri Apr 10 02:30
+- Sophia: Thu Apr 9 23:30  (-1 day)
+- NY: Fri Apr 17 16:30
+- Kenji: Sat Apr 18 05:30  (+1 day)
+3. UI and Computation Must Match
+- For any member and week:
+- The displayed day shift must match the actual timezone conversion.
+- UI labels must never contradict the computed local time.
+
+4. Change Control
+- Any future changes to:
+- timezone conversion
+- rotation scheduling
+- date calculation
+- display timezone
+must NOT break Phase 3.1 verified behavior.
+Regression of:
+- anchor time drift
+- incorrect +1/-1 day labeling
+- UI/date mismatch is not allowed.
+
+5. Testing Priority
+- During current development:
+- Algorithm correctness > UI polish
+- UI, styling, and design may change later, but timezone and scheduling correctness must remain stable.
+
+Phase 3.2 (Week Iteration Stability)
+- The scheduling engine must preserve weekday alignment and +7-day iteration across rotation weeks.
+
+Rules verified in Phase 3.2:
+- Each generated week must remain on the configured day_of_week.
+- Week dates must increment strictly by +7 days from the anchor start date.
+- Month rollover and year rollover must be handled correctly (e.g., Dec → Jan).
+- Anchor timezone (displayTimezone) is the source of truth for weekday validation.
+
+Constraints:
+- Do not modify week iteration logic (utcStart.plus({ weeks: i })) unless a regression is proven.
+- Any future change affecting week generation must preserve:
+- weekday stability
+- correct month/year rollover
+- deterministic +7 day progression.

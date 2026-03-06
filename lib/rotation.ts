@@ -175,6 +175,20 @@ function getNextMeetingDayUtc(dayOfWeek: number): DateTime {
   return now.plus({ days: daysUntil }).startOf("day")
 }
 
+/**
+ * Week 1 date for rotation schedule.
+ * If config.startDateIso is set: use that date (UTC).
+ * Else: next occurrence of config.dayOfWeek (backward compatible).
+ */
+function getWeek1DateUtc(config: MeetingConfig): DateTime {
+  const iso = config.startDateIso
+  if (iso && typeof iso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(iso.trim())) {
+    const dt = DateTime.utc(parseInt(iso.slice(0, 4), 10), parseInt(iso.slice(5, 7), 10), parseInt(iso.slice(8, 10), 10))
+    if (dt.isValid) return dt.startOf("day")
+  }
+  return getNextMeetingDayUtc(config.dayOfWeek)
+}
+
 function formatDate(dt: DateTime): string {
   return dt.toLocaleString({
     weekday: "short",
@@ -193,7 +207,7 @@ function getCandidateUtcHours(): number[] {
 }
 
 /**
- * Check if candidate UTC time is valid for all members.
+ * Check if candidate UTC time is valid for all members (hard + working hours).
  * A candidate is allowed only if for EVERY member:
  * - localHour within working hours (supports cross-midnight)
  * - localHour NOT in any hardNo range (supports cross-midnight)
@@ -207,6 +221,22 @@ function isCandidateValid(
     const localHour = utcToLocalHour(utcDate, utcHour, m)
     if (!isWithinWorkingHours(localHour, m.workStartHour, m.workEndHour))
       return false
+    if (isInHardNoLocal(localHour, m.hardNoRanges)) return false
+  }
+  return true
+}
+
+/**
+ * Anchor mode: hard boundaries ONLY. Working hours are soft (burden scoring).
+ * A candidate is allowed if for EVERY member: localHour NOT in any hardNo range.
+ */
+function isCandidateHardValid(
+  utcDate: DateTime,
+  utcHour: number,
+  team: TeamMember[]
+): boolean {
+  for (const m of team) {
+    const localHour = utcToLocalHour(utcDate, utcHour, m)
     if (isInHardNoLocal(localHour, m.hardNoRanges)) return false
   }
   return true
@@ -252,13 +282,42 @@ function wouldBeConsecutiveMaxDiscomfort(
 
 // --- Find valid candidates for a week ---
 
+/** Convert base time (minutes 0–1439) to UTC hour for given anchor offset. */
+function baseTimeMinutesToUtcHour(
+  baseTimeMinutes: number,
+  anchorOffsetHours: number
+): number {
+  const displayHour = baseTimeMinutes / 60
+  let utcHour = displayHour - anchorOffsetHours
+  utcHour = ((utcHour % 24) + 24) % 24
+  return Math.round(utcHour * 2) / 2
+}
+
 function findValidCandidates(
   utcDate: DateTime,
-  team: TeamMember[]
+  team: TeamMember[],
+  config?: MeetingConfig | null
 ): number[] {
-  return getCandidateUtcHours().filter((h) =>
-    isCandidateValid(utcDate, h, team)
+  const useAnchorMode = config?.baseTimeMinutes != null
+  // Feasible window = 24h minus hard_no_ranges only. Working hours are soft (burden only).
+  const isValid = isCandidateHardValid
+  let candidates = getCandidateUtcHours().filter((h) =>
+    isValid(utcDate, h, team)
   )
+  if (useAnchorMode && config!.baseTimeMinutes != null) {
+    const weekOffset = getAnchorOffsetForWeek(utcDate, config!)
+    const baseUtcHour = baseTimeMinutesToUtcHour(
+      config!.baseTimeMinutes,
+      weekOffset
+    )
+    if (
+      !candidates.includes(baseUtcHour) &&
+      isCandidateHardValid(utcDate, baseUtcHour, team)
+    ) {
+      candidates = [...candidates, baseUtcHour].sort((a, b) => a - b)
+    }
+  }
+  return candidates
 }
 
 /** Circular distance in minutes (0–1439). Used for base-time preference. */
@@ -268,10 +327,21 @@ function distanceMinutes(a: number, b: number): number {
 }
 
 /** Convert UTC hour to display-timezone minutes (0–1439). */
-function utcHourToDisplayMinutes(utcHour: number, anchorOffset: number): number {
-  const displayHour = utcHour + anchorOffset
+function utcHourToDisplayMinutes(utcHour: number, anchorOffsetHours: number): number {
+  const displayHour = utcHour + anchorOffsetHours
   const m = Math.round(displayHour * 60)
   return ((m % 1440) + 1440) % 1440
+}
+
+/**
+ * Anchor offset for a given week.
+ * - Auto fair mode (baseTimeMinutes null): uses config.anchorOffset.
+ * - Fixed base time: uses config.anchorOffset (captured at selection time).
+ *   This ensures absolute time: "9 AM in the anchor zone at selection" stays
+ *   the same UTC moment across DST. On Mar 10 (EDT), 9 AM EST → 10 AM EDT.
+ */
+function getAnchorOffsetForWeek(_utcDate: DateTime, config: MeetingConfig): number {
+  return config.anchorOffset
 }
 
 /** Sort candidates by proximity to base time (soft preference). Closer first. */
@@ -482,7 +552,7 @@ function generateRotationWithMode(
 
   for (const m of team) burden[m.id] = 0
 
-  const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+  const utcStart = getWeek1DateUtc(config)
 
   // Debug: Log team configuration at start
   if (DEBUG) {
@@ -510,13 +580,14 @@ function generateRotationWithMode(
     const utcDate = utcStart.plus({ weeks: i })
 
     const totalCandidates = getCandidateUtcHours().length
-    let hardValidCandidates = findValidCandidates(utcDate, team)
+    let hardValidCandidates = findValidCandidates(utcDate, team, config)
     const baseTimeMinutes = config.baseTimeMinutes
     if (baseTimeMinutes != null) {
+      const weekOffset = getAnchorOffsetForWeek(utcDate, config)
       hardValidCandidates = sortByBaseTimePreference(
         hardValidCandidates,
         baseTimeMinutes,
-        config.anchorOffset
+        weekOffset
       )
     }
 
@@ -591,6 +662,23 @@ function generateRotationWithMode(
       }
     }
 
+    // Anchor mode: when user fixed base time, use it if valid (no hard boundary).
+    // Do not replace with in-working-hours time just to reduce burden.
+    let bestHour: number | null = null
+    let bestMemberTimes: MemberTime[] | null = null
+    if (baseTimeMinutes != null) {
+      const weekOffset = getAnchorOffsetForWeek(utcDate, config)
+      const baseUtcHour = baseTimeMinutesToUtcHour(baseTimeMinutes, weekOffset)
+      const baseTimeDist = distanceMinutes(
+        utcHourToDisplayMinutes(baseUtcHour, weekOffset),
+        baseTimeMinutes
+      )
+      if (baseTimeDist < 1 && hardValidCandidates.includes(baseUtcHour)) {
+        bestHour = baseUtcHour
+        bestMemberTimes = computeMemberTimes(utcDate, baseUtcHour, team)
+      }
+    }
+
     // Fairness weights (configurable)
     const FAIRNESS_WEIGHT = 1000 // Primary: minimax burden
     const EQUITY_WEIGHT = 100   // Secondary: penalize low-burden members staying at 0
@@ -599,8 +687,6 @@ function generateRotationWithMode(
     const DIVERSITY_WEIGHT = 1  // Favor time slots that differ from previous week
     const STREAK_PENALTY_WEIGHT = 5 // Soft penalty when same member is max too often in rolling window
 
-    let bestHour: number | null = null
-    let bestMemberTimes: MemberTime[] | null = null
     let bestScore = Infinity
     let bestMaxProjected = Infinity
     let bestMinProjected = -Infinity
@@ -764,6 +850,7 @@ function generateRotationWithMode(
       console.groupEnd()
     }
 
+    if (bestHour == null) {
     for (const utcHour of hardValidCandidates) {
       const memberTimes = computeMemberTimes(utcDate, utcHour, team)
 
@@ -799,10 +886,11 @@ function generateRotationWithMode(
       const sumDiscomfort = computeTotalScore(memberTimes)
       const slotIndex = utcHourToSlotIndex(utcHour)
       const timeDiversity = prevSlotIndex < 0 ? 0 : Math.abs(slotIndex - prevSlotIndex)
+      const weekOffset = getAnchorOffsetForWeek(utcDate, config)
       const baseTimeDist =
         baseTimeMinutes != null
           ? distanceMinutes(
-              utcHourToDisplayMinutes(utcHour, config.anchorOffset),
+              utcHourToDisplayMinutes(utcHour, weekOffset),
               baseTimeMinutes
             )
           : 0
@@ -923,6 +1011,7 @@ function generateRotationWithMode(
         bestHour = utcHour
         bestMemberTimes = memberTimes
       }
+    }
     }
 
     // Debug: log top 5 candidates for week 1
@@ -1181,7 +1270,7 @@ export function diagnoseNoViableTime(
   team: TeamMember[],
   config: MeetingConfig
 ): NoViableTimeResult {
-  const utcDate = getNextMeetingDayUtc(config.dayOfWeek)
+  const utcDate = getWeek1DateUtc(config)
   const candidates = getCandidateUtcHours()
 
   const blockers: NoViableTimeResult["diagnosis"]["blockers"] = []
@@ -1388,9 +1477,8 @@ function fairnessGuaranteeBeamSearch(
   perWeekFeasibleUtcHours: number[][]
 } {
   const thresholds = getThresholds(config)
-  const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+  const utcStart = getWeek1DateUtc(config)
   const baseTimeMinutes = config.baseTimeMinutes
-  const anchorOffset = config.anchorOffset
 
   const perWeekHardValidCount: number[] = []
   const perWeekMaxMemberSets: string[][] = []
@@ -1412,15 +1500,16 @@ function fairnessGuaranteeBeamSearch(
 
   for (let i = 0; i < config.rotationWeeks; i++) {
     const utcDate = utcStart.plus({ weeks: i })
-    let hardValid = findValidCandidates(utcDate, team)
+    let hardValid = findValidCandidates(utcDate, team, config)
     perWeekHardValidCount.push(hardValid.length)
     perWeekFeasibleUtcHours.push([...hardValid])
 
     if (baseTimeMinutes != null) {
+      const weekOffset = getAnchorOffsetForWeek(utcDate, config)
       hardValid = sortByBaseTimePreference(
         hardValid,
         baseTimeMinutes,
-        anchorOffset
+        weekOffset
       )
     }
     const topK = hardValid.slice(0, FAIRNESS_BEAM_K)
@@ -1479,10 +1568,11 @@ function fairnessGuaranteeBeamSearch(
         const vals = Object.values(newBurden)
         const spread = Math.max(...vals, 0) - Math.min(...vals, 0)
         const weekPenalty = memberTimes.reduce((s, mt) => s + (mt.score ?? 0), 0)
+        const weekOffset = getAnchorOffsetForWeek(utcDate, config)
         const slotDev =
           baseTimeMinutes != null
             ? distanceMinutes(
-                utcHourToDisplayMinutes(utcHour, anchorOffset),
+                utcHourToDisplayMinutes(utcHour, weekOffset),
                 baseTimeMinutes
               )
             : 0
@@ -1621,9 +1711,8 @@ function runFallbackBeamNoPruning(
   team: TeamMember[],
   config: MeetingConfig
 ): FairnessBeamState | null {
-  const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+  const utcStart = getWeek1DateUtc(config)
   const baseTimeMinutes = config.baseTimeMinutes
-  const anchorOffset = config.anchorOffset
   const initialBurden: Record<string, number> = {}
   for (const m of team) initialBurden[m.id] = 0
 
@@ -1640,12 +1729,13 @@ function runFallbackBeamNoPruning(
 
   for (let i = 0; i < config.rotationWeeks; i++) {
     const utcDate = utcStart.plus({ weeks: i })
-    let hardValid = findValidCandidates(utcDate, team)
+    let hardValid = findValidCandidates(utcDate, team, config)
     if (baseTimeMinutes != null) {
+      const weekOffset = getAnchorOffsetForWeek(utcDate, config)
       hardValid = sortByBaseTimePreference(
         hardValid,
         baseTimeMinutes,
-        anchorOffset
+        weekOffset
       )
     }
     const topK = hardValid.slice(0, FAIRNESS_BEAM_K)
@@ -1675,10 +1765,11 @@ function runFallbackBeamNoPruning(
         const maxId = getMaxMemberId(memberTimes)
         const newMaxIds = [...state.maxMemberIdsPerWeek, maxId ?? ""]
         const weekPenalty = memberTimes.reduce((s, mt) => s + (mt.score ?? 0), 0)
+        const weekOffset = getAnchorOffsetForWeek(utcDate, config)
         const slotDev =
           baseTimeMinutes != null
             ? distanceMinutes(
-                utcHourToDisplayMinutes(utcHour, anchorOffset),
+                utcHourToDisplayMinutes(utcHour, weekOffset),
                 baseTimeMinutes
               )
             : 0
@@ -1784,9 +1875,8 @@ function beamSearchBetterPlan(
   currentPlan: RotationWeekData[],
   mode: ConstraintMode
 ): { plan: RotationWeekData[]; metrics: PlanMetrics } | null {
-  const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+  const utcStart = getWeek1DateUtc(config)
   const baseTimeMinutes = config.baseTimeMinutes
-  const anchorOffset = config.anchorOffset
   const enforceBurdenDiff = mode === "STRICT" || mode === "RELAXED"
   const enforceConsecutiveMax = mode === "STRICT"
 
@@ -1803,12 +1893,13 @@ function beamSearchBetterPlan(
 
   for (let i = 0; i < config.rotationWeeks; i++) {
     const utcDate = utcStart.plus({ weeks: i })
-    let hardValid = findValidCandidates(utcDate, team)
+    let hardValid = findValidCandidates(utcDate, team, config)
     if (baseTimeMinutes != null) {
+      const weekOffset = getAnchorOffsetForWeek(utcDate, config)
       hardValid = sortByBaseTimePreference(
         hardValid,
         baseTimeMinutes,
-        anchorOffset
+        weekOffset
       )
     }
     const topK = hardValid.slice(0, FAIRNESS_BEAM_K)
@@ -1964,7 +2055,8 @@ export function verifyInputIntegrity(
     JSON.stringify((m.hardNoRanges ?? []).sort((a, b) => a.start - b.start))
   )
   const allSame = rangeStrings.every((s) => s === rangeStrings[0])
-  if (allSame && team.length > 1) {
+  const allEmpty = rangeStrings.every((s) => s === "[]")
+  if (allSame && team.length > 1 && !allEmpty) {
     console.warn(
       "[ROTATION_DEBUG] WARNING: All members share identical hardNoRanges (likely mapping bug).",
       "Source: each member's hardNoRanges from dbMemberToTeamMember(s.hard_no_ranges).",
@@ -1984,8 +2076,8 @@ export function canGenerateRotation(
     return { valid: false, reason: "Add at least 2 team members." }
   }
 
-  const utcDate = getNextMeetingDayUtc(config.dayOfWeek)
-  const valid = findValidCandidates(utcDate, team)
+  const utcDate = getWeek1DateUtc(config)
+  const valid = findValidCandidates(utcDate, team, config)
   if (valid.length === 0) {
     return {
       valid: false,
@@ -1998,23 +2090,158 @@ export function canGenerateRotation(
 }
 
 /**
+ * Anchor mode UI: check if fixed base time is blocked or outside work hours.
+ * Returns null when baseTimeMinutes is not set.
+ */
+export function getBaseTimeStatus(
+  team: TeamMember[],
+  config: MeetingConfig
+): { blockedByHardNo: boolean; outsideWorkHoursCount: number } | null {
+  if (config.baseTimeMinutes == null) return null
+  const utcDate = getWeek1DateUtc(config)
+  const weekOffset = getAnchorOffsetForWeek(utcDate, config)
+  const baseUtcHour = baseTimeMinutesToUtcHour(config.baseTimeMinutes, weekOffset)
+  const blockedByHardNo = !isCandidateHardValid(utcDate, baseUtcHour, team)
+  let outsideWorkHoursCount = 0
+  for (const m of team) {
+    const localHour = utcToLocalHour(utcDate, baseUtcHour, m)
+    if (!isWithinWorkingHours(localHour, m.workStartHour, m.workEndHour)) {
+      outsideWorkHoursCount++
+    }
+  }
+  return { blockedByHardNo, outsideWorkHoursCount }
+}
+
+/**
  * Generate rotation with Fairness Guarantee:
  * 1. Try plan-level beam search (FAIRNESS_GUARANTEE) first — lexicographic: spread, maxBurden, consecutiveMax, sumPenalty, slotDeviation
  * 2. If beam yields shareable plan → return it
  * 3. If beam yields forced plan (no shareable) → return with evidence
  * 4. If beam yields nothing → fallback to greedy (STRICT/RELAXED/FALLBACK)
+ *
+ * When useFixedBaseTime=true AND anchor is within all members' work hours AND no hard overlap:
+ * use the same anchor for all weeks (no rotation).
  */
+function tryFixedAnchorPlan(
+  team: TeamMember[],
+  config: MeetingConfig
+): RotationResult | null {
+  const baseTimeMinutes = config.baseTimeMinutes
+  if (baseTimeMinutes == null) return null
+
+  const utcStart = getWeek1DateUtc(config)
+  const weeks: RotationWeekData[] = []
+
+  for (let i = 0; i < config.rotationWeeks; i++) {
+    const utcDate = utcStart.plus({ weeks: i })
+    const weekOffset = getAnchorOffsetForWeek(utcDate, config)
+    const baseUtcHour = baseTimeMinutesToUtcHour(baseTimeMinutes, weekOffset)
+
+    if (!isCandidateHardValid(utcDate, baseUtcHour, team)) return null
+
+    for (const m of team) {
+      const localHour = utcToLocalHour(utcDate, baseUtcHour, m)
+      if (!isWithinWorkingHours(localHour, m.workStartHour, m.workEndHour)) {
+        return null
+      }
+    }
+
+    const memberTimes = computeMemberTimes(utcDate, baseUtcHour, team)
+    weeks.push({
+      week: i + 1,
+      date: formatDate(utcDate),
+      utcDateIso: utcDate.toISODate() ?? undefined,
+      utcHour: baseUtcHour,
+      memberTimes,
+      explanation: "Everyone meets within working hours this week.",
+    })
+  }
+
+  const burden: Record<string, number> = {}
+  for (const m of team) burden[m.id] = 0
+  for (const w of weeks) {
+    for (const mt of w.memberTimes) {
+      burden[mt.memberId] = (burden[mt.memberId] ?? 0) + (mt.score ?? 0)
+    }
+  }
+  const values = Object.values(burden)
+  const maxBurden = Math.max(...values, 0)
+  const minBurden = Math.min(...values, 0)
+  const spread = maxBurden - minBurden
+  const maxBurdenMemberIds = team
+    .filter((m) => (burden[m.id] ?? 0) === maxBurden)
+    .map((m) => m.id)
+
+  const thresholds = getThresholds(config)
+  const shareablePlanExists =
+    spread <= thresholds.spreadLimit &&
+    (maxBurden === 0 || maxBurdenMemberIds.length <= 1)
+
+  return {
+    weeks,
+    modeUsed: "FIXED_ANCHOR",
+    explain: {
+      weeks: weeks.map((w, i) => ({
+        week: w.week,
+        hardValidCandidatesCount: 0,
+        totalCandidatesCount: getCandidateUtcHours().length,
+        rejectedBy: { burdenDiff: 0, consecutiveMax: 0 },
+        failureReason: null,
+      })),
+      shareablePlanExists,
+      currentPlanMetrics: {
+        maxBurden,
+        minBurden,
+        spread,
+        maxBurdenMemberIds,
+        consecutiveMax: 0,
+        sumPenalty: 0,
+      },
+      bestPlanMetrics: {
+        maxBurden,
+        minBurden,
+        spread,
+        maxBurdenMemberIds,
+        consecutiveMax: 0,
+        sumPenalty: 0,
+      },
+      betterPlanExists: false,
+      ...(shareablePlanExists && {
+        evidence: {
+          perWeekHardValidCount: weeks.map(() => 0),
+          perWeekMaxMemberSets: weeks.map(() => []),
+          perWeekFeasibleUtcHours: weeks.map(() => []),
+          bestAchievableMetrics: {
+            maxBurden,
+            minBurden,
+            spread,
+            maxBurdenMemberIds,
+            consecutiveMax: 0,
+            sumPenalty: 0,
+          },
+        },
+      }),
+    },
+  }
+}
+
 export function generateRotation(
   team: TeamMember[],
   config: MeetingConfig
 ): RotationResult | NoViableTimeResult | RotationWeekData[] {
   if (team.length < 2) return []
 
-  const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
-  const hardValidCandidates = findValidCandidates(utcStart, team)
+  const utcStart = getWeek1DateUtc(config)
+  const hardValidCandidates = findValidCandidates(utcStart, team, config)
   if (hardValidCandidates.length === 0) {
     if (DEBUG) console.log("[ROTATION_DEBUG] no hard-valid candidates, returning diagnosis")
     return diagnoseNoViableTime(team, config)
+  }
+
+  const fixedAnchorResult = tryFixedAnchorPlan(team, config)
+  if (fixedAnchorResult) {
+    if (DEBUG) console.log("[ROTATION_DEBUG] using FIXED_ANCHOR plan (anchor within all work hours)")
+    return fixedAnchorResult
   }
 
   if (DEBUG_VERIFY) {
@@ -2120,6 +2347,7 @@ export function generateRotation(
     }
   }
 
+  let beamExhaustedNoFallback = false
   if (beamResult.plan === null && beamResult.allPlansExceededThresholds) {
     const fallbackBeam = runFallbackBeamNoPruning(team, config)
     if (fallbackBeam) {
@@ -2184,13 +2412,27 @@ export function generateRotation(
           forcedSummary,
         },
       }
+    } else {
+      beamExhaustedNoFallback = true
     }
   }
 
   const modes: ConstraintMode[] = ["STRICT", "RELAXED", "FALLBACK"]
+  let strictFailureAtWeek: number | undefined
+  let strictFailureReason: string | undefined
 
   for (const mode of modes) {
     const { weeks, modeUsed, explain } = generateRotationWithMode(team, config, mode)
+    if (mode === "STRICT" && weeks.length < config.rotationWeeks && explain.weeks.length > 0) {
+      const last = explain.weeks[explain.weeks.length - 1]
+      if (last?.failureReason) {
+        strictFailureAtWeek = last.week
+        strictFailureReason =
+          last.primaryCause === "MIXED_REJECTIONS"
+            ? "STRICT_NO_ACCEPTABLE_CANDIDATE"
+            : (last.failureReason ?? "ALL_REJECTED")
+      }
+    }
     if (weeks.length === config.rotationWeeks) {
       if (DEBUG) {
         console.log("[ROTATION_DEBUG] succeeded with mode", mode)
@@ -2299,16 +2541,25 @@ export function generateRotation(
       }
 
       const thresholds = getThresholds(config)
+      const strictSucceededWithNoFailure =
+        mode === "STRICT" &&
+        explain.weeks.every((w) => !w.failureReason) &&
+        explain.weeks.every((w) => (w.hardValidCandidatesCount ?? 0) > 0)
       const shareablePlanExists =
-        currentPlanMetrics.spread <= thresholds.spreadLimit &&
-        (currentPlanMetrics.consecutiveMax ?? 0) <= thresholds.consecutiveMaxLimit
+        strictSucceededWithNoFailure ||
+        (currentPlanMetrics.spread <= thresholds.spreadLimit &&
+          (currentPlanMetrics.consecutiveMax ?? 0) <= thresholds.consecutiveMaxLimit)
 
       let forcedReason: ForcedReason | undefined
       let evidence: ForcedPlanEvidence | undefined
       let forcedSummary: string | undefined
 
       if (!shareablePlanExists) {
-        if (currentPlanMetrics.spread > thresholds.spreadLimit) {
+        const beamActuallyExhausted =
+          beamExhaustedNoFallback && mode !== "STRICT"
+        if (beamActuallyExhausted) {
+          forcedReason = "BEAM_EXHAUSTED"
+        } else if (currentPlanMetrics.spread > thresholds.spreadLimit) {
           forcedReason = "SPREAD_IMPOSSIBLE"
         } else if (
           (currentPlanMetrics.consecutiveMax ?? 0) > thresholds.consecutiveMaxLimit
@@ -2320,10 +2571,10 @@ export function generateRotation(
         const perWeekHardValidCount: number[] = []
         const perWeekMaxMemberSets: string[][] = []
         const perWeekFeasibleUtcHours: number[][] = []
-        const utcStart = getNextMeetingDayUtc(config.dayOfWeek)
+        const utcStart = getWeek1DateUtc(config)
         for (let i = 0; i < config.rotationWeeks; i++) {
           const utcDate = utcStart.plus({ weeks: i })
-          const hardValid = findValidCandidates(utcDate, team)
+          const hardValid = findValidCandidates(utcDate, team, config)
           perWeekHardValidCount.push(hardValid.length)
           perWeekFeasibleUtcHours.push([...hardValid])
           const sets = new Set<string>()
@@ -2340,10 +2591,13 @@ export function generateRotation(
           bestAchievableMetrics: currentPlanMetrics,
         }
         const hasNoFeasible = perWeekHardValidCount.some((c) => c === 0)
-        if (hasNoFeasible) {
+        if (hasNoFeasible && !beamActuallyExhausted) {
           forcedReason = "NO_FEASIBLE_TIME"
           forcedSummary =
             "No feasible time: no UTC hour fits all members' work windows and hard-no ranges."
+        } else if (beamActuallyExhausted) {
+          forcedSummary =
+            "Beam search disabled or exhausted; plan produced by fallback mode."
         } else {
           const maxMemberName =
             team.find((m) => m.id === currentPlanMetrics.maxBurdenMemberIds[0])
@@ -2352,8 +2606,23 @@ export function generateRotation(
         }
       }
 
+      const explainWeeks = [...explain.weeks]
+      if (
+        strictFailureAtWeek != null &&
+        strictFailureReason &&
+        strictFailureAtWeek >= 1 &&
+        strictFailureAtWeek <= explainWeeks.length
+      ) {
+        const idx = strictFailureAtWeek - 1
+        explainWeeks[idx] = {
+          ...explainWeeks[idx],
+          failureReason: strictFailureReason as WeekExplain["failureReason"],
+        }
+      }
+
       const fullExplain: RotationExplain = {
         ...explain,
+        weeks: explainWeeks,
         modeUsed,
         shareablePlanExists,
         ...(betterPlanExists && { betterPlanExists: true }),

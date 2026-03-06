@@ -3,6 +3,7 @@ import {
   generateRotation,
   isRotationResult,
   getBurdenCounts,
+  getBaseTimeStatus,
 } from "./rotation"
 import type { TeamMember, MeetingConfig } from "./types"
 import { DEFAULT_FAIRNESS_THRESHOLDS } from "./types"
@@ -57,6 +58,23 @@ describe("Fairness Guarantee", () => {
     }
   })
 
+  it("cross-timezone team with hard_no=[] generates plan (feasible window = 24h minus hardNo only)", () => {
+    const team: TeamMember[] = [
+      makeMember("a", "Alice", "America/New_York", 9, 18, []),
+      makeMember("b", "Bob", "Europe/London", 9, 18, []),
+      makeMember("c", "Carol", "Asia/Tokyo", 9, 18, []),
+    ]
+    const config: MeetingConfig = {
+      ...defaultConfig,
+      baseTimeMinutes: undefined,
+      rotationWeeks: 4,
+    }
+    const result = generateRotation(team, config)
+    expect(isRotationResult(result)).toBe(true)
+    if (!isRotationResult(result)) return
+    expect(result.weeks.length).toBe(4)
+  })
+
   it("beam search finds shareable alternative when greedy would repeat same max member", () => {
     const team: TeamMember[] = [
       makeMember("a", "Alice", "America/New_York", 9, 18, [{ start: 0, end: 8 }]),
@@ -73,6 +91,98 @@ describe("Fairness Guarantee", () => {
     const minBurden = Math.min(...burdenData.map((d) => d.count))
     const spread = maxBurden - minBurden
     expect(spread).toBeLessThanOrEqual(DEFAULT_FAIRNESS_THRESHOLDS.spreadLimit)
+  })
+
+  it("Anchor mode: fixed base time 6 AM outside working hours is used when no hard boundary hit", () => {
+    const team: TeamMember[] = [
+      makeMember("a", "Alice", "America/New_York", 9, 18, [{ start: 10, end: 11 }]),
+      makeMember("b", "Bob", "America/New_York", 9, 18, [{ start: 12, end: 13 }]),
+      makeMember("c", "Carol", "America/New_York", 9, 18, [{ start: 15, end: 16 }]),
+    ]
+    const config: MeetingConfig = {
+      ...defaultConfig,
+      baseTimeMinutes: 360,
+      rotationWeeks: 4,
+      displayTimezone: "America/New_York",
+      startDateIso: "2025-02-12", // Wed, EST: 6 AM EST = 6 AM local
+    }
+    const result = generateRotation(team, config)
+    expect(isRotationResult(result)).toBe(true)
+    if (!isRotationResult(result)) return
+    const { weeks } = result
+    expect(weeks.length).toBe(4)
+    const week1 = weeks[0]
+    expect(week1).toBeDefined()
+    const aliceTime = week1!.memberTimes.find((m) => m.memberId === "a")
+    expect(aliceTime).toBeDefined()
+    expect(aliceTime!.localTime).toMatch(/6:00 AM|6:00/)
+    const burdenData = getBurdenCounts(weeks, team)
+    const totalBurden = burdenData.reduce((s, d) => s + d.count, 0)
+    expect(totalBurden).toBeGreaterThan(0)
+  })
+
+  it("Anchor mode: fixed 10:30 AM used for all weeks when within all work hours, no rotation", () => {
+    const team: TeamMember[] = [
+      makeMember("a", "Alice", "America/New_York", 9, 18, []),
+      makeMember("b", "Bob", "America/New_York", 9, 18, []),
+    ]
+    const config: MeetingConfig = {
+      ...defaultConfig,
+      baseTimeMinutes: 10 * 60 + 30,
+      anchorOffset: -5,
+      displayTimezone: "America/New_York",
+      startDateIso: "2025-02-05", // Wed, all 4 weeks in EST so 10:30 stays 10:30
+      rotationWeeks: 4,
+    }
+    const result = generateRotation(team, config)
+    expect(isRotationResult(result)).toBe(true)
+    if (!isRotationResult(result)) return
+    const { weeks, modeUsed } = result
+    expect(modeUsed).toBe("FIXED_ANCHOR")
+    expect(weeks.length).toBe(4)
+    const localHours = weeks.flatMap((w) =>
+      w.memberTimes.map((mt) => mt.localHour)
+    )
+    expect(localHours.every((h) => Math.abs(h - 10.5) < 0.01)).toBe(true)
+    const localTimes = weeks.flatMap((w) =>
+      w.memberTimes.map((mt) => mt.localTime)
+    )
+    expect(localTimes.every((t) => t.includes("10:30"))).toBe(true)
+  })
+
+  it("Anchor mode: 7pm allowed when hardNoRanges=[], workWindow 9-18 (outside work is soft)", () => {
+    const team: TeamMember[] = [
+      makeMember("a", "Alice", "America/New_York", 9, 18, []),
+      makeMember("b", "Bob", "America/New_York", 9, 18, []),
+    ]
+    const config: MeetingConfig = {
+      ...defaultConfig,
+      baseTimeMinutes: 19 * 60,
+      anchorOffset: -5,
+      displayTimezone: "America/New_York",
+      startDateIso: "2025-03-05",
+    }
+    const status = getBaseTimeStatus(team, config)
+    expect(status).not.toBeNull()
+    expect(status!.blockedByHardNo).toBe(false)
+    expect(status!.outsideWorkHoursCount).toBeGreaterThan(0)
+  })
+
+  it("Anchor mode: 7pm blocked when hardNoRanges includes [18,24]", () => {
+    const team: TeamMember[] = [
+      makeMember("a", "Alice", "America/New_York", 9, 18, [{ start: 18, end: 24 }]),
+      makeMember("b", "Bob", "America/New_York", 9, 18, [{ start: 18, end: 24 }]),
+    ]
+    const config: MeetingConfig = {
+      ...defaultConfig,
+      baseTimeMinutes: 19 * 60,
+      anchorOffset: -5,
+      displayTimezone: "America/New_York",
+      startDateIso: "2025-03-05",
+    }
+    const status = getBaseTimeStatus(team, config)
+    expect(status).not.toBeNull()
+    expect(status!.blockedByHardNo).toBe(true)
   })
 
   it("when NO shareable plan exists: returns forced plan with shareablePlanExists=false, forcedReason and evidence", () => {

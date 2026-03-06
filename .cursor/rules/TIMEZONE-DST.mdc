@@ -1,0 +1,65 @@
+---
+description: 
+alwaysApply: true
+---
+
+Context
+- We are currently running Phase 5 and Phase 6 verification for the Parallel scheduling engine.
+- Phase 0–4 logic has already been validated and must remain unchanged.
+- Important: This phase is NOT about redesigning the algorithm. It is only about verifying timezone conversion stability and fairness behavior under edge cases.
+
+Scope of investigation
+Allowed:
+- Timezone conversion
+- DST boundary handling
+- Local time rendering
+- Anchor time → week date conversion
+- Non-integer UTC offsets (e.g. +05:30, +05:45)
+
+Not allowed:
+- Changing fairness scoring
+- Changing rotation algorithm
+- Changing feasibility logic
+- Changing hard boundary enforcement
+- Changing burden scoring rules
+- Changing beam search or candidate ranking
+
+Algorithm stability requirement
+The following modules are considered LOCKED:
+
+- rotation scoring
+- fairness spread calculation
+- consecutive burden limit logic
+- feasibility detection
+- hard boundary exclusion
+
+If a bug appears during Phase 5/6 testing,
+the fix must be limited strictly to:
+
+timezone conversion or display logic.
+
+DST rule
+The system must produce consistent results when the meeting week occurs after a DST transition.
+
+All base time selections (9 AM, 12 PM, 6 PM, etc.) must follow the SAME conversion rule between:
+
+anchor timezone offset
+and
+actual meeting week local timezone offset.
+
+No special-case behavior per hour is allowed.
+
+Determinism requirement
+Given the same inputs:
+- team members
+- timezones
+- base time
+- rotation length
+
+The generated schedule must remain deterministic.
+
+Testing priority
+1. Non-integer timezone offsets (India, Nepal)
+2. DST transition weeks (US and Europe)
+3. Cross-day labeling
+4. Rotation fairness behavior

@@ -1,4 +1,5 @@
 ---
+description: 
 alwaysApply: true
 ---
 
@@ -45,3 +46,5 @@ Changes in this phase must ONLY affect:
 - UI display timezone default behavior
 
 All algorithm outputs must remain identical before and after this change.
+
+In Parallel scheduling: hardNoRanges are the only hard constraint. Working hours are soft and affect burden only. In Anchor mode (useFixedBaseTime=true), the planner must schedule exactly at the user-selected base time unless it intersects any hard boundary; it must never replace the chosen base time with a lower-burden in-working-hours time. Always inject baseTimeMinutes into candidate generation and log whether it was considered/rejected.

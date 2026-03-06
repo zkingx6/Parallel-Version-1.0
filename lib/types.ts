@@ -1,4 +1,4 @@
-import { getTimezoneDisplayLabel } from "./timezone"
+import { getTimezoneDisplayLabelNow } from "./timezone"
 
 export type Discomfort = "comfortable" | "stretch" | "sacrifice"
 
@@ -30,6 +30,8 @@ export type MeetingConfig = {
   fairnessThresholds?: Partial<FairnessThresholds>
   /** IANA display timezone (e.g. America/New_York). Used for share links. */
   displayTimezone?: string
+  /** Week 1 calendar date (YYYY-MM-DD). null/undefined = next occurrence of dayOfWeek. */
+  startDateIso?: string | null
 }
 
 /** Default fairness thresholds for shareable plans. */
@@ -68,7 +70,7 @@ export type WeekExplain = {
   hardValidCandidatesCount: number
   totalCandidatesCount: number
   rejectedBy: { burdenDiff: number; consecutiveMax: number }
-  failureReason: "NO_HARD_VALID" | "ALL_REJECTED" | null
+  failureReason: "NO_HARD_VALID" | "ALL_REJECTED" | "STRICT_NO_ACCEPTABLE_CANDIDATE" | null
   primaryCause?: "BURDEN_DIFF" | "CONSECUTIVE_MAX" | "MIXED_REJECTIONS"
   unavoidableMaxMemberId?: string
   /** True when rotation was feasible but no alternative avoided 60% max; we fell back. */
@@ -101,6 +103,8 @@ export type ForcedReason =
   | "SPREAD_IMPOSSIBLE"
   | "CONSECUTIVE_MAX_IMPOSSIBLE"
   | "HARD_CONSTRAINTS_TOO_TIGHT"
+  /** Beam disabled (width ≤ 0) or exhausted before fairness search could operate. */
+  | "BEAM_EXHAUSTED"
 
 export type ForcedPlanEvidence = {
   perWeekHardValidCount: number[]
@@ -196,11 +200,41 @@ export const FULL_DAY_HOURS = Array.from({ length: 24 }, (_, i) => ({
   value: i,
 }))
 
-/** Base time options: 6:00 AM–9:30 PM, every 30 min. Value = minutes from midnight (0–1439). */
-export const BASE_TIME_OPTIONS = Array.from({ length: 32 }, (_, i) => {
-  const hour = 6 + i * 0.5
-  return { label: formatHourLabel(hour), value: Math.round(hour * 60) }
+/** Base time options: 12:00 AM–11:45 PM, every 15 min. Value = minutes from midnight (0–1425). */
+export const BASE_TIME_OPTIONS = Array.from({ length: 96 }, (_, i) => {
+  const minutes = i * 15
+  const hour = minutes / 60
+  return { label: formatHourLabel(hour), value: minutes }
 })
+
+/**
+ * Parse a time string (e.g. "7:00am", "2:30 AM", "11:45pm") to minutes from midnight.
+ * Accepts formats: "H:MM AM/PM", "H AM/PM". Returns null if invalid.
+ * Output is clamped to 15-min slots (0, 15, 30, ..., 1425).
+ */
+export function parseTimeToMinutes(str: string): number | null {
+  const s = str.trim()
+  if (!s) return null
+  const m = s.match(
+    /^(\d{1,2})(?::(\d{2}))?\s*(am|pm|AM|PM)$/i
+  )
+  if (!m) return null
+  let h = parseInt(m[1], 10)
+  const mins = m[2] != null ? parseInt(m[2], 10) : 0
+  if (h < 1 || h > 12 || mins < 0 || mins > 59) return null
+  const isPm = /^pm$/i.test(m[3])
+  if (h === 12) h = isPm ? 12 : 0
+  else if (isPm) h += 12
+  const total = h * 60 + mins
+  const slot = Math.round(total / 15) * 15
+  return Math.min(1425, Math.max(0, slot))
+}
+
+/** Format minutes from midnight (0–1425) to display label, e.g. "2:00 AM", "11:45 PM". */
+export function minutesToTimeLabel(minutes: number): string {
+  const hour = minutes / 60
+  return formatHourLabel(hour)
+}
 
 export const MAX_HARD_NO_HOURS = 6
 
@@ -230,7 +264,7 @@ export function getHardNoEndOptions(
   })
 }
 
-/** Format IANA timezone for display. Use getTimezoneDisplayLabel(iana) directly. */
+/** Format IANA timezone for display. Use getTimezoneDisplayLabelNow(iana) for current offset. */
 export function getAnchorLabel(iana: string): string {
-  return getTimezoneDisplayLabel(iana)
+  return getTimezoneDisplayLabelNow(iana)
 }

@@ -1,0 +1,386 @@
+---
+description: 
+alwaysApply: true
+---
+
+# Parallel Rotation Engine
+# Phase 7 & Phase 8 Stability Rules
+
+Status: LOCKED AFTER VERIFICATION
+
+These rules protect the Phase 7 and Phase 8 behavior of the rotation engine.
+All changes must preserve the verified scheduling behavior and fairness metrics.
+
+---
+
+## 1. Core Behavior (DO NOT CHANGE)
+
+The following pipeline has been verified and must remain intact:
+
+STRICT search
+    ↓
+If no valid plan exists
+    ↓
+BEAM_EXHAUSTED
+    ↓
+Fallback to RELAXED mode
+    ↓
+Generate viable rotation plan
+    ↓
+Return explain data + fairness metrics
+
+The engine must always produce a schedule when hard constraints allow it.
+
+---
+
+## 2. Rotation Explain Layer (Phase 7)
+
+The explain system must continue to expose:
+
+- weeks[]
+- hardValidCandidatesCount
+- totalCandidatesCount
+- rejectedBy
+- failureReason
+- rotationForced
+- weekHasMultipleBestCandidates
+
+This data is used for debugging, algorithm verification, and UI transparency.
+
+Do not remove or rename these fields.
+
+Explain output must remain deterministic for identical inputs.
+
+---
+
+## 3. Relaxed Mode Behavior (Phase 8)
+
+When STRICT mode cannot produce a shareable plan:
+
+shareablePlanExists = false  
+forcedReason = "BEAM_EXHAUSTED"  
+modeUsed = "RELAXED"
+
+The engine must still return a valid rotation schedule.
+
+This fallback is **intentional and correct behavior**.
+
+Do not treat this as an error.
+
+---
+
+## 4. Fairness Metrics
+
+The algorithm must continue returning the following metrics:
+
+currentPlanMetrics:
+    maxBurden
+    minBurden
+    spread
+    maxBurdenMemberIds
+    consecutiveMax
+    sumPenalty
+
+These metrics are used for:
+
+- fairness validation
+- UI fairness summary
+- rotation transparency
+
+Do not change metric semantics without a full regression test.
+
+---
+
+## 5. Rotation Forcing
+
+The engine may mark:
+
+rotationForced: true
+
+when the best candidate exceeds fairness constraints but is still selected.
+
+This is expected behavior for extreme timezone distributions.
+
+Do not remove this flag.
+
+---
+
+## 6. Determinism Requirement
+
+For identical inputs the engine must produce identical outputs.
+
+Given the same:
+
+team members  
+timezones  
+constraints  
+weeks  
+base time  
+
+the generated rotation must be deterministic.
+
+If randomness is introduced it must be seeded.
+
+---
+
+## 7. Protected Components
+
+The following components must remain stable:
+
+lib/rotation.ts
+generateRotation()
+generateRotationGuarded()
+beam search candidate scoring
+fairness scoring logic
+rotation penalty evaluation
+
+Changes to these areas require explicit regression testing.
+
+---
+
+## 8. UI Contract
+
+The rotation UI relies on the following fields:
+
+modeUsed  
+shareablePlanExists  
+forcedReason  
+weeks[]  
+currentPlanMetrics  
+
+These fields must remain backward compatible.
+
+Do not rename them without updating the UI.
+
+---
+
+## 9. Change Control
+
+Do NOT:
+
+- refactor fairness scoring
+- change penalty weights
+- alter beam search depth
+- modify candidate filtering
+
+unless a full regression test pack is executed.
+
+---
+
+## 10. Testing Requirement
+
+Any modification to the rotation engine must pass:
+
+Phase 0 — Determinism  
+Phase 1 — Input Contract  
+Phase 2 — Hard Constraints  
+Phase 3 — Fairness Logic  
+Phase 4 — Boundary Guards  
+Phase 5 — Explain Layer  
+Phase 6 — Strict / Relaxed Fallback  
+Phase 7 — Explain Validation  
+Phase 8 — Fairness Metrics Validation
+
+Status: VERIFIED
+
+These rules extend the rotation engine protection after completing
+Phase 7, Phase 8, Pack I and Pack J verification.
+
+The goal is to guarantee algorithm stability, performance boundaries,
+and correct fallback behavior.
+
+---
+
+# 1. Verified Solver Pipeline
+
+The rotation engine pipeline is now verified and must remain intact.
+
+STRICT search
+↓
+If no shareable plan exists
+↓
+BEAM_EXHAUSTED
+↓
+Fallback to RELAXED
+↓
+If still infeasible
+↓
+FALLBACK mode
+↓
+Return best available plan + explain metrics
+
+The solver must **never silently fail**.
+
+---
+
+# 2. Mode Semantics (DO NOT CHANGE)
+
+The engine can return three modes:
+
+STRICT  
+RELAXED  
+FALLBACK
+
+Rules:
+
+STRICT  
+A fairness-valid plan exists.
+
+RELAXED  
+Fairness constraints were softened.
+
+FALLBACK  
+Beam search exhausted without producing a fairness-valid schedule.
+
+The solver must **honestly report which mode was used**.
+
+---
+
+# 3. Explain Contract
+
+The explain system must continue exposing:
+
+weeks[]
+hardValidCandidatesCount
+totalCandidatesCount
+rejectedBy
+failureReason
+rotationForced
+weekHasMultipleBestCandidates
+
+These fields support algorithm transparency and debugging.
+
+Do not rename or remove them.
+
+---
+
+# 4. Fairness Metrics Contract
+
+The engine must return:
+
+currentPlanMetrics
+bestPlanMetrics
+
+Metrics include:
+
+maxBurden  
+minBurden  
+spread  
+maxBurdenMemberIds  
+consecutiveMax  
+sumPenalty
+
+These metrics power UI summaries and fairness evaluation.
+
+Do not change metric semantics without regression tests.
+
+---
+
+# 5. Pack I Verification (20 Member Load Test)
+
+Pack I verified the solver remains stable with:
+
+• 20 participants  
+• global timezone distribution  
+• 8-week rotation
+
+Observed behavior:
+
+modeUsed = FALLBACK  
+shareablePlanExists = false  
+forcedReason = BEAM_EXHAUSTED
+
+Generation time remained ~2–3 seconds.
+
+This establishes the **current performance envelope**.
+
+The solver must remain stable at this scale.
+
+---
+
+# 6. Pack J Verification (Candidate Density Test)
+
+Pack J verified stability when candidate density increases.
+
+Configuration:
+
+• wide working hours (7–21)
+• 12 members
+• multi-timezone
+• no hard boundaries
+
+Observed behavior:
+
+hardValidCandidatesCount ≈ 48 per week
+modeUsed = FALLBACK
+forcedReason = BEAM_EXHAUSTED
+
+No solver instability or performance degradation occurred.
+
+---
+
+# 7. Beam Search Guard
+
+The beam width parameter:
+
+FAIRNESS_BEAM_WIDTH
+
+Current verified value:
+
+200
+
+This parameter controls search breadth.
+
+Changes must be validated with Pack I and Pack J.
+
+Do not reduce beam width without testing.
+
+---
+
+# 8. Determinism Requirement
+
+The solver must be deterministic.
+
+For identical inputs:
+
+team members  
+timezones  
+constraints  
+meeting cadence  
+weeks  
+
+The output rotation must remain identical.
+
+No randomness may affect scheduling.
+
+---
+
+# 9. Protected Components
+
+The following components are protected:
+
+lib/rotation.ts
+generateRotation()
+generateRotationGuarded()
+beam search scoring
+fairness scoring
+candidate enumeration
+
+Changes require full regression testing.
+
+---
+
+# 10. Change Control
+
+Do NOT modify:
+
+fairness scoring weights  
+beam width defaults  
+candidate enumeration logic  
+fallback pipeline
+
+Unless all rotation test packs pass again.
+
+---
+
+End of Phase 7/8 + Pack I/J rules

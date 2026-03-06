@@ -7,6 +7,7 @@ import {
   hasConsecutiveStretch,
   encodeShareData,
 } from "@/lib/rotation"
+import { ensureDisplayTimezoneIana } from "@/lib/timezone"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -73,8 +74,9 @@ export function FairnessSummary({
     burdenCarriers > 0 && burdenCarriers < team.length && !isEven
 
   const handleShare = async () => {
-    const displayTz =
+    const displayTz = ensureDisplayTimezoneIana(
       config.displayTimezone ?? team[0]?.timezone ?? "America/New_York"
+    )
     const encoded = encodeShareData(team, config, displayTz)
     const url = `${window.location.origin}${window.location.pathname}?d=${encoded}`
     try {

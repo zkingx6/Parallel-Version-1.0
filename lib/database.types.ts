@@ -1,5 +1,6 @@
 import { TeamMember, MeetingConfig, HardNoRange, getInitials } from "./types"
-import { tryResolveToStandardTimezone } from "./timezone"
+import { ensureDisplayTimezoneIana, tryResolveToStandardTimezone } from "./timezone"
+import { isComplementOfOverlapPattern } from "./hard-no-ranges"
 
 export type DbMeeting = {
   id: string
@@ -13,6 +14,8 @@ export type DbMeeting = {
   display_timezone?: string | null
   /** Base time in minutes from midnight (0–1439). null = auto fair mode. */
   base_time_minutes?: number | null
+  /** Week 1 calendar date (YYYY-MM-DD). NULL = next occurrence of day_of_week. */
+  start_date?: string | null
   invite_token: string
   created_at: string
 }
@@ -40,13 +43,17 @@ export function dbMeetingToConfig(m: DbMeeting): MeetingConfig {
     durationMinutes: m.duration_minutes,
     rotationWeeks: m.rotation_weeks,
     baseTimeMinutes: m.base_time_minutes === null ? null : (m.base_time_minutes ?? 540),
+    startDateIso: m.start_date ?? undefined,
+    displayTimezone:
+      m.display_timezone != null
+        ? ensureDisplayTimezoneIana(m.display_timezone)
+        : undefined,
   }
 }
 
 export function dbMemberToTeamMember(s: DbMemberSubmission): TeamMember {
-  const hardNoRanges = Array.isArray(s.hard_no_ranges)
-    ? s.hard_no_ranges
-    : []
+  const raw = Array.isArray(s.hard_no_ranges) ? s.hard_no_ranges : []
+  const hardNoRanges = isComplementOfOverlapPattern(raw) ? [] : raw
   const timezone = tryResolveToStandardTimezone(s.timezone) ?? s.timezone ?? ""
   return {
     id: s.id,

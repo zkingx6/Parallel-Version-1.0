@@ -1,0 +1,40 @@
+---
+description: 
+alwaysApply: true
+---
+
+Phase 4 – Hard Boundary and Feasibility Rules
+
+These rules are additive to Phase 1–3 and must not modify previously verified behavior.
+
+1. Hard boundaries are absolute constraints.
+   - Any time that falls inside a member's `hard_no_ranges` must never be selected.
+   - Such times must be removed from candidate evaluation before scoring.
+
+2. Fixed base time validation.
+   - When `useFixedBaseTime = true`, the selected base time must be validated against all members' hard boundaries.
+   - If the base time falls inside any hard boundary:
+     - schedule generation must not proceed
+     - the UI must block generation and show a hard-boundary message.
+
+3. Auto fair mode behavior.
+   - When `useFixedBaseTime = false`, the system may choose any candidate time that:
+     - is not inside any hard boundary
+     - satisfies algorithm constraints.
+   - The algorithm must never generate a time inside a hard boundary.
+
+4. Shared hard boundary case.
+   - If all members block the same time window, that window must be excluded from candidate times.
+   - If this results in zero feasible candidates, the system must return an infeasible state.
+
+5. Hard boundaries override working hours.
+   - `hard_no_ranges` always take priority over working hours.
+   - Working hours affect burden scoring only and must not override hard boundary exclusion.
+
+6. Do not modify:
+   - rotation fairness scoring
+   - beam search logic
+   - burden calculation
+   - timezone conversion pipeline.
+
+This rule only enforces hard-boundary correctness and feasibility gating.

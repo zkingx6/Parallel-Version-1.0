@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 import {
   utcToLocalInZone,
   convertUtcToLocal,
-  getIanaShortLabel,
+  getOffsetLabelForLocalDateTime,
 } from "@/lib/timezone"
 
 function WeekCard({
@@ -32,7 +32,15 @@ function WeekCard({
   const anchorLocalHour =
     anchorDisplay?.localHour ??
     convertUtcToLocal(week.utcDateIso ?? "2025-03-05", week.utcHour, displayTimezone)
-  const anchorLabel = getIanaShortLabel(displayTimezone)
+  const dateIso = week.utcDateIso ?? "2025-03-05"
+  const localH = Math.floor(anchorLocalHour)
+  const localM = Math.round((anchorLocalHour % 1) * 60)
+  const anchorLabel = getOffsetLabelForLocalDateTime(
+    displayTimezone,
+    dateIso,
+    localH,
+    localM
+  )
 
   return (
     <div

@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 import { DateTime } from "luxon"
 import { MeetingConfig } from "@/lib/types"
-import { getTimezoneOptions, resolveToStandardTimezone } from "@/lib/timezone"
+import { ensureDisplayTimezoneIana, getTimezoneOptions } from "@/lib/timezone"
 
 const DAYS = [
   { label: "Monday", value: 1 },
@@ -38,14 +38,14 @@ function MeetingTimezoneSelect({
 }) {
   const options = useMemo(() => getTimezoneOptions(), [])
   const value = useMemo(
-    () => resolveToStandardTimezone(config.displayTimezone ?? "America/New_York"),
+    () => ensureDisplayTimezoneIana(config.displayTimezone ?? "America/New_York"),
     [config.displayTimezone]
   )
   return (
     <InlineSelect
       value={value}
       onChange={(iana) => {
-        const resolved = resolveToStandardTimezone(iana)
+        const resolved = ensureDisplayTimezoneIana(iana)
         onConfigChange({
           ...config,
           displayTimezone: resolved,

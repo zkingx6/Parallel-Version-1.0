@@ -1,0 +1,86 @@
+---
+description: 
+alwaysApply: true
+---
+
+Phase 1 and Phase 2 scheduling behavior have been fully tested and verified.
+
+These semantics are now considered LOCKED behavior and must NOT be changed.
+
+The following rules are confirmed:
+
+1. Hard Constraints
+- hardNoRanges are the ONLY hard constraint in the scheduling system.
+- If a candidate meeting time intersects any hardNoRange for any participant,
+that candidate MUST be rejected.
+- Working hours are NOT hard constraints.
+- Working hours only influence burden scoring.
+- A meeting outside working hours is allowed and only increases burden.
+
+2. Working Hours Behavior
+- Working hours must never block scheduling.
+- They only affect burden calculations.
+
+Example:
+- A meeting at 19:00 with work window 9–18 is valid and must NOT be rejected.
+
+3. HardNo Range Interval Semantics
+- hardNoRanges use HALF-OPEN interval semantics:
+
+[start, end)
+
+Meaning:
+
+start is inclusive  
+end is exclusive
+
+Example:
+hardNoRange = 12:00–13:00
+
+12:00 → blocked  
+12:30 → blocked  
+12:59 → blocked  
+13:00 → allowed
+
+The algorithm MUST treat end as available.
+
+4. Fixed Anchor Mode
+- When useFixedBaseTime = true:
+- The planner MUST schedule exactly at baseTimeMinutes
+for all weeks.
+- The planner MUST NOT replace the base time with
+another time that has lower burden.
+- The only reason the anchor time may be rejected is:
+intersection with a hardNoRange.
+
+If anchor time passes all hard constraints,
+it MUST be used without rotation.
+
+5. Candidate Generation Rule
+
+baseTimeMinutes MUST always be injected
+into candidate generation.
+
+The system must log whether the base time
+was considered, accepted, or rejected.
+
+6. Determinism Guarantee
+
+- The scheduling algorithm must remain deterministic.
+- For identical inputs:
+team
+hardNoRanges
+work windows
+timezone
+duration
+baseTimeMinutes
+- The planner must produce identical outputs.
+
+7. Safety Constraint
+
+Do NOT modify:
+- lib/rotation.ts scheduling logic  
+- hardNo validation logic  
+- anchor mode behavior  
+- candidate generation logic  
+- unless explicitly instructed and approved.

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
+import { ChevronDownIcon } from "lucide-react"
 import Link from "next/link"
 import { updateMeetingConfig } from "@/lib/actions"
 import {
@@ -11,19 +12,22 @@ import {
 } from "@/lib/database.types"
 import {
   BASE_TIME_OPTIONS,
+  minutesToTimeLabel,
+  parseTimeToMinutes,
   type NoViableTimeResult,
   type RotationResult,
 } from "@/lib/types"
 import { DateTime } from "luxon"
 import {
-  getIanaShortLabel,
-  getTimezoneDisplayLabel,
+  ensureDisplayTimezoneIana,
+  getTimezoneDisplayLabelNow,
   getTimezoneOptions,
   resolveToStandardTimezone,
 } from "@/lib/timezone"
 import {
   generateRotationGuarded,
   canGenerateRotation,
+  getBaseTimeStatus,
   getBurdenCounts,
   hasConsecutiveStretch,
   isInputContractViolation,
@@ -66,6 +70,15 @@ const ROTATION_WEEKS = [
   { label: "10 weeks", value: 10 },
   { label: "12 weeks", value: 12 },
 ]
+
+/** Next occurrence of weekday (1=Mon..7=Sun) as YYYY-MM-DD. */
+function getNextOccurrenceOfWeekday(dayOfWeek: number): string {
+  const now = DateTime.utc()
+  const current = now.weekday
+  let daysUntil = dayOfWeek - current
+  if (daysUntil <= 0) daysUntil += 7
+  return now.plus({ days: daysUntil }).toISODate() ?? ""
+}
 function InlineSelect<T extends number | string>({
   value,
   onChange,
@@ -91,6 +104,191 @@ function InlineSelect<T extends number | string>({
         </option>
       ))}
     </select>
+  )
+}
+
+function BaseTimePicker({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (v: number) => void
+}) {
+  const [inputValue, setInputValue] = useState(() => minutesToTimeLabel(value))
+  const [isOpen, setIsOpen] = useState(false)
+  const [isInvalid, setIsInvalid] = useState(false)
+  const [highlightIndex, setHighlightIndex] = useState(-1)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const didSelectRef = useRef(false)
+
+  const currentIndex = BASE_TIME_OPTIONS.findIndex((o) => o.value === value)
+  const scrollToIndex = useCallback((idx: number) => {
+    const el = listRef.current?.children[idx] as HTMLElement | undefined
+    el?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+  }, [])
+
+  const commit = useCallback(
+    (raw: string) => {
+      const parsed = parseTimeToMinutes(raw)
+      if (parsed != null) {
+        onChange(parsed)
+        setInputValue(minutesToTimeLabel(parsed))
+        setIsInvalid(false)
+      } else {
+        setIsInvalid(true)
+      }
+    },
+    [onChange]
+  )
+
+  const selectOption = useCallback(
+    (opt: { label: string; value: number }) => {
+      didSelectRef.current = true
+      onChange(opt.value)
+      setInputValue(opt.label)
+      setIsInvalid(false)
+      setIsOpen(false)
+      setHighlightIndex(-1)
+    },
+    [onChange]
+  )
+
+  const openDropdown = useCallback(() => {
+    const idx = currentIndex >= 0 ? currentIndex : 0
+    setHighlightIndex(idx)
+    setIsOpen(true)
+    requestAnimationFrame(() => scrollToIndex(idx))
+  }, [currentIndex, scrollToIndex])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+        commit(inputValue)
+      }
+    }
+    document.addEventListener("mousedown", onDocClick)
+    return () => document.removeEventListener("mousedown", onDocClick)
+  }, [isOpen, inputValue, commit])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
+        e.preventDefault()
+        openDropdown()
+      } else if (e.key === "Enter") {
+        commit(inputValue)
+      }
+      return
+    }
+    if (e.key === "Escape") {
+      setIsOpen(false)
+      setInputValue(minutesToTimeLabel(value))
+      setHighlightIndex(-1)
+      return
+    }
+    if (e.key === "Enter") {
+      e.preventDefault()
+      if (highlightIndex >= 0 && BASE_TIME_OPTIONS[highlightIndex]) {
+        selectOption(BASE_TIME_OPTIONS[highlightIndex])
+      } else {
+        commit(inputValue)
+        setIsOpen(false)
+      }
+      return
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      const next = Math.min(highlightIndex + 1, BASE_TIME_OPTIONS.length - 1)
+      setHighlightIndex(next)
+      scrollToIndex(next)
+      return
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault()
+      const next = Math.max(highlightIndex - 1, 0)
+      setHighlightIndex(next)
+      scrollToIndex(next)
+      return
+    }
+  }
+
+  return (
+    <div ref={containerRef} className="relative inline-flex flex-col gap-0.5">
+      <div className="relative flex">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value)
+            setIsInvalid(false)
+            setIsOpen(true)
+            setHighlightIndex(-1)
+          }}
+          onFocus={() => openDropdown()}
+          onBlur={() => {
+            setTimeout(() => {
+              if (didSelectRef.current) {
+                didSelectRef.current = false
+                return
+              }
+              commit(inputValue)
+              setIsOpen(false)
+            }, 150)
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="e.g. 9:00 AM"
+          className={cn(
+            "bg-card border rounded-lg pl-2.5 pr-8 py-1.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 shadow-sm transition-colors w-30",
+            isInvalid
+              ? "border-destructive/60 focus:border-destructive/60"
+              : "border-border/60 hover:border-primary/30"
+          )}
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => (isOpen ? setIsOpen(false) : openDropdown())}
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground focus:outline-none"
+          aria-label="Open time options"
+        >
+          <ChevronDownIcon
+            className={cn("size-4 transition-transform", isOpen && "rotate-180")}
+          />
+        </button>
+      </div>
+      {isOpen && (
+        <div
+          ref={listRef}
+          className="absolute top-full left-0 mt-1 z-50 w-30 max-h-48 overflow-y-auto rounded-lg border border-border/60 bg-card shadow-lg py-1"
+        >
+          {BASE_TIME_OPTIONS.map((opt, idx) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={cn(
+                "w-full text-left px-2.5 py-1.5 text-sm font-medium transition-colors",
+                idx === highlightIndex
+                  ? "bg-primary/15 text-foreground"
+                  : "text-foreground/90 hover:bg-muted/60"
+              )}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                selectOption(opt)
+              }}
+              onMouseEnter={() => setHighlightIndex(idx)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {isInvalid && (
+        <span className="text-xs text-destructive">Invalid time</span>
+      )}
+    </div>
   )
 }
 
@@ -232,7 +430,7 @@ function NoViableTimePanel({
                       : "Working hours"}
                   </Badge>
                   <span className="text-muted-foreground text-xs">
-                    {getTimezoneDisplayLabel(b.timezone)}
+                    {getTimezoneDisplayLabelNow(b.timezone)}
                   </span>
                   <p className="w-full text-muted-foreground text-xs mt-1">
                     {b.localBlockedSummary}
@@ -334,21 +532,15 @@ export function RotationSection({
 }) {
   const [meeting, setMeeting] = useState(initialMeeting)
   const ownerTimezoneIana = getOwnerTimezoneIana(initialMembers)
-  const displayTimezoneInitial = (() => {
-    if (initialMeeting.display_timezone && resolveToStandardTimezone(initialMeeting.display_timezone) === initialMeeting.display_timezone) {
-      return initialMeeting.display_timezone
-    }
-    return ownerTimezoneIana ?? "America/New_York"
-  })()
+  const displayTimezoneInitial = ensureDisplayTimezoneIana(
+    initialMeeting.display_timezone ?? ownerTimezoneIana ?? "America/New_York"
+  )
   const [displayTimezoneIana, setDisplayTimezoneIana] = useState<string>(displayTimezoneInitial)
 
   useEffect(() => {
-    const ownerTz = getOwnerTimezoneIana(initialMembers)
-    const initial =
-      initialMeeting.display_timezone &&
-      resolveToStandardTimezone(initialMeeting.display_timezone) === initialMeeting.display_timezone
-        ? initialMeeting.display_timezone
-        : ownerTz ?? "America/New_York"
+    const initial = ensureDisplayTimezoneIana(
+      initialMeeting.display_timezone ?? getOwnerTimezoneIana(initialMembers) ?? "America/New_York"
+    )
     setDisplayTimezoneIana(initial)
     // Only re-init when loading a different meeting; never when toggling or re-planning
   }, [initialMeeting.id])
@@ -394,6 +586,10 @@ export function RotationSection({
         baseTimeMinutes: null,
         anchorOffset: meeting.anchor_offset,
       }
+  const fixedBaseTimeStatus = useFixedBaseTime
+    ? getBaseTimeStatus(team, { ...config, displayTimezone: displayTimezoneIana })
+    : null
+  const isFixedBaseTimeBlocked = fixedBaseTimeStatus?.blockedByHardNo ?? false
 
   const handleConfigChange = useCallback(
     async (updates: Record<string, number | string | null>) => {
@@ -428,6 +624,12 @@ export function RotationSection({
     if (team.length < 2) {
       console.log("[DEBUG] Early return triggered: team.length < 2")
       setRotationError("At least 2 members needed. Share the invite link.")
+      setNoViableResult(null)
+      return
+    }
+    if (isFixedBaseTimeBlocked) {
+      setRotationError("Blocked by hard boundaries — choose a different time.")
+      setRotationResult(null)
       setNoViableResult(null)
       return
     }
@@ -539,13 +741,39 @@ export function RotationSection({
                 onChange={(v) => handleConfigChange({ day_of_week: v })}
                 options={DAYS}
               />
+              <span className="sr-only sm:not-sr-only">, starting</span>
+              <label className="flex items-center gap-1.5" title="Week 1 date. Leave empty for next occurrence.">
+                <input
+                  type="date"
+                  value={meeting.start_date ?? ""}
+                  onChange={(e) =>
+                    handleConfigChange({
+                      start_date: e.target.value ? e.target.value : null,
+                    })
+                  }
+                  className="bg-card border border-border/60 rounded-lg px-2.5 py-1.5 text-sm font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <span className="text-xs text-muted-foreground/70">
+                  {meeting.start_date ? "(Week 1)" : "(optional)"}
+                </span>
+              </label>
+              {!meeting.start_date && (
+                <span className="text-xs text-muted-foreground/60">
+                  Start week: Next{" "}
+                  {DateTime.fromISO(
+                    getNextOccurrenceOfWeekday(meeting.day_of_week),
+                    { zone: "utc" }
+                  ).toFormat("ccc, MMM d")}{" "}
+                  (auto)
+                </span>
+              )}
               {meeting.base_time_minutes != null && (
                 <>
                   <span>at</span>
-                  <InlineSelect
+                  <BaseTimePicker
+                    key={meeting.base_time_minutes ?? 540}
                     value={meeting.base_time_minutes ?? 540}
                     onChange={(v) => handleConfigChange({ base_time_minutes: v })}
-                    options={BASE_TIME_OPTIONS}
                   />
                 </>
               )}
@@ -582,8 +810,31 @@ export function RotationSection({
             </div>
             {!useFixedBaseTime && (
               <p className="text-xs text-muted-foreground/70">
-                Times displayed in {getIanaShortLabel(displayTimezoneIana)}. Algorithm runs in UTC.
+                Times displayed in {getTimezoneDisplayLabelNow(displayTimezoneIana)}. Algorithm runs in UTC.
               </p>
+            )}
+            {useFixedBaseTime && (
+              <>
+                <p className="text-xs text-muted-foreground/70">
+                  Anchor time in {getTimezoneDisplayLabelNow(displayTimezoneIana)}.
+                </p>
+                {fixedBaseTimeStatus && (
+                  <>
+                    {fixedBaseTimeStatus.blockedByHardNo && (
+                      <p className="text-xs text-destructive mt-1">
+                        Blocked by hard boundaries — choose a different time.
+                      </p>
+                    )}
+                    {fixedBaseTimeStatus.outsideWorkHoursCount > 0 && (
+                      <p className="text-xs text-muted-foreground/70 mt-1">
+                        Outside working hours for {fixedBaseTimeStatus.outsideWorkHoursCount} member
+                        {fixedBaseTimeStatus.outsideWorkHoursCount !== 1 ? "s" : ""} — burden will
+                        increase.
+                      </p>
+                    )}
+                  </>
+                )}
+              </>
             )}
             <label className="flex items-center gap-2.5 cursor-pointer pt-2">
               <input
@@ -626,18 +877,20 @@ export function RotationSection({
             size="lg"
             className={cn(
               "w-full h-12 text-sm font-medium rounded-xl shadow-sm transition-all duration-200",
-              team.length < 2 && "opacity-50 cursor-not-allowed"
+              (team.length < 2 || isFixedBaseTimeBlocked) && "opacity-50 cursor-not-allowed"
             )}
-            disabled={team.length < 2 || isGenerating}
+            disabled={team.length < 2 || isGenerating || isFixedBaseTimeBlocked}
             onClick={handleGenerate}
           >
             {isGenerating
               ? "Planning…"
               : `Plan the next ${meeting.rotation_weeks} weeks fairly`}
           </Button>
-          {team.length < 2 && (
+          {(team.length < 2 || isFixedBaseTimeBlocked) && (
             <p className="text-xs text-muted-foreground/60 text-center mt-2">
-              At least 2 members needed. Share the invite link.
+              {team.length < 2
+                ? "At least 2 members needed. Share the invite link."
+                : "Blocked by hard boundaries — choose a different time."}
             </p>
           )}
         </div>

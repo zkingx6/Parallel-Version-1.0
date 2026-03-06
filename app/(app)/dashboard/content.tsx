@@ -124,13 +124,14 @@ export function DashboardContent({ meetings }: { meetings: DbMeeting[] }) {
       </div>
 
       <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm mb-6">
+        <p className="text-xs font-medium text-muted-foreground mb-2">Add meeting</p>
         <div className="flex gap-3">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            placeholder="New meeting title…"
+            placeholder="Meeting title…"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/40"
           />
           <Button
@@ -139,14 +140,14 @@ export function DashboardContent({ meetings }: { meetings: DbMeeting[] }) {
             onClick={handleCreate}
             className="rounded-lg text-xs h-8 px-4"
           >
-            {creating ? "Creating…" : "Create"}
+            {creating ? "Adding…" : "Add meeting"}
           </Button>
         </div>
       </div>
 
       {meetings.length === 0 ? (
         <p className="text-sm text-muted-foreground/50 text-center py-12">
-          No meetings yet. Create one above.
+          No meetings yet. Add one above.
         </p>
       ) : (
         <div className="space-y-2">

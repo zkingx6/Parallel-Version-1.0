@@ -7,7 +7,7 @@ import {
   getHardNoEndOptions,
   HardNoRange,
 } from "@/lib/types"
-import { getTimezoneOptions, resolveToStandardTimezone } from "@/lib/timezone"
+import { ensureDisplayTimezoneIana, getTimezoneOptions } from "@/lib/timezone"
 import { Button } from "@/components/ui/button"
 
 export type ParticipantFormPayload = {
@@ -38,8 +38,8 @@ const inputClasses =
 const selectClasses =
   "bg-transparent border-none text-muted-foreground cursor-pointer focus:outline-none focus:text-foreground p-0 text-[11px] appearance-none"
 
-function resolveDefaultTimezone(v: string | undefined): string {
-  if (v) return resolveToStandardTimezone(v)
+function resolveDefaultTimezone(v: string | number | undefined): string {
+  if (v != null) return ensureDisplayTimezoneIana(String(v))
   return "America/New_York"
 }
 

@@ -82,6 +82,30 @@ export function resolveToStandardTimezone(
   return "America/New_York"
 }
 
+/**
+ * Ensure display timezone is IANA only. Rejects fixed-offset zones and label strings.
+ * Use this when reading display_timezone from DB or user input.
+ * - "UTC-05:00", "Etc/GMT+5", "New York (UTC-05:00)" → normalized to IANA (America/New_York)
+ * - "America/New_York" → passes through
+ */
+export function ensureDisplayTimezoneIana(
+  value: string | null | undefined
+): string {
+  if (!value || typeof value !== "string") return "America/New_York"
+  const trimmed = value.trim()
+  if (!trimmed) return "America/New_York"
+  if (STANDARD_TIMEZONES.includes(trimmed)) return trimmed
+  if (
+    trimmed.startsWith("UTC") ||
+    trimmed.startsWith("Etc/") ||
+    trimmed.includes("GMT") ||
+    trimmed.includes("(UTC")
+  ) {
+    return "America/New_York"
+  }
+  return resolveToStandardTimezone(trimmed)
+}
+
 /** Canonicalize IANA if in STANDARD_TIMEZONES. Returns null if not (no fallback). */
 export function tryResolveToStandardTimezone(
   iana: string | null | undefined
@@ -101,6 +125,18 @@ export function getDisplayTimezone(
 export function getMemberTimezone(timezoneIana: string | null | undefined): string {
   if (timezoneIana) return timezoneIana
   return "UTC"
+}
+
+/**
+ * Get offset in hours for a given date in an IANA zone. DST-aware.
+ * Used for anchor mode: fixed local time across DST boundaries.
+ */
+export function getOffsetHoursForDate(
+  utcDateIso: string,
+  displayTimezone: string
+): number {
+  const dt = DateTime.fromISO(utcDateIso, { zone: "utc" }).setZone(displayTimezone)
+  return dt.offset / 60
 }
 
 /**
@@ -155,11 +191,56 @@ export function getIanaShortLabel(zone: string): string {
   return getCityName(zone)
 }
 
-/** Full display label: "City (UTC±HH:MM)". */
-export function getTimezoneDisplayLabel(iana: string): string {
+/**
+ * Full display label: "City (UTC±HH:MM)".
+ * Offset computed from DateTime.now(). Use for top "displayed in ..." label only.
+ */
+export function getTimezoneDisplayLabelNow(iana: string): string {
   const dt = DateTime.now().setZone(iana)
   const city = getCityName(iana)
   const offsetLabel = formatOffsetLabel(dt.offset)
   return `${city} (${offsetLabel})`
+}
+
+/**
+ * Full display label: "City (UTC±HH:MM)" with offset computed at a specific
+ * local time-of-day. Avoids DST boundary bugs (e.g. Mar 8 midnight = EST,
+ * Mar 8 9:00 AM = EDT). Use noon by default to avoid midnight boundary.
+ *
+ * @param dateISO - YYYY-MM-DD or full ISO string
+ * @param hourForOffset - local hour (0-23) for offset computation
+ * @param minute - local minute (0-59)
+ */
+export function getOffsetLabelForLocalDateTime(
+  iana: string,
+  dateISO: string,
+  hourForOffset = 12,
+  minute = 0
+): string {
+  const dt = DateTime.fromISO(dateISO, { zone: iana }).set({
+    hour: hourForOffset,
+    minute,
+    second: 0,
+    millisecond: 0,
+  })
+  const city = getCityName(iana)
+  const offsetLabel = formatOffsetLabel(dt.offset)
+  return `${city} (${offsetLabel})`
+}
+
+/**
+ * Full display label for a specific date. Offset at noon local (avoids midnight DST boundary).
+ * @deprecated Prefer getOffsetLabelForLocalDateTime with meeting time for schedule headers.
+ */
+export function getTimezoneDisplayLabelForDate(
+  iana: string,
+  dateISO: string
+): string {
+  return getOffsetLabelForLocalDateTime(iana, dateISO, 12, 0)
+}
+
+/** @deprecated Use getTimezoneDisplayLabelNow for "displayed in" or getTimezoneDisplayLabelForDate for schedule. */
+export function getTimezoneDisplayLabel(iana: string): string {
+  return getTimezoneDisplayLabelNow(iana)
 }
 
