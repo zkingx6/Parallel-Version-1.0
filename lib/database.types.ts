@@ -16,6 +16,8 @@ export type DbMeeting = {
   base_time_minutes?: number | null
   /** Week 1 calendar date (YYYY-MM-DD). NULL = next occurrence of day_of_week. */
   start_date?: string | null
+  /** Published rotation result when owner publishes from Rotation. NULL when not published. */
+  published_schedule?: unknown | null
   invite_token: string
   created_at: string
 }

@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { getMemberTeamSummary, getMemberDashboardData } from "@/lib/actions"
+import { getMemberTeamSummary, getMemberDashboardData, getSchedulesForCurrentUser } from "@/lib/actions"
 import { getStoredMemberTeams, addStoredMemberTeam } from "@/lib/member-teams-storage"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
+import { ScheduleListContent } from "@/components/parallel/schedule-list-content"
 
 type TeamSummary = {
   token: string
@@ -189,6 +190,29 @@ function ScheduleTab({
   navMember: { name: string; avatar_url?: string | null; updated_at?: string } | null
   meetingTitle: string
 }) {
+  const [schedules, setSchedules] = useState<{ id: string; name: string; weeks: number; created_at: string; team_id: string }[]>([])
+  const [teamTitles, setTeamTitles] = useState<Record<string, string>>({})
+  const [scheduleLoading, setScheduleLoading] = useState(true)
+  const [debugData, setDebugData] = useState<Record<string, unknown> | null>(null)
+  const [debugOpen, setDebugOpen] = useState(false)
+
+  useEffect(() => {
+    getSchedulesForCurrentUser().then((r) => {
+      setScheduleLoading(false)
+      if (r.data) {
+        setSchedules(r.data.schedules)
+        setTeamTitles(r.data.teamTitles)
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/dev/debug-member-schedule")
+      .then((res) => res.json())
+      .then((d) => setDebugData(d))
+      .catch(() => setDebugData({ error: "Failed to fetch debug" }))
+  }, [])
+
   return (
     <div className="min-h-screen bg-background">
       <MemberTopNav
@@ -218,15 +242,35 @@ function ScheduleTab({
           </p>
         </section>
 
-        <section className="rounded-xl border border-border/50 bg-card p-8 mb-6 shadow-sm text-center">
-          <p className="text-sm text-muted-foreground">
-            No schedule has been published yet.
-          </p>
-          <p className="text-sm text-muted-foreground/80 mt-2">
-            Team owners have not finalized rotations. Once schedules are
-            generated, your assigned meeting times will appear here.
-          </p>
-        </section>
+        {scheduleLoading ? (
+          <section className="rounded-xl border border-border/50 bg-card p-8 mb-6 shadow-sm text-center">
+            <p className="text-sm text-muted-foreground">Loading schedules…</p>
+          </section>
+        ) : (
+          <ScheduleListContent
+            schedules={schedules}
+            teamTitles={teamTitles}
+            showDeleteButton={false}
+            emptyStateHref={teamUrl}
+          />
+        )}
+
+        {process.env.NODE_ENV === "development" && debugData && (
+          <section className="mt-8 rounded-xl border border-amber-500/50 bg-amber-500/5 p-4">
+            <button
+              type="button"
+              onClick={() => setDebugOpen(!debugOpen)}
+              className="text-sm font-medium text-amber-700 dark:text-amber-400"
+            >
+              [DEV] Member schedule debug {debugOpen ? "▼" : "▶"}
+            </button>
+            {debugOpen && (
+              <pre className="mt-2 overflow-auto text-xs text-muted-foreground max-h-96">
+                {JSON.stringify(debugData, null, 2)}
+              </pre>
+            )}
+          </section>
+        )}
       </main>
     </div>
   )

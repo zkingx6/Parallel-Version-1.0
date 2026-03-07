@@ -4,6 +4,7 @@ import {
   isRotationResult,
   getBurdenCounts,
   getBaseTimeStatus,
+  alternatingPatternJitter,
 } from "./rotation"
 import type { TeamMember, MeetingConfig } from "./types"
 import { DEFAULT_FAIRNESS_THRESHOLDS } from "./types"
@@ -183,6 +184,46 @@ describe("Fairness Guarantee", () => {
     const status = getBaseTimeStatus(team, config)
     expect(status).not.toBeNull()
     expect(status!.blockedByHardNo).toBe(true)
+  })
+
+  it("alternatingPatternJitter: clean alternating pattern has lower jitter than jittered", () => {
+    const clean = [
+      { utcHour: 20.5 },
+      { utcHour: 8.5 },
+      { utcHour: 20.5 },
+      { utcHour: 8.5 },
+    ]
+    const jittered = [
+      { utcHour: 20.0 },
+      { utcHour: 8.5 },
+      { utcHour: 20.5 },
+      { utcHour: 8.5 },
+    ]
+    expect(alternatingPatternJitter(clean)).toBe(0)
+    expect(alternatingPatternJitter(jittered)).toBeGreaterThan(0)
+    expect(alternatingPatternJitter(clean)).toBeLessThan(alternatingPatternJitter(jittered))
+  })
+
+  it("alternatingPatternJitter: beam produces deterministic plan with valid jitter metric", () => {
+    const team: TeamMember[] = [
+      makeMember("a", "Alice", "America/New_York", 9, 18, [{ start: 0, end: 6 }]),
+      makeMember("b", "Bob", "Europe/London", 9, 18, [{ start: 0, end: 6 }]),
+    ]
+    const config: MeetingConfig = {
+      ...defaultConfig,
+      baseTimeMinutes: undefined,
+      rotationWeeks: 4,
+      dayOfWeek: 2,
+    }
+    const r1 = generateRotation(team, config)
+    const r2 = generateRotation(team, config)
+    expect(isRotationResult(r1)).toBe(true)
+    expect(isRotationResult(r2)).toBe(true)
+    if (!isRotationResult(r1) || !isRotationResult(r2)) return
+    expect(r1.weeks.map((w) => w.utcHour)).toEqual(r2.weeks.map((w) => w.utcHour))
+    const jitter = alternatingPatternJitter(r1.weeks.map((w) => ({ utcHour: w.utcHour })))
+    expect(typeof jitter).toBe("number")
+    expect(jitter).toBeGreaterThanOrEqual(0)
   })
 
   it("when NO shareable plan exists: returns forced plan with shareablePlanExists=false, forcedReason and evidence", () => {

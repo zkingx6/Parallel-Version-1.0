@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import { ChevronDownIcon } from "lucide-react"
 import Link from "next/link"
-import { updateMeetingConfig } from "@/lib/actions"
+import { useRouter } from "next/navigation"
+import { updateMeetingConfig, createScheduleRecord } from "@/lib/actions"
 import {
   DbMeeting,
   DbMemberSubmission,
@@ -562,7 +563,8 @@ export function RotationSection({
   const [noViableResult, setNoViableResult] = useState<NoViableTimeResult | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [rotationError, setRotationError] = useState<string | null>(null)
-  const [showExplainDetails, setShowExplainDetails] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const router = useRouter()
 
   const rotation = rotationResult?.weeks ?? null
 
@@ -698,6 +700,27 @@ export function RotationSection({
     },
     []
   )
+
+  const handlePublishSchedule = async () => {
+    if (!rotationResult?.weeks?.length) return
+    setIsPublishing(true)
+    try {
+      const result = await createScheduleRecord(meeting.id, meeting.title, {
+        weeks: rotationResult.weeks,
+        modeUsed: rotationResult.modeUsed,
+        explain: rotationResult.explain,
+      })
+      if (result?.error) {
+        setRotationError(result.error)
+        return
+      }
+      if (result?.data?.id) {
+        router.push(`/schedule/${result.data.id}`)
+      }
+    } finally {
+      setIsPublishing(false)
+    }
+  }
 
   const burdenData = rotation ? getBurdenCounts(rotation, team) : null
   const maxCount = burdenData
@@ -928,25 +951,6 @@ export function RotationSection({
               displayTimezone={displayTimezoneIana}
               useBaseTime={useFixedBaseTime}
             />
-            {rotationResult && rotationResult.modeUsed !== "STRICT" && (
-              <div className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Rotation constraints were relaxed to produce a viable plan.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowExplainDetails((d) => !d)}
-                  className="text-xs text-primary hover:text-primary/80"
-                >
-                  {showExplainDetails ? "Hide details" : "See details"}
-                </button>
-                {showExplainDetails && rotationResult.explain && (
-                  <pre className="mt-2 p-2 rounded bg-muted/40 text-xs overflow-auto max-h-48">
-                    {JSON.stringify(rotationResult.explain, null, 2)}
-                  </pre>
-                )}
-              </div>
-            )}
             {rotationResult?.explain?.weeks?.some((w) => w.unavoidableMaxMemberId) && (
               <p className="text-sm text-muted-foreground">
                 Given the current hard limits, at least one member had to take a
@@ -1008,6 +1012,17 @@ export function RotationSection({
                 )}
               </div>
             </section>
+
+            <div className="pt-6">
+              <Button
+                size="lg"
+                className="w-full h-12 text-sm font-medium rounded-xl shadow-sm"
+                onClick={handlePublishSchedule}
+                disabled={isPublishing}
+              >
+                {isPublishing ? "Publishing…" : "Publish schedule"}
+              </Button>
+            </div>
           </>
         )}
 

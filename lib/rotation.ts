@@ -1394,6 +1394,20 @@ function computeConsecutiveMax(
   return best
 }
 
+/** Variance of array (0 if length <= 1). */
+function varianceOf(hours: number[]): number {
+  if (hours.length <= 1) return 0
+  const mean = hours.reduce((a, b) => a + b, 0) / hours.length
+  return hours.reduce((s, h) => s + (h - mean) ** 2, 0) / hours.length
+}
+
+/** Jitter within alternating pattern (even vs odd weeks). Lower = more consistent. Exported for tests. */
+export function alternatingPatternJitter(weeks: Array<{ utcHour: number }>): number {
+  const evens = weeks.filter((_, i) => i % 2 === 0).map((w) => w.utcHour)
+  const odds = weeks.filter((_, i) => i % 2 === 1).map((w) => w.utcHour)
+  return varianceOf(evens) + varianceOf(odds)
+}
+
 function debugLogPlanMetrics(
   team: TeamMember[],
   burden: Record<string, number>,
@@ -1642,6 +1656,9 @@ function fairnessGuaranteeBeamSearch(
       if (a.totalPenalty !== b.totalPenalty) return a.totalPenalty - b.totalPenalty
       if (a.totalSlotDeviation !== b.totalSlotDeviation)
         return a.totalSlotDeviation - b.totalSlotDeviation
+      const jitterA = alternatingPatternJitter(a.weeks)
+      const jitterB = alternatingPatternJitter(b.weeks)
+      if (jitterA !== jitterB) return jitterA - jitterB
       const lastA = a.weeks[a.weeks.length - 1]?.utcHour ?? 0
       const lastB = b.weeks[b.weeks.length - 1]?.utcHour ?? 0
       return lastA - lastB
@@ -1802,6 +1819,9 @@ function runFallbackBeamNoPruning(
       if (a.totalPenalty !== b.totalPenalty) return a.totalPenalty - b.totalPenalty
       if (a.totalSlotDeviation !== b.totalSlotDeviation)
         return a.totalSlotDeviation - b.totalSlotDeviation
+      const jitterA = alternatingPatternJitter(a.weeks)
+      const jitterB = alternatingPatternJitter(b.weeks)
+      if (jitterA !== jitterB) return jitterA - jitterB
       const lastA = a.weeks[a.weeks.length - 1]?.utcHour ?? 0
       const lastB = b.weeks[b.weeks.length - 1]?.utcHour ?? 0
       return lastA - lastB

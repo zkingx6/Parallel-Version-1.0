@@ -92,10 +92,7 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
           ) : (
             <span className={cn(tabBase, tabDisabled)}>Rotation</span>
           )}
-          <Link
-            href="/schedule"
-            className={getTabClass(isSchedule)}
-          >
+          <Link href="/schedule" className={getTabClass(isSchedule)}>
             Schedule
           </Link>
         </nav>

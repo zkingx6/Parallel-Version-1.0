@@ -25,7 +25,17 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const pathname = request.nextUrl.pathname
+  if (pathname.startsWith("/join/") && !user) {
+    const redirectTo = request.nextUrl.pathname + request.nextUrl.search
+    return NextResponse.redirect(
+      new URL(`/?redirect=${encodeURIComponent(redirectTo)}`, request.url)
+    )
+  }
 
   return supabaseResponse
 }

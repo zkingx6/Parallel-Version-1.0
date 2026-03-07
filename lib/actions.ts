@@ -12,14 +12,37 @@ export async function createMeeting(title: string) {
   } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
 
-  const { data, error } = await supabase
+  const { data: meeting, error } = await supabase
     .from("meetings")
     .insert({ manager_id: user.id, title })
     .select()
     .single()
 
   if (error) return { error: error.message }
-  return { data }
+  if (!meeting) return { error: "Failed to create meeting" }
+
+  const ownerName =
+    (user.user_metadata?.full_name as string) ||
+    (user.user_metadata?.name as string) ||
+    user.email?.split("@")[0] ||
+    "Owner"
+
+  const { error: memberError } = await supabase.from("member_submissions").insert({
+    meeting_id: meeting.id,
+    name: ownerName,
+    timezone: "America/New_York",
+    work_start_hour: 9,
+    work_end_hour: 18,
+    hard_no_ranges: [],
+    is_owner_participant: true,
+    user_id: user.id,
+  })
+
+  if (memberError) {
+    console.error("[createMeeting] Failed to insert owner as member:", memberError)
+  }
+
+  return { data: meeting }
 }
 
 export async function updateMeetingConfig(
@@ -51,6 +74,95 @@ export async function updateMeetingConfig(
   revalidatePath(`/meeting/${meetingId}`)
   revalidatePath(`/team/${meetingId}`)
   revalidatePath(`/rotation/${meetingId}`)
+  revalidatePath(`/schedule`)
+  return { success: true }
+}
+
+export async function createScheduleRecord(
+  teamId: string,
+  name: string,
+  rotationResult: { weeks: unknown[]; modeUsed: string; explain: unknown }
+) {
+  const supabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: "Not authenticated" }
+
+  const weeks = rotationResult.weeks?.length ?? 0
+  const { data, error } = await supabase
+    .from("schedules")
+    .insert({
+      team_id: teamId,
+      name,
+      rotation_result: rotationResult,
+      weeks,
+    })
+    .select("id")
+    .single()
+
+  if (error) return { error: error.message }
+  revalidatePath(`/rotation/${teamId}`)
+  revalidatePath(`/schedule`)
+  return { data: data as { id: string } }
+}
+
+export async function getSchedulesForCurrentUser() {
+  const supabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // DEBUG: member schedule visibility (check server logs when member visits schedule tab)
+  console.log("[member-schedule-debug]", {
+    authUserId: user?.id ?? null,
+    authUserIsNull: user === null,
+  })
+
+  if (!user) {
+    return { data: { schedules: [], teamTitles: {} } }
+  }
+
+  const { data: schedules, error } = await supabase
+    .from("schedules")
+    .select("*")
+    .order("created_at", { ascending: false })
+
+  console.log("[member-schedule-debug] query result:", {
+    rowCount: schedules?.length ?? 0,
+    error: error?.message ?? null,
+  })
+
+  const items = schedules ?? []
+  const teamIds = [...new Set(items.map((s) => s.team_id))]
+  const teamTitles: Record<string, string> = {}
+  if (teamIds.length > 0) {
+    const { data: meetings } = await supabase
+      .from("meetings")
+      .select("id, title")
+      .in("id", teamIds)
+    for (const m of meetings ?? []) {
+      teamTitles[m.id] = m.title
+    }
+  }
+
+  return { data: { schedules: items, teamTitles } }
+}
+
+export async function deleteSchedule(scheduleId: string) {
+  const supabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: "Not authenticated" }
+
+  const { error } = await supabase
+    .from("schedules")
+    .delete()
+    .eq("id", scheduleId)
+
+  if (error) return { error: error.message }
+  revalidatePath(`/schedule`)
   return { success: true }
 }
 
@@ -351,6 +463,11 @@ export async function submitMember(
   existingId?: string
 ) {
   const supabase = createServiceSupabase()
+  const serverSupabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await serverSupabase.auth.getUser()
+  const userId = user?.id ?? null
 
   const { data: meeting } = await supabase
     .from("meetings")
@@ -380,6 +497,7 @@ export async function submitMember(
       .from("member_submissions")
       .update({
         ...persistInput,
+        user_id: userId,
         updated_at: new Date().toISOString(),
       })
       .eq("id", existingId)
@@ -397,6 +515,7 @@ export async function submitMember(
     .from("member_submissions")
     .insert({
       meeting_id: meeting.id,
+      user_id: userId,
       ...persistInput,
     })
     .select()

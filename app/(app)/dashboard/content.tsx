@@ -21,12 +21,18 @@ const rotationStatus = {
 export function DashboardContent({ meetings }: { meetings: DbMeeting[] }) {
   const [title, setTitle] = useState("")
   const [creating, setCreating] = useState(false)
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
+  const [items, setItems] = useState(meetings)
   const router = useRouter()
   const { setSetupFromMeetings } = useSetup()
 
   useEffect(() => {
     setSetupFromMeetings(meetings)
   }, [meetings, setSetupFromMeetings])
+
+  useEffect(() => {
+    setItems(meetings)
+  }, [meetings])
 
   const handleCreate = async () => {
     if (!title.trim()) return
@@ -40,6 +46,9 @@ export function DashboardContent({ meetings }: { meetings: DbMeeting[] }) {
 
   const handleDelete = async (id: string) => {
     await deleteMeeting(id)
+    setItems((prev) => prev.filter((m) => m.id !== id))
+    setConfirmRemoveId(null)
+    setSetupFromMeetings(items.filter((m) => m.id !== id))
     router.refresh()
   }
 
@@ -145,40 +154,73 @@ export function DashboardContent({ meetings }: { meetings: DbMeeting[] }) {
         </div>
       </div>
 
-      {meetings.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-sm text-muted-foreground/50 text-center py-12">
           No teams yet. Create one above.
         </p>
       ) : (
         <div className="space-y-2">
-          {meetings.map((m) => (
-            <div
-              key={m.id}
-              className="rounded-xl border border-border/50 bg-card shadow-sm p-4 flex items-center justify-between hover:border-primary/20 transition-colors cursor-pointer"
-              onClick={() => router.push(`/team/${m.id}`)}
-            >
-              <div>
-                <p className="text-sm font-medium">{m.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {new Date(m.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDelete(m.id)
+          {items.map((m) => {
+            const isConfirming = confirmRemoveId === m.id
+            return (
+              <div
+                key={m.id}
+                className="rounded-xl border border-border/50 bg-card shadow-sm p-4 flex items-center justify-between hover:border-primary/20 transition-colors cursor-pointer"
+                onClick={() => {
+                  if (isConfirming) {
+                    setConfirmRemoveId(null)
+                  } else {
+                    router.push(`/team/${m.id}`)
+                  }
                 }}
-                className="text-muted-foreground/30 hover:text-destructive transition-colors text-lg px-1 cursor-pointer"
-                aria-label="Delete team"
               >
-                ×
-              </button>
-            </div>
-          ))}
+                <div>
+                  <p className="text-sm font-medium">{m.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {new Date(m.created_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+                <div
+                  className="flex items-center gap-1.5 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {isConfirming ? (
+                    <>
+                      <span className="text-[11px] text-muted-foreground">
+                        Remove team?
+                      </span>
+                      <button
+                        onClick={() => setConfirmRemoveId(null)}
+                        className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        className="h-6 px-2 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
+                        onClick={() => handleDelete(m.id)}
+                      >
+                        Remove
+                      </Button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmRemoveId(m.id)}
+                      className="text-muted-foreground/30 hover:text-destructive transition-colors text-lg px-1 cursor-pointer"
+                      aria-label="Delete team"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </main>

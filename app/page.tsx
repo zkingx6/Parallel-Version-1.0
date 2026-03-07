@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 
@@ -12,6 +12,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get("redirect")
   const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,7 +38,11 @@ export default function Home() {
       return
     }
 
-    router.push("/meetings")
+    const safeRedirect =
+      redirectTo &&
+      redirectTo.startsWith("/") &&
+      !redirectTo.startsWith("//")
+    router.push(safeRedirect ? redirectTo : "/meetings")
     router.refresh()
   }
 
@@ -48,7 +54,11 @@ export default function Home() {
             Parallel
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {isSignUp ? "Create your manager account" : "Sign in to manage meetings"}
+            {isSignUp
+              ? "Create your manager account"
+              : redirectTo
+                ? "Sign in to join the team"
+                : "Sign in to manage meetings"}
           </p>
         </div>
 
