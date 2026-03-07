@@ -4,8 +4,15 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useSetup } from "@/lib/setup-context"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
-export function TopNav() {
+type TopNavProps = {
+  userEmail: string
+  userName: string
+  userAvatar: string
+}
+
+export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
   const pathname = usePathname()
   const { isSetupComplete, firstMeetingId } = useSetup()
 
@@ -25,19 +32,18 @@ export function TopNav() {
   const teamRotationEnabled =
     isSetupComplete || (meetingIdFromUrl && meetingIdFromUrl !== "rotation-settings")
 
-  // Explicit route-to-tab mapping (not startsWith) so /team/rotation-settings highlights Meetings.
+  // Explicit route-to-tab mapping.
   const activeTab = (() => {
     if (pathname === "/meetings") return "meetings"
     if (pathname?.startsWith("/team/rotation-settings")) return "meetings"
-    if (pathname?.startsWith("/team/")) return "team"
+    if (pathname?.startsWith("/team/")) return "meetings"
     if (pathname?.startsWith("/rotation/")) return "rotation"
-    if (pathname?.startsWith("/availability")) return "availability"
+    if (pathname?.startsWith("/schedule")) return "schedule"
     return null
   })()
   const isMeetings = activeTab === "meetings"
-  const isTeam = activeTab === "team"
   const isRotation = activeTab === "rotation"
-  const isAvailability = activeTab === "availability"
+  const isSchedule = activeTab === "schedule"
   const isAccount = pathname?.startsWith("/settings")
 
   const tabBase =
@@ -68,53 +74,50 @@ export function TopNav() {
           </Link>
         </div>
 
-        {/* Center: Tabs (Meetings | Team | Rotation | Availability) */}
+        {/* Center: Tabs (Teams | Rotation | Schedule) */}
         <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 text-sm">
           <Link
             href="/meetings"
             className={getTabClass(isMeetings)}
           >
-            Meetings
+            Teams
           </Link>
           {teamRotationEnabled && targetMeetingId ? (
-            <>
-              <Link
-                href={`/team/${targetMeetingId}`}
-                className={getTabClass(isTeam)}
-              >
-                Team
-              </Link>
-              <Link
-                href={`/rotation/${targetMeetingId}`}
-                className={getTabClass(isRotation)}
-              >
-                Rotation
-              </Link>
-            </>
+            <Link
+              href={`/rotation/${targetMeetingId}`}
+              className={getTabClass(isRotation)}
+            >
+              Rotation
+            </Link>
           ) : (
-            <>
-              <span className={cn(tabBase, tabDisabled)}>Team</span>
-              <span className={cn(tabBase, tabDisabled)}>Rotation</span>
-            </>
+            <span className={cn(tabBase, tabDisabled)}>Rotation</span>
           )}
           <Link
-            href="/availability"
-            className={getTabClass(isAvailability)}
+            href="/schedule"
+            className={getTabClass(isSchedule)}
           >
-            Availability
+            Schedule
           </Link>
         </nav>
 
-        {/* Right: Account */}
+        {/* Right: Account avatar */}
         <div className="shrink-0">
           <Link
             href="/settings"
             className={cn(
-              "text-sm font-medium transition-colors",
-              isAccount ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              isAccount && "ring-2 ring-neutral-300 ring-offset-2 ring-offset-background"
             )}
+            aria-label="Account"
           >
-            Account
+            <Avatar className="size-8">
+              {userAvatar ? (
+                <AvatarImage src={userAvatar} alt="" />
+              ) : null}
+              <AvatarFallback className="text-xs">
+                {userName ? userName[0].toUpperCase() : userEmail ? userEmail[0].toUpperCase() : "?"}
+              </AvatarFallback>
+            </Avatar>
           </Link>
         </div>
       </div>

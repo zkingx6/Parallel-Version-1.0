@@ -31,6 +31,7 @@ export type DbMemberSubmission = {
   hard_no_ranges: HardNoRange[]
   role: string | null
   is_owner_participant?: boolean
+  avatar_url?: string | null
   created_at: string
   updated_at: string
 }

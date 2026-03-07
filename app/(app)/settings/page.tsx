@@ -16,11 +16,13 @@ export default async function SettingsPage() {
         user?.email?.split("@")[0] ||
         ""
       }
-      userAvatar={
-        (user?.user_metadata?.avatar_url as string) ||
-        (user?.user_metadata?.picture as string) ||
-        ""
-      }
+      userAvatar={(() => {
+        const url =
+          (user?.user_metadata?.avatar_url as string) ||
+          (user?.user_metadata?.picture as string) ||
+          ""
+        return url ? `${url}?v=${user?.updated_at ?? ""}` : ""
+      })()}
     />
   )
 }

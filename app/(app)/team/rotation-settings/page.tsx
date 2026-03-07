@@ -148,7 +148,7 @@ export default function RotationSettingsPage() {
         href="/meetings"
         className="mb-8 inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
       >
-        ← Back to Meetings
+        ← Back to Teams
       </Link>
 
       <header className="mb-10">

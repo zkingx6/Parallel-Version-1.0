@@ -116,22 +116,22 @@ export function DashboardContent({ meetings }: { meetings: DbMeeting[] }) {
 
       <div className="mb-10">
         <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-          Your meetings
+          Your teams
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Create a meeting, invite your team, and plan a fair rotation.
+          Create a team, invite members, and plan fair rotation schedules.
         </p>
       </div>
 
       <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm mb-6">
-        <p className="text-xs font-medium text-muted-foreground mb-2">Add meeting</p>
+        <p className="text-xs font-medium text-muted-foreground mb-2">Create team</p>
         <div className="flex gap-3">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            placeholder="Meeting title…"
+            placeholder="Team name…"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/40"
           />
           <Button
@@ -140,14 +140,14 @@ export function DashboardContent({ meetings }: { meetings: DbMeeting[] }) {
             onClick={handleCreate}
             className="rounded-lg text-xs h-8 px-4"
           >
-            {creating ? "Adding…" : "Add meeting"}
+            {creating ? "Creating…" : "Create team"}
           </Button>
         </div>
       </div>
 
       {meetings.length === 0 ? (
         <p className="text-sm text-muted-foreground/50 text-center py-12">
-          No meetings yet. Add one above.
+          No teams yet. Create one above.
         </p>
       ) : (
         <div className="space-y-2">
@@ -173,7 +173,7 @@ export function DashboardContent({ meetings }: { meetings: DbMeeting[] }) {
                   handleDelete(m.id)
                 }}
                 className="text-muted-foreground/30 hover:text-destructive transition-colors text-lg px-1 cursor-pointer"
-                aria-label="Delete meeting"
+                aria-label="Delete team"
               >
                 ×
               </button>

@@ -15,10 +15,26 @@ export default async function AppLayout({
 
   if (!user) redirect("/")
 
+  const userEmail = user.email || ""
+  const userName =
+    (user.user_metadata?.full_name as string) ||
+    (user.user_metadata?.name as string) ||
+    user.email?.split("@")[0] ||
+    ""
+  const baseAvatar =
+    (user.user_metadata?.avatar_url as string) ||
+    (user.user_metadata?.picture as string) ||
+    ""
+  const userAvatar = baseAvatar ? `${baseAvatar}?v=${user.updated_at ?? ""}` : ""
+
   return (
     <SetupProvider>
       <div className="min-h-screen">
-        <TopNav />
+        <TopNav
+          userEmail={userEmail}
+          userName={userName}
+          userAvatar={userAvatar}
+        />
         {children}
       </div>
     </SetupProvider>

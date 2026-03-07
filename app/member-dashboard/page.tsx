@@ -1,178 +1,233 @@
 "use client"
 
-import { useState } from "react"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { RotationWindowBanner } from "@/components/rotation-window-banner"
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { getMemberTeamSummary, getMemberDashboardData } from "@/lib/actions"
+import { getStoredMemberTeams, addStoredMemberTeam } from "@/lib/member-teams-storage"
+import { MemberTopNav } from "@/components/parallel/member-top-nav"
 
-// ─── Mock data (hardcoded) ────────────────────────────────────────────────
-const MOCK = {
-  member: {
-    name: "Alex Chen",
-    timezone: "America/Los_Angeles",
-  },
-  nextMeeting: {
-    dateTime: "Tue, Mar 10 • 8:00 AM",
-    badge: "Early for you",
-    participants: ["Alex", "Maria", "Tom", "Li"],
-  },
-  burden: {
-    thisMonth: 4.0,
-    lastMonth: 2.5,
-    maxHours: 8, // for progress bar scale
-  },
-  teamFairness: {
-    highest: { name: "Alex", hrs: 6.0 },
-    lowest: { name: "Maria", hrs: 2.0 },
-    status: "Slightly Imbalanced",
-  },
+type TeamSummary = {
+  token: string
+  memberId: string
+  meeting: { id: string; title: string; day_of_week: number; duration_minutes: number }
+  memberCount: number
+  cadence: string
 }
 
-// ─── Page ───────────────────────────────────────────────────────────────────
-export default function MemberDashboardPage() {
-  const [modalOpen, setModalOpen] = useState(false)
-
-  const burdenPercent = Math.min(
-    100,
-    (MOCK.burden.thisMonth / MOCK.burden.maxHours) * 100
-  )
-
+function MissingParamsMessage() {
   return (
-    <main className="min-h-screen bg-background">
-      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
-        {/* Rotation Window / Lock Status banner */}
-        <RotationWindowBanner />
-
-        {/* Header */}
-        <header className="mb-10 mt-8">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Member Dashboard
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Your personal fairness status and availability
-          </p>
-          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-            <span>
-              <strong className="font-medium text-foreground">Name:</strong>{" "}
-              {MOCK.member.name}
-            </span>
-            <span>
-              <strong className="font-medium text-foreground">Timezone:</strong>{" "}
-              {MOCK.member.timezone}
-            </span>
-          </div>
-        </header>
-
-        {/* Cards grid */}
-        <div className="grid gap-6 sm:grid-cols-2">
-          {/* Card 1: My Next Meeting */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Next Meeting</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-lg font-medium text-foreground">
-                {MOCK.nextMeeting.dateTime}
-              </p>
-              <Badge variant="secondary">{MOCK.nextMeeting.badge}</Badge>
-              <p className="text-sm text-muted-foreground">
-                Participants: {MOCK.nextMeeting.participants.join(", ")}
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button variant="outline" disabled>
-                View Details
-              </Button>
-            </CardFooter>
-          </Card>
-
-          {/* Card 2: My Burden This Month */}
-          <Card>
-            <CardHeader>
-              <CardTitle>This Month Burden</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-2xl font-semibold text-foreground">
-                {MOCK.burden.thisMonth} hrs inconvenience
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Last Month: {MOCK.burden.lastMonth} hrs
-              </p>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary/70 transition-all"
-                  style={{ width: `${burdenPercent}%` }}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Card 3: Team Fairness Snapshot */}
-          <Card className="sm:col-span-2">
-            <CardHeader>
-              <CardTitle>Team Fairness Snapshot</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Highest Burden: {MOCK.teamFairness.highest.name} (
-                {MOCK.teamFairness.highest.hrs} hrs)
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Lowest Burden: {MOCK.teamFairness.lowest.name} (
-                {MOCK.teamFairness.lowest.hrs} hrs)
-              </p>
-              <Badge variant="outline">{MOCK.teamFairness.status}</Badge>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* CTA: Update Availability */}
-        <section className="mt-10 border-t border-border pt-8">
-          <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-            <DialogTrigger asChild>
-              <Button size="lg">Update My Availability</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Update My Availability</DialogTitle>
-                <DialogDescription>
-                  Set your working hours and times you are never available. This
-                  helps the team planner distribute meeting times fairly across
-                  all members.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <p className="text-sm text-muted-foreground">
-                  [Mock availability editor placeholder — no editing logic]
-                </p>
-              </div>
-              <DialogFooter>
-                <Button disabled>Save</Button>
-                <Button variant="outline" onClick={() => setModalOpen(false)}>
-                  Cancel
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </section>
+    <main className="min-h-screen flex items-center justify-center px-5">
+      <div className="text-center space-y-3 max-w-sm">
+        <h1 className="text-[17px] font-semibold tracking-tight text-primary">
+          Parallel
+        </h1>
+        <p className="text-sm text-muted-foreground">Missing token or member ID.</p>
+        <p className="text-xs text-muted-foreground/70">
+          Use your invite link to join and access your dashboard.
+        </p>
       </div>
     </main>
+  )
+}
+
+export default function MemberDashboardPage() {
+  const searchParams = useSearchParams()
+  const token = searchParams.get("token")
+  const memberId = searchParams.get("memberId")
+  const tab = searchParams.get("tab") || "team"
+
+  const [teams, setTeams] = useState<TeamSummary[]>([])
+  const [navMember, setNavMember] = useState<{ name: string; avatar_url?: string | null; updated_at?: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (token && memberId) {
+      addStoredMemberTeam(token, memberId)
+    }
+    const allTeams = getStoredMemberTeams()
+
+    if (allTeams.length === 0) {
+      setLoading(false)
+      return
+    }
+
+    Promise.all(
+      allTeams.map((t) => getMemberTeamSummary(t.token, t.memberId))
+    ).then((results) => {
+      const summaries: TeamSummary[] = []
+      let firstMember: { name: string; avatar_url?: string | null; updated_at?: string } | null = null
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i]
+        if (r.error) continue
+        if (r.data) {
+          summaries.push(r.data)
+          if (i === 0 || !firstMember) {
+            getMemberDashboardData(allTeams[i].token, allTeams[i].memberId).then(
+              (d) => {
+                if (d.data?.member) {
+                  setNavMember(d.data.member)
+                }
+              }
+            )
+          }
+        }
+      }
+      setTeams(summaries)
+      if (!firstMember && summaries.length > 0) {
+        getMemberDashboardData(allTeams[0].token, allTeams[0].memberId).then(
+          (d) => {
+            if (d.data?.member) setNavMember(d.data.member)
+          }
+        )
+      }
+      setLoading(false)
+    })
+  }, [token, memberId])
+
+  const firstTeam = teams[0]
+  const baseParams = firstTeam
+    ? `token=${encodeURIComponent(firstTeam.token)}&memberId=${encodeURIComponent(firstTeam.memberId)}`
+    : token && memberId
+      ? `token=${encodeURIComponent(token)}&memberId=${encodeURIComponent(memberId)}`
+      : ""
+  const teamUrl = `/member-dashboard?${baseParams}`
+  const scheduleUrl = `/member-dashboard?${baseParams}&tab=schedule`
+  const accountUrl = `/member-dashboard/account?${baseParams}`
+
+  if (loading && teams.length === 0) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-5">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </main>
+    )
+  }
+
+  if (!loading && teams.length === 0 && !token && !memberId) {
+    return <MissingParamsMessage />
+  }
+
+  if (tab === "schedule") {
+    return (
+      <ScheduleTab
+        teamUrl={teamUrl}
+        scheduleUrl={scheduleUrl}
+        accountUrl={accountUrl}
+        navMember={navMember}
+        meetingTitle={firstTeam?.meeting.title ?? ""}
+      />
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <MemberTopNav
+        memberName={navMember?.name ?? ""}
+        memberAvatarUrl={
+          navMember?.avatar_url
+            ? `${navMember.avatar_url}?v=${navMember.updated_at ?? ""}`
+            : ""
+        }
+        meetingTitle={firstTeam?.meeting.title ?? "Teams"}
+        teamUrl={teamUrl}
+        scheduleUrl={scheduleUrl}
+        accountUrl={accountUrl}
+        activeTab="team"
+      />
+
+      <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
+        <section className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+            Teams
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Teams you&apos;ve joined. Click a team to view details.
+          </p>
+        </section>
+
+        {teams.length === 0 ? (
+          <section className="rounded-xl border border-border/50 bg-card p-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No teams yet. Use an invite link to join a team.
+            </p>
+          </section>
+        ) : (
+          <div className="space-y-2">
+            {teams.map((t) => (
+              <Link
+                key={`${t.token}-${t.memberId}`}
+                href={`/member-dashboard/team?token=${encodeURIComponent(t.token)}&memberId=${encodeURIComponent(t.memberId)}`}
+                className="block rounded-xl border border-border/50 bg-card p-4 shadow-sm hover:border-primary/20 transition-colors"
+              >
+                <p className="font-medium">{t.meeting.title}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {t.cadence}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Members: {t.memberCount}
+                </p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}
+
+function ScheduleTab({
+  teamUrl,
+  scheduleUrl,
+  accountUrl,
+  navMember,
+  meetingTitle,
+}: {
+  teamUrl: string
+  scheduleUrl: string
+  accountUrl: string
+  navMember: { name: string; avatar_url?: string | null; updated_at?: string } | null
+  meetingTitle: string
+}) {
+  return (
+    <div className="min-h-screen bg-background">
+      <MemberTopNav
+        memberName={navMember?.name ?? ""}
+        memberAvatarUrl={
+          navMember?.avatar_url
+            ? `${navMember.avatar_url}?v=${navMember.updated_at ?? ""}`
+            : ""
+        }
+        meetingTitle={meetingTitle || "Schedule"}
+        teamUrl={teamUrl}
+        scheduleUrl={scheduleUrl}
+        accountUrl={accountUrl}
+        activeTab="schedule"
+      />
+
+      <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
+        <section className="mb-8">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+            Schedule
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+            Your schedule
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Assigned meeting times and rotation entries across your teams.
+          </p>
+        </section>
+
+        <section className="rounded-xl border border-border/50 bg-card p-8 mb-6 shadow-sm text-center">
+          <p className="text-sm text-muted-foreground">
+            No schedule has been published yet.
+          </p>
+          <p className="text-sm text-muted-foreground/80 mt-2">
+            Team owners have not finalized rotations. Once schedules are
+            generated, your assigned meeting times will appear here.
+          </p>
+        </section>
+      </main>
+    </div>
   )
 }

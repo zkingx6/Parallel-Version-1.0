@@ -25,9 +25,9 @@ export default function RotationPlaceholderPage() {
           preview / confirm).
         </p>
         <p className="mt-2 text-sm text-neutral-500">
-          Select a meeting from{" "}
+          Select a team from{" "}
           <Link href="/meetings" className="text-primary hover:underline">
-            Your meetings
+            Your teams
           </Link>{" "}
           to access the rotation planner.
         </p>

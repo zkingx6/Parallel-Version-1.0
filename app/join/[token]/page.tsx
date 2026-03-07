@@ -1,9 +1,12 @@
- "use client"
+"use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
-import { getJoinData, submitMember } from "@/lib/actions"
+import { useParams, useSearchParams, useRouter } from "next/navigation"
+import { getJoinData, getExistingMemberForJoin, submitMember } from "@/lib/actions"
+import { addStoredMemberTeam } from "@/lib/member-teams-storage"
 import { ParticipantForm } from "@/components/parallel/participant-form"
+import { MemberTopNav } from "@/components/parallel/member-top-nav"
+import { isComplementOfOverlapPattern } from "@/lib/hard-no-ranges"
 
 const DAYS_LABEL: Record<number, string> = {
   1: "Monday",
@@ -23,14 +26,26 @@ type MeetingInfo = {
 
 export default function JoinPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const token = params.token as string
+  const memberIdFromUrl = searchParams.get("memberId")
 
   const [meeting, setMeeting] = useState<MeetingInfo | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [submitted, setSubmitted] = useState(false)
   const [saving, setSaving] = useState(false)
   const storageKey = meeting ? `parallel_sub_${meeting.id}` : null
   const [existingId, setExistingId] = useState<string | null>(null)
+  const [existingMember, setExistingMember] = useState<{
+    name: string
+    timezone: string
+    work_start_hour: number
+    work_end_hour: number
+    hard_no_ranges: unknown[]
+    role: string | null
+    avatar_url?: string | null
+    updated_at?: string
+  } | null>(null)
 
   useEffect(() => {
     getJoinData(token).then((result) => {
@@ -43,11 +58,23 @@ export default function JoinPage() {
   }, [token])
 
   useEffect(() => {
-    if (storageKey) {
+    if (memberIdFromUrl) {
+      setExistingId(memberIdFromUrl)
+    } else if (storageKey) {
       const id = localStorage.getItem(storageKey)
       if (id) setExistingId(id)
     }
-  }, [storageKey])
+  }, [storageKey, memberIdFromUrl])
+
+  useEffect(() => {
+    if (token && existingId) {
+      getExistingMemberForJoin(token, existingId).then((result) => {
+        if (result.data) setExistingMember(result.data)
+      })
+    } else {
+      setExistingMember(null)
+    }
+  }, [token, existingId])
 
   const handleSubmit = async (payload: Parameters<typeof submitMember>[1]) => {
     setSaving(true)
@@ -57,7 +84,11 @@ export default function JoinPage() {
       if (result.data && storageKey) {
         localStorage.setItem(storageKey, result.data.id)
       }
-      setSubmitted(true)
+      if (result.data?.id) {
+        addStoredMemberTeam(token, result.data.id)
+        router.push(`/member-dashboard?token=${encodeURIComponent(token)}&memberId=${encodeURIComponent(result.data.id)}`)
+        return
+      }
     } finally {
       setSaving(false)
     }
@@ -84,40 +115,38 @@ export default function JoinPage() {
     )
   }
 
-  if (submitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-5">
-        <div className="text-center space-y-3 max-w-sm">
-          <h1 className="text-[17px] font-semibold tracking-tight text-primary">
-            Parallel
-          </h1>
-          <p className="text-sm font-medium">Saved.</p>
-          <p className="text-sm text-muted-foreground">
-            Your availability has been recorded for{" "}
-            <span className="font-medium text-foreground">{meeting.title}</span>
-            . You can close this page.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const editUrl = `/join/${token}${existingId ? `?memberId=${existingId}` : ""}`
+  const baseParams = existingId
+    ? `token=${encodeURIComponent(token)}&memberId=${encodeURIComponent(existingId)}`
+    : ""
+  const teamUrl = existingId
+    ? `/member-dashboard?${baseParams}`
+    : editUrl
+  const scheduleUrl = existingId
+    ? `/member-dashboard?${baseParams}&tab=schedule`
+    : editUrl
+  const accountUrl = existingId
+    ? `/member-dashboard/account?${baseParams}`
+    : editUrl
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-border/40">
-        <div className="mx-auto max-w-lg px-5 sm:px-8">
-          <div className="flex items-center justify-between py-5">
-            <h1 className="text-[17px] font-semibold tracking-tight text-primary">
-              Parallel
-            </h1>
-            <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-              team setup
-            </span>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background">
+      <MemberTopNav
+        memberName={existingMember?.name ?? ""}
+        memberAvatarUrl={
+          existingMember?.avatar_url
+            ? `${existingMember.avatar_url}?v=${existingMember.updated_at ?? ""}`
+            : ""
+        }
+        meetingTitle={meeting.title}
+        teamUrl={teamUrl}
+        scheduleUrl={scheduleUrl}
+        accountUrl={accountUrl}
+        hideNavTabs={!existingId}
+        avatarLinksToAccount={!!existingId}
+      />
 
-      <main className="mx-auto max-w-lg px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
+      <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
         <div className="mb-8">
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
             Join {meeting.title}
@@ -130,7 +159,18 @@ export default function JoinPage() {
         </div>
 
         <ParticipantForm
-          defaultTimezone={meeting.anchor_offset}
+          defaultName={existingMember?.name ?? ""}
+          defaultTimezone={existingMember?.timezone ?? "America/New_York"}
+          defaultWorkStart={existingMember?.work_start_hour ?? 9}
+          defaultWorkEnd={existingMember?.work_end_hour ?? 18}
+          defaultHardNoRanges={
+            existingMember?.hard_no_ranges && Array.isArray(existingMember.hard_no_ranges)
+              ? isComplementOfOverlapPattern(existingMember.hard_no_ranges)
+                ? []
+                : (existingMember.hard_no_ranges as { start: number; end: number }[])
+              : []
+          }
+          defaultRole={existingMember?.role ?? ""}
           onSubmit={handleSubmit}
           submitLabel={
             existingId ? "Update my availability" : "Save my availability"

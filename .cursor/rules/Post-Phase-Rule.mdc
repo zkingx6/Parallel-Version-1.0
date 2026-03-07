@@ -1,5 +1,265 @@
 ---
+description: 
 alwaysApply: true
 ---
 
 Test K and L
+# Post-Phase Stability Rule (Pack K + Pack L Locked)
+
+## Purpose
+This rule locks the behaviors verified in the Post-Phase stability passes after Phase 0–8 completion.
+
+These tests confirmed that the Parallel rotation engine is stable across:
+- team-size / performance stress
+- supported rotation-week boundaries
+- fixed-base-time anchor behavior
+- fallback / strict mode explainability
+- hard-boundary pre-generation guards
+
+Any future change must preserve these verified behaviors.
+
+---
+
+## Locked Verified Behaviors
+
+### 1) Team Size / Performance Stability
+Verified:
+- ~9-person real multi-timezone team generates successfully
+- ~18-person constrained team fails gracefully when no shared hard-valid candidate exists
+- runtime remains fast (~2 seconds observed)
+- UI remains responsive
+- solver does not silently fail
+
+Must preserve:
+- no crash under moderate team size
+- no UI freeze during generation
+- no hidden solver failure
+- honest no-candidate state when hard constraints eliminate all candidates
+
+Do not:
+- introduce expensive loops or repeated recomputation in schedule generation
+- add noisy logging that materially impacts generation performance
+- bypass hard-boundary candidate pruning
+
+---
+
+### 2) No-Candidate Hard-Boundary Guard
+Verified:
+- when no shared time fits everyone's hard limits, system stops before solver-mode generation
+- UI correctly shows "No shared time fits everyone's limits"
+- system may offer relaxation path, but does not fabricate a plan
+
+Must preserve:
+- hard boundaries remain absolute
+- pre-solver guard triggers before any fake STRICT / RELAXED / FALLBACK result
+- no schedule is generated if zero hard-valid candidates exist
+
+Do not:
+- silently downgrade hard boundaries into soft rules
+- produce a schedule when hard-valid candidate count is zero
+- invent modeUsed / forcedReason output for a pre-solver no-candidate case
+
+---
+
+### 3) Supported Rotation Week Boundaries
+Verified supported UI boundary:
+- minimum supported rotationWeeks = 4
+- maximum supported rotationWeeks = 12
+
+Verified generation behavior:
+- 4-week schedules generate correctly
+- 12-week schedules generate correctly
+- no truncation
+- no overflow
+- no missing or extra weeks
+- no week-index corruption
+
+Must preserve:
+- exact schedule length equals requested rotationWeeks
+- 4 and 12 remain stable boundary values
+- long-cycle generation remains deterministic and fast
+
+Do not:
+- reintroduce implicit 8-week assumptions
+- hardcode schedule length independent of rotationWeeks
+- produce Week 13 for a 12-week cycle
+- truncate 12-week output to 8 weeks
+
+---
+
+### 4) Fixed Base Time / Anchor Mode
+Verified:
+- fixed base time is not allowed to violate hard boundaries
+- invalid fixed time is blocked pre-generation with UI warning
+- valid fixed base time generates stable anchor-mode schedules
+- in anchor mode, all generated weeks use the same reference time
+- anchor mode remained stable at both 4 weeks and 12 weeks
+
+Observed verified behavior:
+- chosen UI base time may anchor to the nearest viable schedule time
+- resulting anchor time remains stable across all weeks once generated
+
+Must preserve:
+- fixed base time cannot bypass hard constraints
+- anchor mode must keep a stable repeated reference time across all weeks
+- no week-to-week time drift in anchor mode
+- UI messaging must remain consistent with anchor behavior
+
+Do not:
+- treat fixed base time as permission to violate hard_no_ranges
+- allow anchor schedules to drift across weeks
+- claim "time rotates" when anchor mode is active
+- silently fall back into rotating-time mode when fixed-base mode is enabled
+
+---
+
+### 5) Solver Mode Honesty
+Verified:
+- STRICT appears only when fairness-valid plan exists
+- FALLBACK appears when beam search exhausts fairness-valid search
+- forcedReason = BEAM_EXHAUSTED appears when appropriate
+- explain text matches actual solver behavior
+- no fake fairness claims are shown
+
+Must preserve:
+- modeUsed must reflect actual solver path
+- shareablePlanExists must reflect actual fairness-valid result
+- forcedReason must only appear when actually triggered
+- explain text must match solver reality
+
+Do not:
+- relabel fallback schedules as fair
+- claim balanced rotation when constraints prevent it
+- suppress forcedReason when beam exhaustion actually occurred
+- output STRICT if fairness-valid constraints were not met
+
+---
+
+### 6) Deterministic Repetition Is Allowed
+Verified:
+- for constrained teams, the solver may repeatedly select the same viable local optimum
+- repeated weekly times are valid if candidate space is narrow
+- repeated patterns are not a bug by themselves
+
+Must preserve:
+- deterministic outputs for identical inputs
+- repeated schedule patterns are acceptable when constraints justify them
+
+Do not:
+- inject randomness to make schedules "look more rotated"
+- treat repeated viable times as an automatic bug
+- force artificial diversity that changes solver correctness
+
+---
+
+### 7) Burden / Explain Consistency
+Verified:
+- burden summaries matched actual visible inconvenience distribution
+- anchor-mode schedules concentrate burden on fixed disadvantaged members
+- rotating schedules may still concentrate burden on Asia / Europe when geography makes fairness bounded
+- explanation text remained honest about impossibility of full rotation in some weeks
+
+Must preserve:
+- burden summaries must match generated schedule reality
+- highlighted stretched members must match actual local-time discomfort
+- explain text must remain grounded in actual constraints
+
+Do not:
+- compute burden summaries from a different logic path than rendered schedules
+- highlight the wrong members
+- claim equal distribution when burden metrics clearly show otherwise
+
+---
+
+## Change Control
+For any future modification touching:
+- rotationWeeks
+- fixed base time / anchor mode
+- candidate generation
+- hard-boundary filtering
+- solver mode reporting
+- explain text
+- burden summary
+- generation performance
+
+Cursor must:
+1. propose the smallest possible change set
+2. preserve all verified Post-Phase behaviors above
+3. avoid refactors unless explicitly approved
+4. state clearly whether the change affects:
+   - pre-solver candidate guard
+   - solver search behavior
+   - anchor mode behavior
+   - explain / burden rendering only
+
+---
+
+## Regression Expectations
+After any relevant change, re-check at minimum:
+
+### Performance
+- moderate team still generates quickly
+- constrained larger team still fails gracefully without crashing
+
+### Rotation Week Boundary
+- 4 weeks works
+- 12 weeks works
+
+### Anchor Mode
+- invalid fixed time is blocked
+- valid fixed time generates stable repeated reference time
+
+### Mode Reporting
+- STRICT still only appears for fairness-valid plans
+- FALLBACK still appears when beam search exhausts
+
+### Honesty
+- no fake fairness text
+- no fabricated schedule when no hard-valid candidate exists
+
+---
+
+## Non-Negotiable Rule
+Do not change verified behavior merely to make schedules appear more fair, more diverse, or more visually pleasing.
+
+Correctness, honesty, hard-boundary integrity, and deterministic stability take priority over cosmetic rotation variety.
+
+# Pack M Behavior Rule — Real Asymmetric Teams
+
+## Purpose
+
+Pack M verified solver behavior for asymmetric global teams.
+
+Parallel must prioritize **correctness and honesty**
+over visually appearing fair.
+
+---
+
+## Locked Behaviors
+
+1. Asymmetric teams may produce partially repeated meeting times.
+
+2. The solver may insert occasional alternate weeks
+to distribute burden when possible.
+
+3. Some members (often Asia or Europe) may still carry higher burden
+due to geography.
+
+This is expected behavior.
+
+---
+
+## Do Not
+
+- artificially force time diversity
+- inject randomness to "look fairer"
+- suppress real burden differences
+- fabricate rotation when constraints prevent it
+
+---
+
+## Core Principle
+
+Parallel distributes inconvenience **when possible**.
+
+It must never pretend that fairness exists when geography makes it impossible.

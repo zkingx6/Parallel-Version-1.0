@@ -3,7 +3,6 @@
 import { createServerSupabase, createServiceSupabase } from "./supabase-server"
 import { revalidatePath } from "next/cache"
 import type { HardNoRange } from "./types"
-import type { WeeklyHours, WeeklyHardNo } from "./availability"
 import { isComplementOfOverlapPattern } from "./hard-no-ranges"
 
 export async function createMeeting(title: string) {
@@ -71,6 +70,61 @@ export async function deleteMeeting(meetingId: string) {
   if (error) return { error: error.message }
   revalidatePath("/dashboard")
   revalidatePath("/meetings")
+  return { success: true }
+}
+
+export async function updateProfile(formData: FormData) {
+  const supabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: "Not authenticated" }
+
+  const displayName = (formData.get("displayName") as string)?.trim() ?? ""
+  if (!displayName) return { error: "Display name is required." }
+
+  const avatarFile = formData.get("avatar") as File | null
+  let avatarUrl: string | null =
+    (user.user_metadata?.avatar_url as string) ||
+    (user.user_metadata?.picture as string) ||
+    null
+
+  if (avatarFile && avatarFile.size > 0) {
+    const ext = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg"
+    const validExts = ["jpg", "jpeg", "png", "gif", "webp"]
+    if (!validExts.includes(ext)) {
+      return { error: "Avatar must be JPG, PNG, GIF, or WebP." }
+    }
+    const path = `${user.id}/avatar.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(path, avatarFile, { upsert: true })
+
+    if (uploadError) {
+      const msg =
+        uploadError.message === "Bucket not found"
+          ? "Avatar storage not set up yet. Create the avatars bucket in Supabase (see AVATAR_SETUP.md)."
+          : uploadError.message || "Avatar upload failed."
+      return { error: msg }
+    }
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("avatars").getPublicUrl(path)
+    avatarUrl = publicUrl
+  }
+
+  const existing = (user.user_metadata || {}) as Record<string, unknown>
+  const { error } = await supabase.auth.updateUser({
+    data: {
+      ...existing,
+      full_name: displayName,
+      avatar_url: avatarUrl ?? existing.avatar_url ?? existing.picture ?? undefined,
+    },
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath("/settings")
+  revalidatePath("/settings/profile")
   return { success: true }
 }
 
@@ -171,6 +225,119 @@ export async function getJoinData(token: string) {
   return { data: meeting }
 }
 
+export async function getMemberTeamSummary(token: string, memberId: string) {
+  const supabase = createServiceSupabase()
+
+  const { data: meeting, error: meetingError } = await supabase
+    .from("meetings")
+    .select("id, title, day_of_week, duration_minutes")
+    .eq("invite_token", token)
+    .single()
+
+  if (meetingError || !meeting) return { error: "Invalid or expired invite link." }
+
+  const { data: member, error: memberError } = await supabase
+    .from("member_submissions")
+    .select("id")
+    .eq("meeting_id", meeting.id)
+    .eq("id", memberId)
+    .maybeSingle()
+
+  if (memberError) return { error: memberError.message }
+  if (!member) return { error: "Member not found." }
+
+  const { count } = await supabase
+    .from("member_submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("meeting_id", meeting.id)
+
+  const dayNames = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+  const dayName = dayNames[meeting.day_of_week] ?? ""
+
+  return {
+    data: {
+      token,
+      memberId,
+      meeting: {
+        id: meeting.id,
+        title: meeting.title,
+        day_of_week: meeting.day_of_week,
+        duration_minutes: meeting.duration_minutes,
+      },
+      memberCount: count ?? 0,
+      cadence: dayName
+        ? `Weekly ${dayName} • ${meeting.duration_minutes} min`
+        : `${meeting.duration_minutes} min, weekly`,
+    },
+  }
+}
+
+export async function getMemberDashboardData(token: string, memberId: string) {
+  const supabase = createServiceSupabase()
+
+  const { data: meeting, error: meetingError } = await supabase
+    .from("meetings")
+    .select("id, title, day_of_week, duration_minutes")
+    .eq("invite_token", token)
+    .single()
+
+  if (meetingError || !meeting) return { error: "Invalid or expired invite link." }
+
+  const { data: member, error: memberError } = await supabase
+    .from("member_submissions")
+    .select("id, name, timezone, work_start_hour, work_end_hour, hard_no_ranges, role, avatar_url, updated_at")
+    .eq("meeting_id", meeting.id)
+    .eq("id", memberId)
+    .maybeSingle()
+
+  if (memberError) return { error: memberError.message }
+  if (!member) return { error: "Member not found." }
+
+  const { count } = await supabase
+    .from("member_submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("meeting_id", meeting.id)
+
+  const { data: members } = await supabase
+    .from("member_submissions")
+    .select("id, name, role, is_owner_participant")
+    .eq("meeting_id", meeting.id)
+    .order("is_owner_participant", { ascending: false })
+    .order("name")
+
+  return {
+    data: {
+      meeting,
+      member,
+      memberCount: count ?? 0,
+      members: members ?? [],
+    },
+  }
+}
+
+export async function getExistingMemberForJoin(token: string, memberId: string) {
+  const supabase = createServiceSupabase()
+
+  const { data: meeting } = await supabase
+    .from("meetings")
+    .select("id")
+    .eq("invite_token", token)
+    .single()
+
+  if (!meeting) return { error: "Invalid invite link." }
+
+  const { data: member, error } = await supabase
+    .from("member_submissions")
+    .select("name, timezone, work_start_hour, work_end_hour, hard_no_ranges, role, avatar_url, updated_at")
+    .eq("meeting_id", meeting.id)
+    .eq("id", memberId)
+    .maybeSingle()
+
+  if (error) return { error: error.message }
+  if (!member) return { error: "Member not found." }
+  return { data: member }
+}
+
 export async function submitMember(
   token: string,
   input: {
@@ -202,7 +369,11 @@ export async function submitMember(
         "Invalid hard boundaries: pattern looks like corrupted data. Please set your availability again.",
     }
   }
-  const persistInput = { ...input, hard_no_ranges: userDefined }
+  const persistInput = {
+    ...input,
+    hard_no_ranges: userDefined,
+    role: (input.role?.trim() || null) as string | null,
+  }
 
   if (existingId) {
     const { data, error } = await supabase
@@ -218,6 +389,7 @@ export async function submitMember(
 
     if (error) return { error: error.message }
     if (!data) return { error: "Submission not found. It may have been removed." }
+    revalidatePath(`/team/${meeting.id}`)
     return { data }
   }
 
@@ -231,19 +403,77 @@ export async function submitMember(
     .single()
 
   if (error) return { error: error.message }
+  revalidatePath(`/team/${meeting.id}`)
   return { data }
 }
 
-export async function saveAvailabilityTemplate(payload: {
-  timezone: string
-  weekly_hours: WeeklyHours
-  weekly_hard_no: WeeklyHardNo
-}) {
-  const supabase = await createServerSupabase()
-  const { saveDefaultTemplate } = await import("./availability")
-  const result = await saveDefaultTemplate(supabase, payload)
-  if (result.error) return { error: result.error }
-  revalidatePath("/availability")
-  revalidatePath("/availability/default")
-  return { success: true }
+export async function updateMemberProfile(
+  token: string,
+  memberId: string,
+  formData: FormData
+) {
+  const supabase = createServiceSupabase()
+
+  const { data: meeting } = await supabase
+    .from("meetings")
+    .select("id")
+    .eq("invite_token", token)
+    .single()
+
+  if (!meeting) return { error: "Invalid invite link." }
+
+  const { data: member } = await supabase
+    .from("member_submissions")
+    .select("avatar_url")
+    .eq("id", memberId)
+    .eq("meeting_id", meeting.id)
+    .maybeSingle()
+
+  if (!member) return { error: "Member not found." }
+
+  const name = (formData.get("displayName") as string)?.trim() ?? ""
+  if (!name) return { error: "Display name is required." }
+
+  let avatarUrl: string | null = (member as { avatar_url?: string }).avatar_url ?? null
+
+  const avatarFile = formData.get("avatar") as File | null
+  if (avatarFile && avatarFile.size > 0) {
+    const ext = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg"
+    const validExts = ["jpg", "jpeg", "png", "gif", "webp"]
+    if (!validExts.includes(ext)) {
+      return { error: "Avatar must be JPG, PNG, GIF, or WebP." }
+    }
+    const path = `member/${memberId}/avatar.${ext}`
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(path, avatarFile, { upsert: true })
+
+    if (uploadError) {
+      const msg =
+        uploadError.message === "Bucket not found"
+          ? "Avatar storage not set up yet. Create the avatars bucket in Supabase (see AVATAR_SETUP.md)."
+          : uploadError.message || "Avatar upload failed."
+      return { error: msg }
+    }
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("avatars").getPublicUrl(path)
+    avatarUrl = publicUrl
+  }
+
+  const { data, error } = await supabase
+    .from("member_submissions")
+    .update({
+      name,
+      avatar_url: avatarUrl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", memberId)
+    .eq("meeting_id", meeting.id)
+    .select()
+    .maybeSingle()
+
+  if (error) return { error: error.message }
+  if (!data) return { error: "Member not found." }
+  return { data }
 }

@@ -1,9 +1,20 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { updateProfile } from "@/lib/actions"
 
 type SettingsContentProps = {
   userEmail: string
@@ -18,6 +29,11 @@ export function SettingsContent({
 }: SettingsContentProps) {
   const router = useRouter()
   const supabase = createClient()
+  const [editOpen, setEditOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
 
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -67,6 +83,11 @@ export function SettingsContent({
       {/* Profile card */}
       <section className="rounded-xl border border-border/50 bg-card p-5 mb-6">
         <h3 className="text-sm font-semibold mb-4">Profile</h3>
+        {successMessage && (
+          <p className="text-sm text-green-600 dark:text-green-500 mb-4">
+            {successMessage}
+          </p>
+        )}
         <div className="flex items-center gap-4">
           <Avatar className="size-12">
             {userAvatar ? (
@@ -82,14 +103,144 @@ export function SettingsContent({
               {userEmail || "—"}
             </p>
           </div>
-          <Link
-            href="/settings/profile"
+          <button
+            type="button"
+            onClick={() => {
+              setError(null)
+              setSuccessMessage(null)
+              setAvatarPreview(null)
+              setEditOpen(true)
+            }}
             className="text-sm font-medium text-primary hover:text-primary/80 transition-colors shrink-0"
           >
             Edit profile
-          </Link>
+          </button>
         </div>
       </section>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit profile</DialogTitle>
+          </DialogHeader>
+          <form
+            encType="multipart/form-data"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              setError(null)
+              setSaving(true)
+              try {
+                const fd = new FormData(e.currentTarget)
+                const res = await updateProfile(fd)
+                if (res.error) {
+                  setError(res.error)
+                  return
+                }
+                setEditOpen(false)
+                setSuccessMessage("Profile updated.")
+                router.refresh()
+                setTimeout(() => setSuccessMessage(null), 4000)
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Failed to save profile.")
+              } finally {
+                setSaving(false)
+              }
+            }}
+            className="space-y-4"
+          >
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+            <div>
+              <label
+                htmlFor="edit-display-name"
+                className="block text-sm font-medium mb-1.5"
+              >
+                Display name
+              </label>
+              <Input
+                id="edit-display-name"
+                name="displayName"
+                defaultValue={userName}
+                placeholder="Your name"
+                required
+                disabled={saving}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="edit-email"
+                className="block text-sm font-medium mb-1.5"
+              >
+                Email
+              </label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={userEmail}
+                readOnly
+                disabled
+                className="w-full bg-muted/50 cursor-not-allowed"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Account identity — cannot be changed here.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">
+                Avatar
+              </label>
+              <div className="flex items-center gap-4">
+                <Avatar className="size-14 shrink-0">
+                  {(avatarPreview || userAvatar) ? (
+                    <AvatarImage
+                      src={avatarPreview || userAvatar}
+                      alt=""
+                    />
+                  ) : null}
+                  <AvatarFallback className="text-base">
+                    {userName ? userName[0].toUpperCase() : userEmail ? userEmail[0].toUpperCase() : "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <Input
+                    type="file"
+                    name="avatar"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    disabled={saving}
+                    className="w-full"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) {
+                        setAvatarPreview(URL.createObjectURL(f))
+                      } else {
+                        setAvatarPreview(null)
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    JPG, PNG, GIF, or WebP. Optional.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <DialogFooter showCloseButton={false}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditOpen(false)}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Billing card */}
       <section className="rounded-xl border border-border/50 bg-card p-5 mb-6">
@@ -116,7 +267,7 @@ export function SettingsContent({
       <section className="rounded-xl border border-border/50 bg-card p-5 mb-6">
         <h3 className="text-sm font-semibold mb-4">Setup</h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Setup progress: timezone → availability → invite
+          Setup progress: timezone → team → invite
         </p>
         <Link
           href="/settings/setup"

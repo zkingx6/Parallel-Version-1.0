@@ -22,19 +22,28 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { PencilIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 
 export function TeamSection({
   meeting: initialMeeting,
   members: initialMembers,
   userEmail,
+  ownerProfileName = "",
+  ownerProfileAvatar = "",
 }: {
   meeting: DbMeeting
   members: DbMemberSubmission[]
   hasOwnerParticipant: boolean
   userEmail: string
+  /** Profile display name/avatar for owner row. Source of truth for owner card. */
+  ownerProfileName?: string
+  ownerProfileAvatar?: string
 }) {
   const [meeting, setMeeting] = useState(initialMeeting)
   const [members, setMembers] = useState(initialMembers)
@@ -45,6 +54,9 @@ export function TeamSection({
   const [mounted, setMounted] = useState(false)
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null)
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
+  const [renameModalOpen, setRenameModalOpen] = useState(false)
+  const [renameValue, setRenameValue] = useState("")
+  const [renameSaving, setRenameSaving] = useState(false)
 
   const supabase = createClient()
   const inviteUrl = mounted
@@ -57,9 +69,22 @@ export function TeamSection({
     return () => clearTimeout(id)
   }, [])
 
-  const handleTitleChange = async (title: string) => {
-    setMeeting((prev) => ({ ...prev, title }))
-    await updateMeetingConfig(meeting.id, { title })
+  const handleRenameOpen = () => {
+    setRenameValue(meeting.title)
+    setRenameModalOpen(true)
+  }
+
+  const handleRenameSave = async () => {
+    const trimmed = renameValue.trim()
+    if (!trimmed) return
+    setRenameSaving(true)
+    try {
+      await updateMeetingConfig(meeting.id, { title: trimmed })
+      setMeeting((prev) => ({ ...prev, title: trimmed }))
+      setRenameModalOpen(false)
+    } finally {
+      setRenameSaving(false)
+    }
   }
 
   const handleCopyLink = async () => {
@@ -111,18 +136,66 @@ export function TeamSection({
 
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
+      <Link
+        href="/meetings"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+      >
+        <span aria-hidden>←</span>
+        Back to Teams
+      </Link>
       <div className="mb-10">
-        <input
-          type="text"
-          value={meeting.title}
-          onChange={(e) => handleTitleChange(e.target.value)}
-          className="text-2xl sm:text-3xl font-semibold tracking-tight bg-transparent outline-none w-full placeholder:text-muted-foreground/30 focus:bg-muted/20 rounded px-1 -mx-1 py-0.5 transition-colors"
-          placeholder="Meeting title"
-        />
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+            {meeting.title}
+          </h1>
+          <button
+            type="button"
+            onClick={handleRenameOpen}
+            className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+            aria-label="Rename team"
+          >
+            <PencilIcon className="size-4" />
+          </button>
+        </div>
         <p className="mt-2 text-sm text-muted-foreground">
           Invite your team, then plan a fair rotation.
         </p>
       </div>
+
+      <Dialog open={renameModalOpen} onOpenChange={setRenameModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename team</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <label htmlFor="rename-team-input" className="text-sm font-medium">
+              Team name
+            </label>
+            <Input
+              id="rename-team-input"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              placeholder="Team name"
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRenameModalOpen(false)}
+              disabled={renameSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRenameSave}
+              disabled={renameSaving || !renameValue.trim()}
+            >
+              {renameSaving ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-10 sm:space-y-12">
         {!hasOwnerParticipant && (
@@ -140,8 +213,8 @@ export function TeamSection({
         )}
 
         <Dialog open={ownerModalOpen} onOpenChange={setOwnerModalOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-lg flex flex-col max-h-[85vh] overflow-hidden">
+            <DialogHeader className="shrink-0">
               <DialogTitle>
                 {members.some((m) => m.is_owner_participant)
                   ? "Update your availability"
@@ -152,11 +225,11 @@ export function TeamSection({
                 be included in the fair rotation.
               </p>
             </DialogHeader>
+            <div className="flex-1 min-h-0 overflow-y-auto">
             <ParticipantForm
               defaultName={
                 members.find((m) => m.is_owner_participant)?.name ??
-                userEmail.split("@")[0] ??
-                ""
+                ((ownerProfileName || userEmail?.split("@")[0]) ?? "")
               }
               defaultTimezone={
                 members.find((m) => m.is_owner_participant)?.timezone ??
@@ -187,6 +260,7 @@ export function TeamSection({
               }
               saving={ownerSaving}
             />
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -260,6 +334,17 @@ export function TeamSection({
                     ? []
                     : rawRanges
                   const hasRanges = ranges.length > 0
+                  const isOwner = m.is_owner_participant === true
+                  const displayName = isOwner
+                    ? (ownerProfileName || m.name || userEmail)
+                    : m.name
+                  const displayAvatar = isOwner
+                    ? ownerProfileAvatar
+                    : (m.avatar_url ? `${m.avatar_url}?v=${m.updated_at ?? ""}` : "")
+                  const displayInitials = dbMemberToTeamMember({
+                    ...m,
+                    name: displayName || m.name,
+                  }).initials
 
                   return (
                     <div
@@ -278,11 +363,20 @@ export function TeamSection({
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1.5 min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <div className="w-7 h-7 rounded-full bg-primary/10 text-primary text-[10px] font-semibold flex items-center justify-center shrink-0">
-                              {dbMemberToTeamMember(m).initials}
-                            </div>
+                            {displayAvatar ? (
+                              <Avatar className="size-7 shrink-0">
+                                <AvatarImage src={displayAvatar} alt="" />
+                                <AvatarFallback className="text-[10px] font-semibold">
+                                  {displayInitials}
+                                </AvatarFallback>
+                              </Avatar>
+                            ) : (
+                              <div className="w-7 h-7 rounded-full bg-primary/10 text-primary text-[10px] font-semibold flex items-center justify-center shrink-0">
+                                {displayInitials}
+                              </div>
+                            )}
                             <span className="text-sm font-medium truncate">
-                              {m.name}
+                              {displayName || m.name || "—"}
                             </span>
                             {m.is_owner_participant && (
                               <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-medium">
