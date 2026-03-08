@@ -1,8 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import { PageBackLink } from "@/components/ui/page-back-link"
 
 // We store all scheduling rules in team base timezone.
 // Display times are always converted to viewer's timezone before rendering.
@@ -145,17 +144,7 @@ export default function RotationSettingsPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-5 py-10 sm:px-8">
-      <Button
-        asChild
-        variant="ghost"
-        size="sm"
-        className="-ml-2 mb-8 text-muted-foreground hover:text-foreground"
-      >
-        <Link href="/meetings" className="inline-flex items-center gap-1.5">
-          <span aria-hidden>←</span>
-          Back to Teams
-        </Link>
-      </Button>
+      <PageBackLink href="/meetings" className="mb-8">Back to Teams</PageBackLink>
 
       <header className="mb-10">
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">

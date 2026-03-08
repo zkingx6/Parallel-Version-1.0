@@ -232,6 +232,12 @@ export async function updateProfile(formData: FormData) {
   const displayName = (formData.get("displayName") as string)?.trim() ?? ""
   if (!displayName) return { error: "Display name is required." }
 
+  const newEmail = (formData.get("email") as string)?.trim()
+  if (newEmail && newEmail !== user.email) {
+    const { error: emailError } = await supabase.auth.updateUser({ email: newEmail })
+    if (emailError) return { error: emailError.message }
+  }
+
   const removeAvatar = formData.get("removeAvatar") === "1" || formData.get("removeAvatar") === "true"
   const avatarFile = formData.get("avatar") as File | null
   let avatarUrl: string | null =
@@ -484,6 +490,13 @@ export async function getMemberDashboardData(token: string, memberId: string) {
     avatarUrl: member.avatar_url ?? "",
   }
 
+  let memberEmail: string | null = null
+  const memberWithUserId = member as { user_id?: string | null }
+  if (memberWithUserId.user_id) {
+    const { data: authUser } = await supabase.auth.admin.getUserById(memberWithUserId.user_id)
+    memberEmail = authUser?.user?.email ?? null
+  }
+
   const { count } = await supabase
     .from("member_submissions")
     .select("id", { count: "exact", head: true })
@@ -503,6 +516,7 @@ export async function getMemberDashboardData(token: string, memberId: string) {
       meeting,
       member,
       memberDisplay,
+      memberEmail,
       memberCount: count ?? 0,
       members: members ?? [],
       membersDisplay: Object.fromEntries(membersDisplayAll),

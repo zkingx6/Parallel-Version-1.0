@@ -73,9 +73,6 @@ export function MemberTopNav({
 
         {/* Right: Member avatar (links to account when available) */}
         <div className="shrink-0 flex items-center gap-3">
-          <span className="text-xs text-muted-foreground hidden sm:inline truncate max-w-[120px]">
-            {meetingTitle}
-          </span>
           {avatarLinksToAccount ? (
             <Link
               href={accountUrl}

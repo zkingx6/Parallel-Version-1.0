@@ -14,6 +14,10 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PageBackLink } from "@/components/ui/page-back-link"
+import { SignOutButton } from "@/components/ui/sign-out-button"
+import { ChangePasswordModal } from "@/components/account/change-password-modal"
+import { SignOutConfirmModal } from "@/components/account/sign-out-confirm-modal"
 import { updateProfile } from "@/lib/actions"
 
 type SettingsContentProps = {
@@ -35,6 +39,8 @@ export function SettingsContent({
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarRemoved, setAvatarRemoved] = useState(false)
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
 
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -45,7 +51,6 @@ export function SettingsContent({
   }
 
   const handleSignOut = async () => {
-    if (!confirm("Are you sure you want to sign out?")) return
     await supabase.auth.signOut()
     router.push("/")
     router.refresh()
@@ -65,20 +70,14 @@ export function SettingsContent({
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
       {/* Back row */}
-      <button
-        onClick={handleBack}
-        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
-      >
-        <span aria-hidden>←</span>
-        Back
-      </button>
+      <PageBackLink onClick={handleBack}>Back</PageBackLink>
 
       {/* Page title */}
       <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
         Account
       </h2>
       <p className="mt-1.5 text-sm text-muted-foreground mb-10">
-        Manage your profile, billing, and setup.
+        Manage your profile and billing.
       </p>
 
       {/* Profile card */}
@@ -185,14 +184,15 @@ export function SettingsContent({
               </label>
               <Input
                 id="edit-email"
+                name="email"
                 type="email"
-                value={userEmail}
-                readOnly
-                disabled
-                className="w-full bg-muted/50 cursor-not-allowed"
+                defaultValue={userEmail}
+                placeholder="you@example.com"
+                disabled={saving}
+                className="w-full"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Account identity — cannot be changed here.
+                Changing email requires confirmation. A link will be sent to the new address.
               </p>
             </div>
             <div>
@@ -294,30 +294,36 @@ export function SettingsContent({
         </Link>
       </section>
 
-      {/* Setup card */}
+      {/* Security card */}
       <section className="rounded-xl border border-border/50 bg-card p-5 mb-6">
-        <h3 className="text-sm font-semibold mb-4">Setup</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Setup progress: timezone → team → invite
-        </p>
-        <Link
-          href="/settings/setup"
-          className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
-        >
-          Continue setup
-        </Link>
+        <h3 className="text-sm font-semibold mb-4">Security</h3>
+        <div className="space-y-3">
+          <div>
+            <button
+              type="button"
+              onClick={() => setChangePasswordOpen(true)}
+              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              Change password
+            </button>
+          </div>
+          <div>
+            <SignOutButton onClick={() => setSignOutConfirmOpen(true)} />
+          </div>
+        </div>
       </section>
 
-      {/* Divider + Sign out */}
-      <hr className="border-border/40 my-8" />
-      <div>
-        <button
-          onClick={handleSignOut}
-          className="text-sm font-medium text-destructive hover:text-destructive/80 transition-colors cursor-pointer"
-        >
-          Sign out
-        </button>
-      </div>
+      <ChangePasswordModal
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
+        userEmail={userEmail}
+        hasSession={true}
+      />
+      <SignOutConfirmModal
+        open={signOutConfirmOpen}
+        onOpenChange={setSignOutConfirmOpen}
+        onConfirm={handleSignOut}
+      />
     </main>
   )
 }

@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { PencilIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PageBackLink } from "@/components/ui/page-back-link"
 import { MemberAvatar } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 
@@ -134,17 +135,7 @@ export function TeamSection({
 
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-      <Button
-        asChild
-        variant="ghost"
-        size="sm"
-        className="-ml-2 mb-6 text-muted-foreground hover:text-foreground"
-      >
-        <Link href="/meetings" className="inline-flex items-center gap-1.5">
-          <span aria-hidden>←</span>
-          Back to Teams
-        </Link>
-      </Button>
+      <PageBackLink href="/meetings" className="mb-6">Back to Teams</PageBackLink>
       <div className="mb-10">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">

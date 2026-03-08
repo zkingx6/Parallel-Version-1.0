@@ -18,7 +18,7 @@ import { getBurdenCounts, hasConsecutiveStretch } from "@/lib/rotation"
 import type { RotationWeekData } from "@/lib/types"
 import { formatHourLabel } from "@/lib/types"
 import { MemberAvatar } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import { PageBackLink } from "@/components/ui/page-back-link"
 import {
   Tooltip,
   TooltipContent,
@@ -226,20 +226,12 @@ export function ScheduleAnalysisContent({
       }
     >
       {!embedded && (
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="-ml-2 mb-4 text-muted-foreground hover:text-foreground"
+        <PageBackLink
+          href={`${scheduleBasePathResolved}/${scheduleId}${scheduleLinkSuffix}`}
+          className="mb-4"
         >
-          <Link
-            href={`${scheduleBasePathResolved}/${scheduleId}${scheduleLinkSuffix}`}
-            className="inline-flex items-center gap-1.5"
-          >
-            <span aria-hidden>←</span>
-            Back to schedule
-          </Link>
-        </Button>
+          Back to schedule
+        </PageBackLink>
       )}
 
       {!embedded && (
@@ -672,20 +664,12 @@ export function ScheduleAnalysisContent({
 
       {!embedded && (
         <div className="pt-6">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 text-muted-foreground hover:text-foreground"
+          <PageBackLink
+            href={`${scheduleBasePathResolved}/${scheduleId}${scheduleLinkSuffix}`}
+            className="mb-0"
           >
-            <Link
-              href={`${scheduleBasePathResolved}/${scheduleId}${scheduleLinkSuffix}`}
-              className="inline-flex items-center gap-1.5"
-            >
-              <span aria-hidden>←</span>
-              Back to schedule
-            </Link>
-          </Button>
+            Back to schedule
+          </PageBackLink>
         </div>
       )}
     </main>

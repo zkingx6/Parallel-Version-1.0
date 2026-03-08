@@ -10,6 +10,7 @@ import { getTimezoneDisplayLabelNow } from "@/lib/timezone"
 import { isComplementOfOverlapPattern } from "@/lib/hard-no-ranges"
 import type { HardNoRange } from "@/lib/types"
 import { Button } from "@/components/ui/button"
+import { PageBackLink } from "@/components/ui/page-back-link"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
 
 const DAY_NAMES = [
@@ -86,17 +87,7 @@ export default function MemberTeamDetailPage() {
             Parallel
           </h1>
           <p className="text-sm text-muted-foreground">Missing token or member ID.</p>
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <Link href="/member-dashboard" className="inline-flex items-center gap-1.5">
-              <span aria-hidden>←</span>
-              Back to teams
-            </Link>
-          </Button>
+          <PageBackLink href="/member-dashboard">Back to teams</PageBackLink>
         </div>
       </main>
     )
@@ -110,20 +101,11 @@ export default function MemberTeamDetailPage() {
             Parallel
           </h1>
           <p className="text-sm text-muted-foreground">{error}</p>
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground"
+          <PageBackLink
+            href={`/member-dashboard?token=${encodeURIComponent(token)}&memberId=${encodeURIComponent(memberId)}`}
           >
-            <Link
-              href={`/member-dashboard?token=${encodeURIComponent(token)}&memberId=${encodeURIComponent(memberId)}`}
-              className="inline-flex items-center gap-1.5"
-            >
-              <span aria-hidden>←</span>
-              Back to teams
-            </Link>
-          </Button>
+            Back to teams
+          </PageBackLink>
         </div>
       </main>
     )
@@ -166,17 +148,7 @@ export default function MemberTeamDetailPage() {
       />
 
       <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="-ml-2 mb-6 text-muted-foreground hover:text-foreground"
-        >
-          <Link href={teamsListUrl} className="inline-flex items-center gap-1.5">
-            <span aria-hidden>←</span>
-            Back to teams
-          </Link>
-        </Button>
+        <PageBackLink href={teamsListUrl} className="mb-6">Back to teams</PageBackLink>
 
         <section className="mb-8">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">

@@ -1,11 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { getMemberDashboardData, updateMemberProfile } from "@/lib/actions"
 import { setCachedMember } from "@/lib/member-avatar-cache"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
+import { PageBackLink } from "@/components/ui/page-back-link"
+import { SignOutButton } from "@/components/ui/sign-out-button"
+import { ChangePasswordModal } from "@/components/account/change-password-modal"
+import { SignOutConfirmModal } from "@/components/account/sign-out-confirm-modal"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
   Dialog,
@@ -21,6 +24,7 @@ type MemberData = {
   meeting: { id: string; title: string }
   member: { id: string; name: string; avatar_url?: string | null; updated_at?: string }
   memberDisplay: { name: string; avatarUrl: string }
+  memberEmail?: string | null
 }
 
 export default function MemberAccountPage() {
@@ -36,6 +40,8 @@ export default function MemberAccountPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarRemoved, setAvatarRemoved] = useState(false)
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (!token || !memberId) return
@@ -147,13 +153,7 @@ export default function MemberAccountPage() {
       />
 
       <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
-        >
-          <span aria-hidden>←</span>
-          Back
-        </button>
+        <PageBackLink onClick={() => router.back()}>Back</PageBackLink>
 
         <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
           Account
@@ -162,7 +162,7 @@ export default function MemberAccountPage() {
           Manage your profile and identity.
         </p>
 
-        <section className="rounded-xl border border-border/50 bg-card p-5 mb-6 shadow-sm">
+        <section className="rounded-xl border border-border/50 bg-card p-5 mb-6">
           <h3 className="text-sm font-semibold mb-4">Profile</h3>
           {successMessage && (
             <p className="text-sm text-green-600 dark:text-green-500 mb-4">
@@ -184,7 +184,7 @@ export default function MemberAccountPage() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{memberDisplay.name || "—"}</p>
               <p className="text-sm text-muted-foreground truncate">
-                Member of {meeting.title}
+                {data.memberEmail ?? "—"}
               </p>
             </div>
             <button
@@ -201,6 +201,10 @@ export default function MemberAccountPage() {
             </button>
           </div>
         </section>
+
+        <p className="text-xs text-muted-foreground mb-6">
+          Role: Member
+        </p>
 
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
@@ -303,6 +307,40 @@ export default function MemberAccountPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        <section className="rounded-xl border border-border/50 bg-card p-5 mb-6">
+          <h3 className="text-sm font-semibold mb-4">Security</h3>
+          <div className="space-y-3">
+            <div>
+              <button
+                type="button"
+                onClick={() => setChangePasswordOpen(true)}
+                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+              >
+                Change password
+              </button>
+            </div>
+            <div>
+              <SignOutButton onClick={() => setSignOutConfirmOpen(true)} />
+            </div>
+          </div>
+        </section>
+
+        <ChangePasswordModal
+          open={changePasswordOpen}
+          onOpenChange={setChangePasswordOpen}
+          userEmail={data.memberEmail ?? ""}
+          hasSession={false}
+        />
+        <SignOutConfirmModal
+          open={signOutConfirmOpen}
+          onOpenChange={setSignOutConfirmOpen}
+          onConfirm={() => {
+            if (typeof window !== "undefined") {
+              window.location.href = "/"
+            }
+          }}
+        />
       </main>
     </div>
   )

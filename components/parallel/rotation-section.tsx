@@ -50,6 +50,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { PageBackLink } from "@/components/ui/page-back-link"
 import { MemberAvatar } from "@/components/ui/avatar"
 
 const DAYS = [
@@ -1147,17 +1148,7 @@ export function RotationSection({
         )}
 
         <div className="pt-4">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 text-muted-foreground hover:text-foreground"
-          >
-            <Link href={`/team/${meeting.id}`} className="inline-flex items-center gap-1.5">
-              <span aria-hidden>←</span>
-              Back to team
-            </Link>
-          </Button>
+          <PageBackLink href={`/team/${meeting.id}`} className="mb-0">Back to team</PageBackLink>
         </div>
       </div>
 

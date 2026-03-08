@@ -11,6 +11,7 @@ import { getBurdenCounts, hasConsecutiveStretch } from "@/lib/rotation"
 import { RotationOutput } from "./rotation-output"
 import { MemberAvatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { PageBackLink } from "@/components/ui/page-back-link"
 import { cn } from "@/lib/utils"
 import { getInitials, type RotationWeekData } from "@/lib/types"
 
@@ -107,17 +108,7 @@ export function ScheduleDetailContent({
   if (!weeks.length) {
     return (
       <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className="-ml-2 mb-6 text-muted-foreground hover:text-foreground"
-        >
-          <Link href={backLink} className="inline-flex items-center gap-1.5">
-            <span aria-hidden>←</span>
-            Back to schedules
-          </Link>
-        </Button>
+        <PageBackLink href={backLink}>Back to schedules</PageBackLink>
         <div className="mb-10">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
             {scheduleName}
@@ -127,17 +118,9 @@ export function ScheduleDetailContent({
           <p className="text-sm text-muted-foreground">
             No schedule data available.
           </p>
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="mt-2 text-muted-foreground hover:text-foreground"
-          >
-            <Link href={backLink} className="inline-flex items-center gap-1.5">
-              <span aria-hidden>←</span>
-              Back to schedules
-            </Link>
-          </Button>
+          <PageBackLink href={backLink} className="mt-2 mb-0">
+            Back to schedules
+          </PageBackLink>
         </div>
       </main>
     )
@@ -158,17 +141,7 @@ export function ScheduleDetailContent({
 
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-      <Button
-        asChild
-        variant="ghost"
-        size="sm"
-        className="-ml-2 mb-6 text-muted-foreground hover:text-foreground"
-      >
-        <Link href={backLink} className="inline-flex items-center gap-1.5">
-          <span aria-hidden>←</span>
-          Back to schedules
-        </Link>
-      </Button>
+      <PageBackLink href={backLink}>Back to schedules</PageBackLink>
       <div className="mb-10">
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
           {scheduleName}
@@ -250,17 +223,7 @@ export function ScheduleDetailContent({
         </section>
 
         <div className="pt-4">
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 text-muted-foreground hover:text-foreground"
-          >
-            <Link href={backLink} className="inline-flex items-center gap-1.5">
-              <span aria-hidden>←</span>
-              Back to schedules
-            </Link>
-          </Button>
+          <PageBackLink href={backLink} className="mb-0">Back to schedules</PageBackLink>
         </div>
       </div>
     </main>
