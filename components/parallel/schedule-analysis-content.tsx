@@ -18,6 +18,12 @@ import { formatHourLabel } from "@/lib/types"
 import { MemberAvatar } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   convertUtcToLocal,
   ensureDisplayTimezoneIana,
   getIanaShortLabel,
@@ -114,6 +120,34 @@ export function ScheduleAnalysisContent({
     return { week: w.week, localHour, label: formatHourLabel(localHour) }
   })
 
+  const sacrificeTimeline = weeks.map((w) => {
+    const dateIso = w.utcDateIso ?? "2025-03-05"
+    const localHour = convertUtcToLocal(dateIso, w.utcHour, displayTimezone)
+    const label = formatHourLabel(localHour)
+    const inconveniencedMembers = w.memberTimes
+      .filter((mt) => (mt.score ?? 0) > 0)
+      .map((mt) => {
+        const member = team.find((m) => m.id === mt.memberId)
+        const display = membersDisplay.get(mt.memberId)
+        const name = display?.name ?? member?.name ?? "—"
+        const timezone = member?.timezone ?? "UTC"
+        const city = getIanaShortLabel(timezone)
+        return {
+          memberId: mt.memberId,
+          name,
+          localTime: mt.localTime,
+          city,
+          timezone,
+          localHour: mt.localHour,
+        }
+      })
+    return {
+      week: w.week,
+      label,
+      members: inconveniencedMembers,
+    }
+  })
+
   const timezoneRanges = (() => {
     const byTz = new Map<
       string,
@@ -138,11 +172,6 @@ export function ScheduleAnalysisContent({
       range: `${formatHourLabel(min)} – ${formatHourLabel(max)}`,
     }))
   })()
-
-  const summarySentence =
-    explain?.shareablePlanExists === false && explain?.forcedSummary
-      ? explain.forcedSummary
-      : `This ${weeksCount}-week schedule was generated using ${modeLabel} mode, balancing time zone constraints and fairness across the team.`
 
   const maxWidth = embedded ? "max-w-2xl" : "max-w-6xl"
 
@@ -217,36 +246,57 @@ export function ScheduleAnalysisContent({
         </p>
       </section>
 
-      {/* Schedule Summary (compact) */}
+      {/* Schedule Summary */}
       <section className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 sm:p-6 mb-6">
         <h2 className="text-lg font-semibold tracking-tight mb-3">
           Schedule Summary
         </h2>
-        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-          <div className="flex gap-3">
-            <dt className="text-muted-foreground shrink-0">Team</dt>
-            <dd className="font-medium">{teamName}</dd>
-          </div>
-          <div className="flex gap-3">
-            <dt className="text-muted-foreground shrink-0">Weeks</dt>
-            <dd className="font-medium">{weeksCount}</dd>
-          </div>
-          <div className="flex gap-3">
-            <dt className="text-muted-foreground shrink-0">Mode</dt>
-            <dd className="font-medium">{modeLabel}</dd>
-          </div>
-        </dl>
-        <div className="mt-4">
-          <h3 className="text-sm font-medium text-muted-foreground mb-2">
-            Over this {weeksCount}-week cycle
-          </h3>
-          <ul className="space-y-1 text-sm text-muted-foreground">
-            <li>Maximum burden: {maxMemberCount}</li>
-            <li>Burden difference between members: {isEven ? 0 : spread}</li>
-          </ul>
+        <div className="mb-4">
+          <p className="text-base font-medium">{teamName}</p>
+          <p className="text-sm text-muted-foreground">
+            {weeksCount}-week rotation cycle
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground leading-relaxed mt-3">
-          {summarySentence}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+          <div>
+            <p className="text-2xl font-semibold tabular-nums text-primary">
+              {maxMemberCount}
+            </p>
+            <p className="text-xs text-muted-foreground">Max Burden</p>
+          </div>
+          <div>
+            <p className="text-2xl font-semibold tabular-nums text-primary">
+              {isEven ? 0 : spread}
+            </p>
+            <p className="text-xs text-muted-foreground">Burden Spread</p>
+          </div>
+          <div>
+            <p className="text-2xl font-semibold tabular-nums text-primary">
+              {burdenData.length}
+            </p>
+            <p className="text-xs text-muted-foreground">Members</p>
+          </div>
+          <div>
+            <p className="text-2xl font-semibold tabular-nums text-primary">
+              {weeksCount}
+            </p>
+            <p className="text-xs text-muted-foreground">Weeks</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span className="text-xs text-muted-foreground">Mode</span>
+          <span className="inline-flex items-center rounded-md bg-primary/15 text-primary px-2.5 py-0.5 text-xs font-medium">
+            {modeLabel.toUpperCase()}
+          </span>
+        </div>
+        {explain?.shareablePlanExists === false && explain?.forcedSummary ? (
+          <p className="text-sm text-muted-foreground">
+            Schedule generated using fallback optimization mode.
+          </p>
+        ) : null}
+        <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+          This schedule balances inconvenience across the team while respecting
+          working hours and blocked time ranges.
         </p>
       </section>
 
@@ -427,6 +477,94 @@ export function ScheduleAnalysisContent({
           </section>
         </div>
       </div>
+
+      {/* Sacrifice Timeline — horizontal, 2 rows of 6, compact */}
+      <section className="rounded-2xl border border-border/50 bg-card shadow-sm p-4 sm:p-5 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Sacrifice Timeline
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              How meeting inconvenience is distributed each week. Each dot = one
+              member outside preferred hours.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 sm:mt-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-blue-400/60 shrink-0" />
+              Early meeting
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-orange-400/60 shrink-0" />
+              Late meeting
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-muted-foreground/50 shrink-0" />
+              Mild inconvenience
+            </span>
+          </div>
+        </div>
+        {sacrificeTimeline.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No week data available.
+          </p>
+        ) : (
+          <TooltipProvider delayDuration={100}>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-4 gap-y-4">
+              {sacrificeTimeline.map(({ week, label, members }) => {
+                const dotColor = (h: number) => {
+                  const nh = ((h % 24) + 24) % 24
+                  if (nh < 8) return "bg-blue-400/60"
+                  if (nh >= 18) return "bg-orange-400/60"
+                  return "bg-muted-foreground/50"
+                }
+                return (
+                  <div
+                    key={week}
+                    className="flex flex-col gap-1 min-w-0"
+                  >
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs font-medium text-muted-foreground shrink-0">
+                        Week {week}
+                      </span>
+                      <span className="text-[11px] tabular-nums text-muted-foreground truncate">
+                        {label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-0.5 flex-wrap min-h-[20px]">
+                      {members.length === 0 ? (
+                        <span className="text-[10px] text-muted-foreground/60">
+                          —
+                        </span>
+                      ) : (
+                        members.map((m) => (
+                          <Tooltip key={m.memberId}>
+                            <TooltipTrigger asChild>
+                              <span
+                                className={`size-2 rounded-full shrink-0 cursor-default ${dotColor(m.localHour)}`}
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[220px]">
+                              <p className="font-medium">{m.name}</p>
+                              <p className="opacity-90 mt-0.5">
+                                Timezone: {m.timezone}
+                              </p>
+                              <p className="opacity-90">
+                                Meeting time: {m.localTime}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </TooltipProvider>
+        )}
+      </section>
 
       {/* Explanation Section — Bottom */}
       <section className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 sm:p-6">
