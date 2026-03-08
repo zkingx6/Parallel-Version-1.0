@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { getMemberDashboardData, updateMemberProfile } from "@/lib/actions"
+import { setCachedMember } from "@/lib/member-avatar-cache"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -38,7 +39,15 @@ export default function MemberAccountPage() {
     if (!token || !memberId) return
     getMemberDashboardData(token, memberId).then((result) => {
       if (result.error) setError(result.error)
-      else if (result.data) setData(result.data as MemberData)
+      else if (result.data) {
+        const d = result.data as MemberData
+        setData(d)
+        setCachedMember(token, memberId, {
+          name: d.member.name,
+          avatar_url: d.member.avatar_url,
+          updated_at: d.member.updated_at,
+        })
+      }
     })
   }, [token, memberId])
 
@@ -101,7 +110,15 @@ export default function MemberAccountPage() {
       setEditOpen(false)
       setSuccessMessage("Profile updated.")
       getMemberDashboardData(token!, memberId!).then((r) => {
-        if (r.data) setData(r.data as MemberData)
+        if (r.data) {
+          const d = r.data as MemberData
+          setData(d)
+          setCachedMember(token!, memberId!, {
+            name: d.member.name,
+            avatar_url: d.member.avatar_url,
+            updated_at: d.member.updated_at,
+          })
+        }
       })
       router.refresh()
       setTimeout(() => setSuccessMessage(null), 4000)
@@ -154,7 +171,15 @@ export default function MemberAccountPage() {
           <div className="flex items-center gap-4">
             <Avatar className="size-12">
               {(avatarPreview || member.avatar_url) ? (
-                <AvatarImage src={avatarPreview || member.avatar_url || ""} alt="" />
+                <AvatarImage
+                  src={
+                    avatarPreview ||
+                    (member.avatar_url
+                      ? `${member.avatar_url}?v=${member.updated_at ?? ""}`
+                      : "")
+                  }
+                  alt=""
+                />
               ) : null}
               <AvatarFallback className="text-base">{initials}</AvatarFallback>
             </Avatar>
@@ -211,7 +236,12 @@ export default function MemberAccountPage() {
                   <Avatar className="size-14 shrink-0">
                     {(avatarPreview || member.avatar_url) ? (
                       <AvatarImage
-                        src={avatarPreview || member.avatar_url || ""}
+                        src={
+                          avatarPreview ||
+                          (member.avatar_url
+                            ? `${member.avatar_url}?v=${member.updated_at ?? ""}`
+                            : "")
+                        }
                         alt=""
                       />
                     ) : null}

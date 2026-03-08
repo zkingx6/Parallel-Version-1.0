@@ -2,6 +2,48 @@
 
 import { createServerSupabase, createServiceSupabase } from "./supabase-server"
 import { revalidatePath } from "next/cache"
+
+/**
+ * Resolve post-login redirect based on user role.
+ * - Owner (has meetings where manager_id = auth.uid()) → /meetings
+ * - Member only (has member_submissions with user_id, no owned meetings) → /member-dashboard
+ * - Neither → /meetings (default)
+ */
+export async function resolvePostLoginRedirect(): Promise<string> {
+  const serverSupabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await serverSupabase.auth.getUser()
+  if (!user) return "/"
+
+  const serviceSupabase = createServiceSupabase()
+
+  const { data: ownedMeetings } = await serviceSupabase
+    .from("meetings")
+    .select("id")
+    .eq("manager_id", user.id)
+    .limit(1)
+  if (ownedMeetings && ownedMeetings.length > 0) return "/meetings"
+
+  const { data: memberRows } = await serviceSupabase
+    .from("member_submissions")
+    .select("id, meeting_id")
+    .eq("user_id", user.id)
+    .limit(1)
+  if (memberRows && memberRows.length > 0) {
+    const m = memberRows[0]
+    const { data: meeting } = await serviceSupabase
+      .from("meetings")
+      .select("invite_token")
+      .eq("id", m.meeting_id)
+      .single()
+    if (meeting?.invite_token) {
+      return `/member-dashboard?token=${encodeURIComponent(meeting.invite_token)}&memberId=${encodeURIComponent(m.id)}`
+    }
+  }
+
+  return "/meetings"
+}
 import type { HardNoRange } from "./types"
 import { isComplementOfOverlapPattern } from "./hard-no-ranges"
 
@@ -113,25 +155,14 @@ export async function getSchedulesForCurrentUser() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // DEBUG: member schedule visibility (check server logs when member visits schedule tab)
-  console.log("[member-schedule-debug]", {
-    authUserId: user?.id ?? null,
-    authUserIsNull: user === null,
-  })
-
   if (!user) {
     return { data: { schedules: [], teamTitles: {} } }
   }
 
-  const { data: schedules, error } = await supabase
+  const { data: schedules } = await supabase
     .from("schedules")
     .select("*")
     .order("created_at", { ascending: false })
-
-  console.log("[member-schedule-debug] query result:", {
-    rowCount: schedules?.length ?? 0,
-    error: error?.message ?? null,
-  })
 
   const items = schedules ?? []
   const teamIds = [...new Set(items.map((s) => s.team_id))]
@@ -594,5 +625,6 @@ export async function updateMemberProfile(
 
   if (error) return { error: error.message }
   if (!data) return { error: "Member not found." }
+  revalidatePath(`/team/${meeting.id}`)
   return { data }
 }

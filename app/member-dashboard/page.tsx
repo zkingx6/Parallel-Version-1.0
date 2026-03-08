@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { getMemberTeamSummary, getMemberDashboardData, getSchedulesForCurrentUser } from "@/lib/actions"
 import { getStoredMemberTeams, addStoredMemberTeam } from "@/lib/member-teams-storage"
+import { getCachedMember, setCachedMember } from "@/lib/member-avatar-cache"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
 import { ScheduleListContent } from "@/components/parallel/schedule-list-content"
 
@@ -56,32 +57,28 @@ export default function MemberDashboardPage() {
 
     Promise.all(
       allTeams.map((t) => getMemberTeamSummary(t.token, t.memberId))
-    ).then((results) => {
+    ).then(async (results) => {
       const summaries: TeamSummary[] = []
-      let firstMember: { name: string; avatar_url?: string | null; updated_at?: string } | null = null
       for (let i = 0; i < results.length; i++) {
         const r = results[i]
         if (r.error) continue
-        if (r.data) {
-          summaries.push(r.data)
-          if (i === 0 || !firstMember) {
-            getMemberDashboardData(allTeams[i].token, allTeams[i].memberId).then(
-              (d) => {
-                if (d.data?.member) {
-                  setNavMember(d.data.member)
-                }
-              }
-            )
-          }
-        }
+        if (r.data) summaries.push(r.data)
       }
       setTeams(summaries)
-      if (!firstMember && summaries.length > 0) {
-        getMemberDashboardData(allTeams[0].token, allTeams[0].memberId).then(
-          (d) => {
-            if (d.data?.member) setNavMember(d.data.member)
-          }
-        )
+      if (summaries.length > 0) {
+        const teamForNav =
+          token && memberId
+            ? { token, memberId }
+            : { token: allTeams[0].token, memberId: allTeams[0].memberId }
+        const d = await getMemberDashboardData(teamForNav.token, teamForNav.memberId)
+        if (d.data?.member) {
+          setNavMember(d.data.member)
+          setCachedMember(teamForNav.token, teamForNav.memberId, {
+            name: d.data.member.name,
+            avatar_url: d.data.member.avatar_url,
+            updated_at: d.data.member.updated_at,
+          })
+        }
       }
       setLoading(false)
     })
@@ -109,6 +106,19 @@ export default function MemberDashboardPage() {
     return <MissingParamsMessage />
   }
 
+  const teamForDisplay =
+    token && memberId
+      ? { token, memberId }
+      : firstTeam
+        ? { token: firstTeam.token, memberId: firstTeam.memberId }
+        : null
+  const cached = teamForDisplay ? getCachedMember(teamForDisplay.token, teamForDisplay.memberId) : null
+  const displayName = navMember?.name ?? cached?.name ?? ""
+  const avatarUrl = navMember?.avatar_url ?? cached?.avatar_url
+  const displayAvatarUrl = avatarUrl
+    ? `${avatarUrl}?v=${navMember?.updated_at ?? cached?.updated_at ?? ""}`
+    : ""
+
   if (tab === "schedule") {
     return (
       <ScheduleTab
@@ -116,6 +126,7 @@ export default function MemberDashboardPage() {
         scheduleUrl={scheduleUrl}
         accountUrl={accountUrl}
         navMember={navMember}
+        cachedMember={cached}
         meetingTitle={firstTeam?.meeting.title ?? ""}
       />
     )
@@ -124,12 +135,8 @@ export default function MemberDashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <MemberTopNav
-        memberName={navMember?.name ?? ""}
-        memberAvatarUrl={
-          navMember?.avatar_url
-            ? `${navMember.avatar_url}?v=${navMember.updated_at ?? ""}`
-            : ""
-        }
+        memberName={displayName}
+        memberAvatarUrl={displayAvatarUrl || undefined}
         meetingTitle={firstTeam?.meeting.title ?? "Teams"}
         teamUrl={teamUrl}
         scheduleUrl={scheduleUrl}
@@ -182,19 +189,24 @@ function ScheduleTab({
   scheduleUrl,
   accountUrl,
   navMember,
+  cachedMember,
   meetingTitle,
 }: {
   teamUrl: string
   scheduleUrl: string
   accountUrl: string
   navMember: { name: string; avatar_url?: string | null; updated_at?: string } | null
+  cachedMember: { name: string; avatar_url?: string | null; updated_at?: string } | null
   meetingTitle: string
 }) {
+  const displayName = navMember?.name ?? cachedMember?.name ?? ""
+  const avatarUrl = navMember?.avatar_url ?? cachedMember?.avatar_url
+  const displayAvatarUrl = avatarUrl
+    ? `${avatarUrl}?v=${navMember?.updated_at ?? cachedMember?.updated_at ?? ""}`
+    : ""
   const [schedules, setSchedules] = useState<{ id: string; name: string; weeks: number; created_at: string; team_id: string }[]>([])
   const [teamTitles, setTeamTitles] = useState<Record<string, string>>({})
   const [scheduleLoading, setScheduleLoading] = useState(true)
-  const [debugData, setDebugData] = useState<Record<string, unknown> | null>(null)
-  const [debugOpen, setDebugOpen] = useState(false)
 
   useEffect(() => {
     getSchedulesForCurrentUser().then((r) => {
@@ -206,22 +218,11 @@ function ScheduleTab({
     })
   }, [])
 
-  useEffect(() => {
-    fetch("/api/dev/debug-member-schedule")
-      .then((res) => res.json())
-      .then((d) => setDebugData(d))
-      .catch(() => setDebugData({ error: "Failed to fetch debug" }))
-  }, [])
-
   return (
     <div className="min-h-screen bg-background">
       <MemberTopNav
-        memberName={navMember?.name ?? ""}
-        memberAvatarUrl={
-          navMember?.avatar_url
-            ? `${navMember.avatar_url}?v=${navMember.updated_at ?? ""}`
-            : ""
-        }
+        memberName={displayName}
+        memberAvatarUrl={displayAvatarUrl || undefined}
         meetingTitle={meetingTitle || "Schedule"}
         teamUrl={teamUrl}
         scheduleUrl={scheduleUrl}
@@ -231,13 +232,10 @@ function ScheduleTab({
 
       <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
         <section className="mb-8">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
-            Schedule
-          </p>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-            Your schedule
+            Schedule
           </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Assigned meeting times and rotation entries across your teams.
           </p>
         </section>
@@ -253,23 +251,6 @@ function ScheduleTab({
             showDeleteButton={false}
             emptyStateHref={teamUrl}
           />
-        )}
-
-        {process.env.NODE_ENV === "development" && debugData && (
-          <section className="mt-8 rounded-xl border border-amber-500/50 bg-amber-500/5 p-4">
-            <button
-              type="button"
-              onClick={() => setDebugOpen(!debugOpen)}
-              className="text-sm font-medium text-amber-700 dark:text-amber-400"
-            >
-              [DEV] Member schedule debug {debugOpen ? "▼" : "▶"}
-            </button>
-            {debugOpen && (
-              <pre className="mt-2 overflow-auto text-xs text-muted-foreground max-h-96">
-                {JSON.stringify(debugData, null, 2)}
-              </pre>
-            )}
-          </section>
         )}
       </main>
     </div>

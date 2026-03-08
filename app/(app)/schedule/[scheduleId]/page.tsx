@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { createServerSupabase } from "@/lib/supabase-server"
+import { createServerSupabase, createServiceSupabase } from "@/lib/supabase-server"
 import { ScheduleDetailContent } from "@/components/parallel/schedule-detail-content"
 
 export default async function ScheduleDetailPage({
@@ -23,16 +23,16 @@ export default async function ScheduleDetailPage({
 
   if (!schedule) redirect("/schedule")
 
-  const { data: meeting } = await supabase
+  const serviceSupabase = createServiceSupabase()
+  const { data: meeting } = await serviceSupabase
     .from("meetings")
     .select("*")
     .eq("id", schedule.team_id)
-    .eq("manager_id", user.id)
     .single()
 
   if (!meeting) redirect("/schedule")
 
-  const { data: members } = await supabase
+  const { data: members } = await serviceSupabase
     .from("member_submissions")
     .select("*")
     .eq("meeting_id", schedule.team_id)

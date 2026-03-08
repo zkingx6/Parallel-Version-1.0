@@ -341,10 +341,14 @@ export function TeamSection({
                   const displayAvatar = isOwner
                     ? ownerProfileAvatar
                     : (m.avatar_url ? `${m.avatar_url}?v=${m.updated_at ?? ""}` : "")
-                  const displayInitials = dbMemberToTeamMember({
-                    ...m,
-                    name: displayName || m.name,
-                  }).initials
+                  const nameForInitials = (displayName || m.name || "").trim()
+                  const isRoleLabel = /^(member|owner)$/i.test(nameForInitials)
+                  const displayInitials = isRoleLabel
+                    ? "?"
+                    : dbMemberToTeamMember({
+                        ...m,
+                        name: displayName || m.name,
+                      }).initials
 
                   return (
                     <div

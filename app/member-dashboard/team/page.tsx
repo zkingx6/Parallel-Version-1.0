@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { getMemberDashboardData } from "@/lib/actions"
+import { setCachedMember } from "@/lib/member-avatar-cache"
 import { formatHourLabel } from "@/lib/types"
 import { getTimezoneDisplayLabelNow } from "@/lib/timezone"
 import { isComplementOfOverlapPattern } from "@/lib/hard-no-ranges"
@@ -63,7 +64,15 @@ export default function MemberTeamDetailPage() {
     if (!token || !memberId) return
     getMemberDashboardData(token, memberId).then((result) => {
       if (result.error) setError(result.error)
-      else if (result.data) setData(result.data as DashboardData)
+      else if (result.data) {
+        const d = result.data as DashboardData
+        setData(d)
+        setCachedMember(token, memberId, {
+          name: d.member.name,
+          avatar_url: d.member.avatar_url,
+          updated_at: d.member.updated_at,
+        })
+      }
     })
   }, [token, memberId])
 

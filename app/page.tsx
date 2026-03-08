@@ -20,30 +20,34 @@ export default function Home() {
     e.preventDefault()
     setError(null)
     setLoading(true)
+    try {
+      const { error: authError } = isSignUp
+        ? await supabase.auth.signUp({ email, password })
+        : await supabase.auth.signInWithPassword({ email, password })
 
-    const { error: authError } = isSignUp
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password })
+      if (authError) {
+        setError(authError.message)
+        return
+      }
 
-    if (authError) {
-      setError(authError.message)
+      if (isSignUp) {
+        setError("Check your email for a confirmation link, then sign in.")
+        setIsSignUp(false)
+        return
+      }
+
+      const safeRedirect =
+        redirectTo &&
+        redirectTo.startsWith("/") &&
+        !redirectTo.startsWith("//")
+      const target = safeRedirect ? redirectTo : "/dashboard"
+      router.push(target)
+      router.refresh()
+    } catch {
+      setError("Something went wrong. Please try again.")
+    } finally {
       setLoading(false)
-      return
     }
-
-    if (isSignUp) {
-      setError("Check your email for a confirmation link, then sign in.")
-      setIsSignUp(false)
-      setLoading(false)
-      return
-    }
-
-    const safeRedirect =
-      redirectTo &&
-      redirectTo.startsWith("/") &&
-      !redirectTo.startsWith("//")
-    router.push(safeRedirect ? redirectTo : "/meetings")
-    router.refresh()
   }
 
   return (

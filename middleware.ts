@@ -30,8 +30,13 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
+  const redirectTo = pathname + request.nextUrl.search
   if (pathname.startsWith("/join/") && !user) {
-    const redirectTo = request.nextUrl.pathname + request.nextUrl.search
+    return NextResponse.redirect(
+      new URL(`/?redirect=${encodeURIComponent(redirectTo)}`, request.url)
+    )
+  }
+  if (pathname.startsWith("/member-dashboard") && !user) {
     return NextResponse.redirect(
       new URL(`/?redirect=${encodeURIComponent(redirectTo)}`, request.url)
     )

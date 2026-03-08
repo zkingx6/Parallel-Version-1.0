@@ -1,0 +1,138 @@
+---
+alwaysApply: true
+---
+
+1. Schedule Access Gate Rule
+
+public.schedules is the single access gate for published schedule visibility.
+
+If a user can read a schedule row through normal user-scoped access, they are considered authorized to open that schedule detail.
+
+Do not add secondary owner-only gating in the schedule detail page using meetings.manager_id = auth.uid().
+
+Do not reintroduce detail-page checks that block invited members after the schedule itself is already accessible.
+
+2. Detail Data Fetch Rule
+
+Schedule detail access must be validated first via normal user-scoped schedules query.
+
+Only after schedule access is confirmed may additional supporting detail data be fetched.
+
+Do not create new cross-table RLS dependencies between meetings and member_submissions.
+
+Avoid policy recursion patterns where meetings policies depend on member_submissions while member_submissions policies also depend on meetings.
+
+3. Member Schedule Regression Rule
+
+Any change touching member dashboard navigation, current team context, token/memberId handling, or account/avatar state must preserve member published schedule visibility.
+
+Invited members must continue to see the same published schedules already visible to the owner, subject to RLS.
+
+Before finalizing any related change, verify:
+
+owner schedule list still works
+
+member schedule list still works
+
+member schedule detail still works
+
+4. Identity Source Consistency Rule
+
+Avatar, display name, and initials for the same person must come from one stable identity source across owner and member surfaces.
+
+Preferred order:
+
+avatar_url
+
+real display name
+
+initials derived from real display name
+
+? only as last resort
+
+Never derive initials from:
+
+"Member"
+
+"Owner"
+
+"Member of X"
+
+helper copy, role labels, status text, or placeholder labels
+
+5. Navbar Avatar Stability Rule
+
+Do not render member navbar avatar from incomplete transient page state if a stable current-member object already exists.
+
+Avoid brief fallback regressions such as ?, blank avatar, or wrong initials during route transitions.
+
+Preserve the last known valid avatar / initials until fresh member data is ready.
+
+Do not let Team / Schedule / Account pages use conflicting member identity sources.
+
+6. Owner/Member UI Parity Rule
+
+Shared concepts must behave consistently across owner and member dashboards unless intentionally different by product design.
+
+Profile trigger/avatar behavior should remain visually and functionally aligned:
+
+same active/highlight behavior
+
+same fallback behavior
+
+same identity source logic
+
+Do not let owner and member navbars drift into separate inconsistent implementations unless explicitly required.
+
+7. Stale Data Rule
+
+If one surface shows updated avatar/name and another surface still shows stale data, treat it as a code/data-flow issue, not a database/RLS issue, unless proven otherwise.
+
+Prefer fixing stale local/server data flow, refresh/revalidation, or incorrect object selection before touching Supabase policies.
+
+8. Debug Cleanup Rule
+
+Temporary debug logs, /api/dev/* routes, row-count inspectors, auth/session debug prints, and test-only UI must be removed after the issue is confirmed fixed.
+
+Do not leave temporary debug artifacts in production code unless explicitly approved.
+
+9. No Symptom-Masking Rule
+
+Do not “fix” identity bugs by replacing wrong initials with "?" unless no real identity data exists.
+
+Root cause must be traced to the actual source field, object selection, fallback chain, or stale state.
+
+Hiding incorrect values is not considered a full fix.
+
+10. Required Regression Checks After Related Changes
+
+Any change touching:
+
+member dashboard
+
+account/profile
+
+avatar rendering
+
+team context
+
+schedule page
+
+schedule detail
+must confirm all of the following still work:
+
+owner can create a team
+
+owner can publish a schedule
+
+owner sees published schedule list
+
+invited member sees published schedule list
+
+invited member opens schedule detail
+
+owner and member both show consistent avatar/name
+
+owner sees member’s latest updated avatar/name
+
+member account/profile card and navbar stay in sync
