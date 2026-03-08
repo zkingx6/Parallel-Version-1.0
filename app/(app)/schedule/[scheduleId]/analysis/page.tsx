@@ -94,6 +94,8 @@ export default async function ScheduleAnalysisPage({
       weeks={weeks}
       membersDisplay={membersDisplay}
       displayTimezone={meeting.display_timezone}
+      modeUsed={modeUsed}
+      useFixedBaseTime={meeting.base_time_minutes != null}
     />
   )
 }

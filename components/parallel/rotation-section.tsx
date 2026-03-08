@@ -379,6 +379,13 @@ function NoViableTimePanel({
 
   const { diagnosis, suggestions } = result
 
+  // Prefer "Allow slightly earlier or later times" as recommended (less intrusive)
+  const sortedSuggestions = [...suggestions].sort((a, b) => {
+    if (a.id === "ALLOW_OUTSIDE_WORKING_HOURS") return -1
+    if (b.id === "ALLOW_OUTSIDE_WORKING_HOURS") return 1
+    return 0
+  })
+
   const handleApplyClick = (s: (typeof suggestions)[0]) => {
     setModalSuggestion({
       id: s.id,
@@ -400,34 +407,29 @@ function NoViableTimePanel({
       <div className="rounded-xl border border-border/60 bg-card p-5 sm:p-6 space-y-6 animate-in fade-in-0 duration-300">
         <div>
           <h3 className="text-base font-semibold text-foreground">
-            No shared time fits everyone&apos;s limits
+            No shared time works for this team
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Everyone&apos;s limits overlap, so there&apos;s no overlap left.
+            Working hours and boundaries leave no overlapping meeting window.
           </p>
         </div>
 
         <section>
           <h4 className="text-sm font-medium text-foreground mb-2">
-            What&apos;s going on
+            Why this happens
           </h4>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            {diagnosis.notes[0]}
+            Your team spans multiple time zones and members have set limits on when they can meet.
           </p>
-          <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-            {diagnosis.notes.slice(1).map((note, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="text-primary mt-0.5">·</span>
-                {note}
-              </li>
-            ))}
-          </ul>
+          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+            Right now, those limits leave no shared meeting window.
+          </p>
         </section>
 
         <section>
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-sm font-medium text-foreground">
-              Who&apos;s limiting options?
+              What&apos;s limiting options?
             </h4>
             <Button
               variant="ghost"
@@ -435,110 +437,104 @@ function NoViableTimePanel({
               className="text-xs"
               onClick={() => setShowBlockers((b) => !b)}
             >
-              {showBlockers ? "Hide conflicts" : "Show conflicts"}
+              {showBlockers ? "Hide explanation" : "Why no time works"}
             </Button>
           </div>
           {showBlockers && (
             <>
-              <p className="mt-2 text-xs text-muted-foreground">
-                These team members have the most impact on when the meeting can be scheduled:
+              <p className="mt-2 text-sm text-muted-foreground">
+                {diagnosis.blockers.some((b) => b.blockingType === "HARD_BOUNDARY")
+                  ? "These members' limits leave no shared meeting window."
+                  : "These members' working hours leave no shared meeting window."}
               </p>
               <ul className="mt-3 space-y-2.5">
-              {diagnosis.blockers.map((b) => (
-                <li
-                  key={b.memberId}
-                  className="flex flex-wrap items-start gap-2 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-sm"
-                >
-                  <span className="font-medium text-foreground">{b.name}</span>
-                  <Badge
-                    variant="outline"
-                    className="text-xs font-normal"
+                {diagnosis.blockers.map((b) => (
+                  <li
+                    key={b.memberId}
+                    className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-sm space-y-1"
                   >
-                    {b.blockingType === "HARD_BOUNDARY"
-                      ? "Never times"
-                      : "Working hours"}
-                  </Badge>
-                  <span className="text-muted-foreground text-xs">
-                    {getTimezoneDisplayLabelNow(b.timezone)}
-                  </span>
-                  <p className="w-full text-muted-foreground text-xs mt-1">
-                    {b.localBlockedSummary}
-                  </p>
-                </li>
-              ))}
-            </ul>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-foreground">{b.name}</span>
+                      <Badge
+                        variant="outline"
+                        className="text-xs font-normal"
+                      >
+                        {b.blockingType === "HARD_BOUNDARY"
+                          ? "Never time"
+                          : "Working hours"}
+                      </Badge>
+                      <span className="text-muted-foreground text-xs">
+                        {getTimezoneDisplayLabelNow(b.timezone)}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      {b.localBlockedSummary}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             </>
           )}
         </section>
 
         <section>
           <h4 className="text-sm font-medium text-foreground mb-3">
-            Choose how to proceed
+            Ways to resolve this
           </h4>
           <div className="space-y-3">
-            {suggestions.map((s) => (
-              <div
-                key={s.id}
-                className="rounded-lg border border-border/50 bg-muted/20 p-4 space-y-2"
-              >
-                <h5 className="text-sm font-medium text-foreground">
-                  {s.title}
-                </h5>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {s.description}
-                </p>
-                <p className="text-xs text-muted-foreground/80">
-                  {s.impactSummary}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => handleApplyClick(s)}
+            {sortedSuggestions.map((s, index) => {
+              const isRecommended = index === 0
+              return (
+                <div
+                  key={s.id}
+                  className={`rounded-lg border p-4 space-y-2 transition-colors cursor-pointer ${
+                    isRecommended
+                      ? "border-teal-700/40 bg-teal-50/30 hover:border-teal-700/60 hover:bg-teal-50/40 dark:border-teal-400/30 dark:bg-teal-950/20 dark:hover:border-teal-400/50 dark:hover:bg-teal-950/30"
+                      : "border-gray-200 bg-white dark:border-border/50 dark:bg-muted/20 hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20"
+                  }`}
                 >
-                  Apply this option
-                </Button>
-              </div>
-            ))}
+                  <h5 className="text-sm font-medium text-foreground">
+                    {s.title}
+                  </h5>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {s.description}
+                  </p>
+                  <p className="text-xs text-muted-foreground/80">
+                    {s.impactSummary}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={
+                      isRecommended
+                        ? "mt-2 rounded-full px-6 py-3 bg-teal-700 text-white hover:bg-teal-800 border-teal-700 hover:border-teal-800"
+                        : "mt-2 rounded-full px-6 py-3"
+                    }
+                    onClick={() => handleApplyClick(s)}
+                  >
+                    Generate preview
+                  </Button>
+                </div>
+              )
+            })}
           </div>
         </section>
       </div>
 
       <Dialog open={!!modalSuggestion} onOpenChange={(o) => !o && setModalSuggestion(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {modalSuggestion?.id === "RELAX_HARD_BOUNDARY_1H"
-                ? "Relax one \"never\" time for this plan"
-                : modalSuggestion?.id === "ALLOW_OUTSIDE_WORKING_HOURS"
-                  ? "Allow slightly earlier or later times"
-                  : modalSuggestion?.title}
-            </DialogTitle>
+            <DialogTitle>Generate schedule preview?</DialogTitle>
             <DialogDescription>
-              {modalSuggestion?.id === "RELAX_HARD_BOUNDARY_1H" ? (
-                <>
-                  We&apos;ll temporarily allow one hour that{" "}
-                  {(modalSuggestion?.params as { memberName?: string })?.memberName ?? "this person"}{" "}
-                  marked as &quot;never&quot; for this meeting plan. Their other &quot;never&quot;
-                  times still apply. Use this only when the team agrees. This only affects this
-                  meeting plan.
-                </>
-              ) : modalSuggestion?.id === "ALLOW_OUTSIDE_WORKING_HOURS" ? (
-                <>
-                  We&apos;ll consider meeting times that fall slightly outside your normal working
-                  hours. Your &quot;never&quot; times still apply. This only affects this meeting
-                  plan.
-                </>
-              ) : (
-                modalSuggestion?.description
-              )}
+              This will generate a temporary schedule preview using this option.
+              Member settings will not be changed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter showCloseButton={false}>
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleConfirmApply}>Confirm</Button>
+            <Button variant="outline" onClick={handleConfirmApply}>Generate preview</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -596,6 +592,8 @@ export function RotationSection({
   const [rotationError, setRotationError] = useState<string | null>(null)
   const [isPublishing, setIsPublishing] = useState(false)
   const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [isPreviewFromRelaxedConstraint, setIsPreviewFromRelaxedConstraint] = useState(false)
+  const [previewRelaxedMemberName, setPreviewRelaxedMemberName] = useState<string | null>(null)
   const router = useRouter()
 
   const rotation = rotationResult?.weeks ?? null
@@ -699,6 +697,8 @@ export function RotationSection({
     setRotationResult(null)
     setNoViableResult(null)
     setRotationError(null)
+    setIsPreviewFromRelaxedConstraint(false)
+    setPreviewRelaxedMemberName(null)
     console.log("Rotation config:", config)
     console.log("[DEBUG] Calling generateRotationGuarded")
     setTimeout(() => {
@@ -735,10 +735,65 @@ export function RotationSection({
 
   const handleApplySuggestion = useCallback(
     (suggestionId: string, params?: unknown) => {
-      console.log("[NoViableTime] Apply suggestion:", suggestionId, params)
-      // Phase 1: no DB write, just log
+      setPreviewRelaxedMemberName(null)
+      let modifiedTeam = team
+      if (suggestionId === "RELAX_HARD_BOUNDARY_1H") {
+        const p = params as { memberId?: string; relaxRange?: { start: number; end: number } } | undefined
+        const memberId = p?.memberId
+        const relaxRange = p?.relaxRange
+        if (memberId && relaxRange != null) {
+          modifiedTeam = team.map((m) => {
+            if (m.id !== memberId) return m
+            const filtered = m.hardNoRanges.filter(
+              (r) => !(r.start === relaxRange.start && r.end === relaxRange.end)
+            )
+            return { ...m, hardNoRanges: filtered }
+          })
+        }
+      }
+      setIsGenerating(true)
+      setNoViableResult(null)
+      setRotationError(null)
+      setIsPreviewFromRelaxedConstraint(false)
+      setPreviewRelaxedMemberName(null)
+      setTimeout(() => {
+        try {
+          const result = generateRotationGuarded(modifiedTeam, config)
+          if (isInputContractViolation(result)) {
+            const msg =
+              result.error.details?.map((d) => d.reason || `${d.field}: invalid`).join("; ") ??
+              result.error.message
+            setRotationError(msg)
+            setRotationResult(null)
+            setNoViableResult(null)
+          } else if (isNoViableTimeResult(result)) {
+            setRotationError("PREVIEW_NO_OVERLAP")
+            setRotationResult(null)
+            setNoViableResult(result)
+          } else if (Array.isArray(result) && result.length === 0) {
+            setRotationError("PREVIEW_NO_OVERLAP")
+            setRotationResult(null)
+            setNoViableResult(null)
+          } else if (isRotationResult(result)) {
+            setRotationResult(result)
+            setNoViableResult(null)
+            setRotationError(null)
+            setIsPreviewFromRelaxedConstraint(true)
+            if (suggestionId === "RELAX_HARD_BOUNDARY_1H") {
+              const p = params as { memberName?: string } | undefined
+              setPreviewRelaxedMemberName(p?.memberName ?? null)
+            }
+          }
+        } catch (error) {
+          console.error("[Preview] Error:", error)
+          setRotationError("PREVIEW_NO_OVERLAP")
+          setRotationResult(null)
+          setNoViableResult(null)
+        }
+        setIsGenerating(false)
+      }, 800)
     },
-    []
+    [team, config]
   )
 
   const handlePublishSchedule = async () => {
@@ -971,10 +1026,18 @@ export function RotationSection({
         )}
 
         {noViableResult && !isGenerating && (
-          <NoViableTimePanel
-            result={noViableResult}
-            onApplySuggestion={handleApplySuggestion}
-          />
+          <>
+            {rotationError === "PREVIEW_NO_OVERLAP" && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-950/30 px-4 py-3 text-sm text-muted-foreground animate-in fade-in-0 duration-300 mb-4">
+                <p>Even with this option, the team still has no overlapping meeting window.</p>
+                <p className="mt-1.5 text-xs text-muted-foreground/90">You may need to adjust member availability or remove some constraints.</p>
+              </div>
+            )}
+            <NoViableTimePanel
+              result={noViableResult}
+              onApplySuggestion={handleApplySuggestion}
+            />
+          </>
         )}
 
         {rotationError && !noViableResult && !isGenerating && (
@@ -985,6 +1048,14 @@ export function RotationSection({
 
         {rotation && !isGenerating && (
           <>
+            {isPreviewFromRelaxedConstraint && (
+              <div className="rounded-lg border border-teal-200 bg-teal-50/50 dark:border-teal-800/50 dark:bg-teal-950/30 px-4 py-3 text-sm text-muted-foreground animate-in fade-in-0 duration-300 space-y-1.5">
+                <p>Preview generated using relaxed constraints. Member settings have not been changed.</p>
+                {previewRelaxedMemberName && (
+                  <p>To generate this preview, one hard boundary was temporarily relaxed for {previewRelaxedMemberName}.</p>
+                )}
+              </div>
+            )}
             <RotationOutput
               weeks={rotation}
               team={team}
@@ -1054,10 +1125,11 @@ export function RotationSection({
               </div>
             </section>
 
-            <div className="pt-6 flex flex-col sm:flex-row sm:justify-end sm:items-center gap-3">
+            <div className="pt-6 flex flex-col sm:flex-row sm:justify-end sm:items-center gap-4">
               <Button
                 variant="outline"
-                size="default"
+                size="lg"
+                className="w-full sm:w-auto h-12 text-sm font-medium rounded-xl border-emerald-500/60 text-emerald-600 hover:bg-emerald-500/10 hover:border-emerald-500/80 hover:text-emerald-700 dark:text-emerald-400 dark:border-emerald-400/50 dark:hover:bg-emerald-500/15 dark:hover:border-emerald-400/70"
                 onClick={() => setAnalysisOpen(true)}
               >
                 View rotation analysis
@@ -1098,7 +1170,7 @@ export function RotationSection({
       </footer>
 
       <Dialog open={analysisOpen} onOpenChange={setAnalysisOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto max-w-2xl">
+        <DialogContent className="w-[90vw] max-w-[1000px] max-h-[85vh] overflow-y-auto p-8">
           <DialogHeader>
             <DialogTitle>Rotation Analysis</DialogTitle>
             <DialogDescription>
@@ -1119,6 +1191,10 @@ export function RotationSection({
                 membersDisplay={membersDisplay}
                 embedded
                 displayTimezone={meeting.display_timezone}
+                modeUsed={rotationResult?.modeUsed}
+                useFixedBaseTime={useFixedBaseTime}
+                relaxedWorkingHours={isPreviewFromRelaxedConstraint && !previewRelaxedMemberName}
+                relaxedHardBoundaryMemberName={previewRelaxedMemberName ?? undefined}
               />
             )}
           </div>

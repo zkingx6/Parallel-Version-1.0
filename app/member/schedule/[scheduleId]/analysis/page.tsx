@@ -114,6 +114,8 @@ export default async function MemberScheduleAnalysisPage({
       scheduleBasePath="/member/schedule"
       scheduleLinkParams={baseParams}
       displayTimezone={meeting.display_timezone}
+      modeUsed={modeUsed}
+      useFixedBaseTime={meeting.base_time_minutes != null}
     />
   )
 }
