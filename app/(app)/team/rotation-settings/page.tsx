@@ -144,7 +144,7 @@ export default function RotationSettingsPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-5 py-10 sm:px-8">
-      <PageBackLink href="/meetings" className="mb-8">Back to Teams</PageBackLink>
+      <PageBackLink href="/teams" className="mb-8">Back to Teams</PageBackLink>
 
       <header className="mb-10">
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">

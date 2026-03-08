@@ -50,7 +50,7 @@ export function ScheduleListContent({
           Generate a rotation and publish a schedule first.
         </p>
         <Link
-          href={emptyStateHref ?? "/meetings"}
+          href={emptyStateHref ?? "/teams"}
           className="inline-block text-sm text-primary hover:text-primary/80 transition-colors mt-2"
         >
           Go to Teams →

@@ -28,13 +28,13 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
       ? meetingIdFromUrl
       : firstMeetingId
 
-  // Team/Rotation enabled when: isSetupComplete (meetings.length > 0 from /meetings) OR valid meetingId in URL.
+  // Team/Rotation enabled when: isSetupComplete (meetings.length > 0 from /teams) OR valid meetingId in URL.
   const teamRotationEnabled =
     isSetupComplete || (meetingIdFromUrl && meetingIdFromUrl !== "rotation-settings")
 
   // Explicit route-to-tab mapping.
   const activeTab = (() => {
-    if (pathname === "/meetings") return "meetings"
+    if (pathname === "/teams") return "meetings"
     if (pathname?.startsWith("/team/rotation-settings")) return "meetings"
     if (pathname?.startsWith("/team/")) return "meetings"
     if (pathname?.startsWith("/rotation/")) return "rotation"
@@ -67,7 +67,7 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
         {/* Left: Logo */}
         <div className="shrink-0">
           <Link
-            href="/meetings"
+            href="/teams"
             className="text-lg font-semibold text-foreground hover:text-foreground/80 transition-colors"
           >
             Parallel
@@ -77,7 +77,7 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
         {/* Center: Tabs (Teams | Rotation | Schedule) */}
         <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 text-sm">
           <Link
-            href="/meetings"
+            href="/teams"
             className={getTabClass(isMeetings)}
           >
             Teams

@@ -9,9 +9,9 @@ import {
 } from "react"
 
 type SetupContextValue = {
-  /** True when user has at least one meeting (from meetings.length > 0 on /meetings page). */
+  /** True when user has at least one meeting (from meetings.length > 0 on /teams page). */
   isSetupComplete: boolean
-  /** First meeting ID for nav links when on /meetings. */
+  /** First meeting ID for nav links when on /teams. */
   firstMeetingId: string | null
   setSetupFromMeetings: (meetings: { id: string }[]) => void
 }

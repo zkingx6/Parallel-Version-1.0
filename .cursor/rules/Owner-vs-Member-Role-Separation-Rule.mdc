@@ -29,7 +29,7 @@ An **Owner** is a user who has purchased a plan (Starter / Pro / Enterprise).
 - Manage team settings
 
 ### Owner Dashboard Routes
-- `/meetings` (teams list)
+- `/teams` (teams list)
 - `/team/[id]` (team detail)
 - `/rotation/[id]` (rotation planning)
 - `/schedule` (schedule list)
@@ -84,13 +84,13 @@ After login, the system must determine user role and route accordingly.
 **Logic:**
 ```
 if user has paid plan (or owned meetings in MVP)
-  → route to owner dashboard (/meetings)
+  → route to owner dashboard (/teams)
 
 else if user exists in member_submissions (user_id = auth.uid())
   → route to member dashboard (/member-dashboard?token=...&memberId=...)
 
 else
-  → route to /meetings (default for new users)
+  → route to /teams (default for new users)
 ```
 
 **Members must never land on owner dashboard after normal login.**

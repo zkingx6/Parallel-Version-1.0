@@ -20,7 +20,7 @@ export default async function RotationPage({
     .eq("id", id)
     .single()
 
-  if (!meeting) redirect("/meetings")
+  if (!meeting) redirect("/teams")
 
   const { data: members } = await supabase
     .from("member_submissions")

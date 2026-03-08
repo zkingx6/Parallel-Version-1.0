@@ -46,7 +46,7 @@ export function SettingsContent({
     if (typeof window !== "undefined" && window.history.length > 1) {
       router.back()
     } else {
-      router.push("/meetings")
+      router.push("/teams")
     }
   }
 

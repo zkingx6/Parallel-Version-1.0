@@ -1,16 +1,50 @@
 "use server"
 
+import { redirect } from "next/navigation"
 import { createServerSupabase, createServiceSupabase } from "./supabase-server"
 import { revalidatePath } from "next/cache"
+
+/**
+ * Sign in with email/password. Redirects to /teams (or resolvePostLoginRedirect) on success.
+ */
+export async function signInAction(formData: FormData) {
+  const email = (formData.get("email") as string)?.trim()
+  const password = formData.get("password") as string
+  const redirectTo = formData.get("redirectTo") as string | null
+  const isSignUp = formData.get("isSignUp") === "1"
+
+  if (!email || !password) {
+    return { error: "Email and password are required." }
+  }
+
+  const supabase = await createServerSupabase()
+
+  if (isSignUp) {
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) return { error: error.message }
+    return { error: null, signUpSuccess: true }
+  }
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) return { error: error.message }
+
+  const safeRedirect =
+    redirectTo &&
+    typeof redirectTo === "string" &&
+    redirectTo.startsWith("/") &&
+    !redirectTo.startsWith("//")
+  const target = safeRedirect ? redirectTo : await resolvePostLoginRedirect()
+  redirect(target)
+}
 
 /**
  * Resolve post-login redirect based on user role.
  * Routing depends ONLY on relationship to teams (owner vs member).
  * Plan type (starter/pro) must NOT determine routing.
  *
- * - Owner: meetings.manager_id === user.id → /meetings
+ * - Owner: meetings.manager_id === user.id → /teams
  * - Member: member_submissions.user_id === user.id, NOT a manager → /member-dashboard
- * - Neither → /meetings (default for new users)
+ * - Neither → /teams (default for new users)
  */
 export async function resolvePostLoginRedirect(): Promise<string> {
   const serverSupabase = await createServerSupabase()
@@ -26,7 +60,7 @@ export async function resolvePostLoginRedirect(): Promise<string> {
     .select("id")
     .eq("manager_id", user.id)
     .limit(1)
-  if (ownedMeetings && ownedMeetings.length > 0) return "/meetings"
+  if (ownedMeetings && ownedMeetings.length > 0) return "/teams"
 
   const { data: memberRows } = await serviceSupabase
     .from("member_submissions")
@@ -48,7 +82,7 @@ export async function resolvePostLoginRedirect(): Promise<string> {
     return `/member-dashboard${params.toString() ? `?${params.toString()}` : ""}`
   }
 
-  return "/meetings"
+  return "/teams"
 }
 import type { HardNoRange } from "./types"
 import { isComplementOfOverlapPattern } from "./hard-no-ranges"
@@ -218,7 +252,7 @@ export async function deleteMeeting(meetingId: string) {
 
   if (error) return { error: error.message }
   revalidatePath("/dashboard")
-  revalidatePath("/meetings")
+  revalidatePath("/teams")
   return { success: true }
 }
 
@@ -301,7 +335,7 @@ export async function updateProfile(formData: FormData) {
   revalidatePath("/settings")
   revalidatePath("/settings/profile")
   revalidatePath("/")
-  revalidatePath("/meetings", "layout")
+  revalidatePath("/teams", "layout")
   revalidatePath("/schedule", "layout")
   revalidatePath("/team", "layout")
   revalidatePath("/rotation", "layout")
@@ -760,7 +794,7 @@ export async function updateMemberProfile(
   revalidatePath(`/team/${meeting.id}`)
   revalidatePath("/schedule", "layout")
   revalidatePath("/member-dashboard", "layout")
-  revalidatePath("/meetings", "layout")
+  revalidatePath("/teams", "layout")
   revalidatePath("/team", "layout")
   revalidatePath("/rotation", "layout")
   return { data }

@@ -135,7 +135,7 @@ export function TeamSection({
 
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-      <PageBackLink href="/meetings" className="mb-6">Back to Teams</PageBackLink>
+      <PageBackLink href="/teams" className="mb-6">Back to Teams</PageBackLink>
       <div className="mb-10">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
