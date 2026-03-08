@@ -34,6 +34,7 @@ export function SettingsContent({
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarRemoved, setAvatarRemoved] = useState(false)
 
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -90,10 +91,12 @@ export function SettingsContent({
         )}
         <div className="flex items-center gap-4">
           <Avatar className="size-12">
-            {userAvatar ? (
+            {userAvatar?.trim() ? (
               <AvatarImage src={userAvatar} alt="" />
             ) : null}
-            <AvatarFallback className="text-base">{initials}</AvatarFallback>
+            <AvatarFallback className="text-base" delayMs={userAvatar?.trim() ? 600 : 0}>
+              {initials}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">
@@ -109,6 +112,7 @@ export function SettingsContent({
               setError(null)
               setSuccessMessage(null)
               setAvatarPreview(null)
+              setAvatarRemoved(false)
               setEditOpen(true)
             }}
             className="text-sm font-medium text-primary hover:text-primary/80 transition-colors shrink-0"
@@ -124,6 +128,7 @@ export function SettingsContent({
             <DialogTitle>Edit profile</DialogTitle>
           </DialogHeader>
           <form
+            id="edit-profile-form"
             encType="multipart/form-data"
             onSubmit={async (e) => {
               e.preventDefault()
@@ -131,12 +136,15 @@ export function SettingsContent({
               setSaving(true)
               try {
                 const fd = new FormData(e.currentTarget)
+                if (avatarRemoved) fd.set("removeAvatar", "1")
                 const res = await updateProfile(fd)
                 if (res.error) {
                   setError(res.error)
                   return
                 }
                 setEditOpen(false)
+                setAvatarPreview(null)
+                setAvatarRemoved(false)
                 setSuccessMessage("Profile updated.")
                 router.refresh()
                 setTimeout(() => setSuccessMessage(null), 4000)
@@ -193,14 +201,14 @@ export function SettingsContent({
               </label>
               <div className="flex items-center gap-4">
                 <Avatar className="size-14 shrink-0">
-                  {(avatarPreview || userAvatar) ? (
+                  {(avatarPreview || (userAvatar?.trim() && !avatarRemoved)) ? (
                     <AvatarImage
-                      src={avatarPreview || userAvatar}
+                      src={avatarPreview || userAvatar || ""}
                       alt=""
                     />
                   ) : null}
-                  <AvatarFallback className="text-base">
-                    {userName ? userName[0].toUpperCase() : userEmail ? userEmail[0].toUpperCase() : "?"}
+                  <AvatarFallback className="text-base" delayMs={(avatarPreview || (userAvatar?.trim() && !avatarRemoved)) ? 600 : 0}>
+                    {userName ? userName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) : userEmail ? userEmail[0].toUpperCase() : "?"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
@@ -214,6 +222,7 @@ export function SettingsContent({
                       const f = e.target.files?.[0]
                       if (f) {
                         setAvatarPreview(URL.createObjectURL(f))
+                        setAvatarRemoved(false)
                       } else {
                         setAvatarPreview(null)
                       }
@@ -222,6 +231,28 @@ export function SettingsContent({
                   <p className="text-xs text-muted-foreground mt-1">
                     JPG, PNG, GIF, or WebP. Optional.
                   </p>
+                  {(userAvatar?.trim() || avatarPreview) && !avatarRemoved ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => {
+                        setAvatarPreview(null)
+                        setAvatarRemoved(true)
+                      }}
+                      className="text-xs text-muted-foreground hover:text-destructive transition-colors mt-2"
+                    >
+                      Remove avatar
+                    </button>
+                  ) : avatarRemoved ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => setAvatarRemoved(false)}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
+                    >
+                      Undo
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>

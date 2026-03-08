@@ -48,8 +48,10 @@ type DashboardData = {
     avatar_url?: string | null
     updated_at?: string
   }
+  memberDisplay: { name: string; avatarUrl: string }
   memberCount: number
   members: MemberSubmission[]
+  membersDisplay: Record<string, { name: string; avatarUrl: string }>
 }
 
 export default function MemberTeamDetailPage() {
@@ -68,9 +70,9 @@ export default function MemberTeamDetailPage() {
         const d = result.data as DashboardData
         setData(d)
         setCachedMember(token, memberId, {
-          name: d.member.name,
-          avatar_url: d.member.avatar_url,
-          updated_at: d.member.updated_at,
+          name: d.memberDisplay.name,
+          avatar_url: d.memberDisplay.avatarUrl,
+          updated_at: undefined,
         })
       }
     })
@@ -84,12 +86,17 @@ export default function MemberTeamDetailPage() {
             Parallel
           </h1>
           <p className="text-sm text-muted-foreground">Missing token or member ID.</p>
-          <Link
-            href="/member-dashboard"
-            className="text-sm text-primary hover:underline"
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
           >
-            Back to teams
-          </Link>
+            <Link href="/member-dashboard" className="inline-flex items-center gap-1.5">
+              <span aria-hidden>←</span>
+              Back to teams
+            </Link>
+          </Button>
         </div>
       </main>
     )
@@ -103,12 +110,20 @@ export default function MemberTeamDetailPage() {
             Parallel
           </h1>
           <p className="text-sm text-muted-foreground">{error}</p>
-          <Link
-            href={`/member-dashboard?token=${encodeURIComponent(token)}&memberId=${encodeURIComponent(memberId)}`}
-            className="text-sm text-primary hover:underline"
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
           >
-            Back to teams
-          </Link>
+            <Link
+              href={`/member-dashboard?token=${encodeURIComponent(token)}&memberId=${encodeURIComponent(memberId)}`}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span aria-hidden>←</span>
+              Back to teams
+            </Link>
+          </Button>
         </div>
       </main>
     )
@@ -122,7 +137,7 @@ export default function MemberTeamDetailPage() {
     )
   }
 
-  const { meeting, member, memberCount, members } = data
+  const { meeting, member, memberDisplay, memberCount, members, membersDisplay } = data
   const rawRanges: HardNoRange[] = Array.isArray(member.hard_no_ranges)
     ? (member.hard_no_ranges as HardNoRange[])
     : []
@@ -141,12 +156,8 @@ export default function MemberTeamDetailPage() {
   return (
     <div className="min-h-screen bg-background">
       <MemberTopNav
-        memberName={member.name}
-        memberAvatarUrl={
-          member.avatar_url
-            ? `${member.avatar_url}?v=${member.updated_at ?? ""}`
-            : ""
-        }
+        memberName={memberDisplay.name}
+        memberAvatarUrl={memberDisplay.avatarUrl || undefined}
         meetingTitle={meeting.title}
         teamUrl={teamsListUrl}
         scheduleUrl={scheduleUrl}
@@ -155,13 +166,17 @@ export default function MemberTeamDetailPage() {
       />
 
       <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <Link
-          href={teamsListUrl}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="-ml-2 mb-6 text-muted-foreground hover:text-foreground"
         >
-          <span aria-hidden>←</span>
-          Back to teams
-        </Link>
+          <Link href={teamsListUrl} className="inline-flex items-center gap-1.5">
+            <span aria-hidden>←</span>
+            Back to teams
+          </Link>
+        </Button>
 
         <section className="mb-8">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
@@ -194,7 +209,7 @@ export default function MemberTeamDetailPage() {
             </p>
             <p>
               <span className="text-muted-foreground">Name:</span>{" "}
-              <span className="font-medium">{member.name}</span>
+              <span className="font-medium">{memberDisplay.name}</span>
             </p>
             {member.role && (
               <p>
@@ -250,7 +265,7 @@ export default function MemberTeamDetailPage() {
           <ul className="space-y-2 text-sm">
             {members.map((m) => (
               <li key={m.id} className="flex items-center gap-2">
-                <span className="font-medium">{m.name}</span>
+                <span className="font-medium">{membersDisplay[m.id]?.name ?? m.name}</span>
                 {m.is_owner_participant && (
                   <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                     Owner

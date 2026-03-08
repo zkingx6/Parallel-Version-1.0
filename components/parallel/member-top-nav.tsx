@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { MemberAvatar } from "@/components/ui/avatar"
 
 type MemberTopNavProps = {
   memberName: string
@@ -39,19 +39,6 @@ export function MemberTopNav({
   const tabInactive =
     "text-neutral-600 hover:bg-neutral-100 hover:border-neutral-200 hover:text-neutral-900"
   const tabActive = "bg-neutral-100 border-neutral-200 text-neutral-900"
-
-  const nameForInitials = (memberName || "").trim()
-  const isRoleLabel = /^(member|owner)$/i.test(nameForInitials)
-  const rawInitials =
-    !isRoleLabel && nameForInitials
-      ? nameForInitials
-          .split(" ")
-          .map((n) => n[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 2)
-      : ""
-  const initials = rawInitials || "?"
 
   return (
     <header className="relative z-10 w-full shrink-0 border-b border-border/40 bg-background">
@@ -98,28 +85,22 @@ export function MemberTopNav({
               )}
               aria-label="Account"
             >
-              <Avatar className="size-8">
-                {memberAvatarUrl ? (
-                  <AvatarImage src={memberAvatarUrl} alt="" />
-                ) : null}
-                <AvatarFallback className="text-xs" delayMs={0}>
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+              <MemberAvatar
+                avatarUrl={memberAvatarUrl ?? undefined}
+                name={memberName || "?"}
+                size="default"
+              />
             </Link>
           ) : (
             <div
               className="flex items-center justify-center rounded-full"
               aria-label={`${memberName} (member)`}
             >
-              <Avatar className="size-8">
-                {memberAvatarUrl ? (
-                  <AvatarImage src={memberAvatarUrl} alt="" />
-                ) : null}
-                <AvatarFallback className="text-xs" delayMs={0}>
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+              <MemberAvatar
+                avatarUrl={memberAvatarUrl ?? undefined}
+                name={memberName || "?"}
+                size="default"
+              />
             </div>
           )}
         </div>

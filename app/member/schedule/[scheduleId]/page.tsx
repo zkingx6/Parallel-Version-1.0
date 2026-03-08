@@ -7,12 +7,15 @@ import {
   authUserToProfile,
 } from "@/lib/profile-resolver"
 
-export default async function ScheduleDetailPage({
+export default async function MemberScheduleDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ scheduleId: string }>
+  searchParams: Promise<{ token?: string; memberId?: string }>
 }) {
   const { scheduleId } = await params
+  const { token, memberId } = await searchParams
   const supabase = await createServerSupabase()
 
   const {
@@ -26,7 +29,7 @@ export default async function ScheduleDetailPage({
     .eq("id", scheduleId)
     .single()
 
-  if (!schedule) redirect("/schedule")
+  if (!schedule) redirect("/member-dashboard")
 
   const serviceSupabase = createServiceSupabase()
   const { data: meeting } = await serviceSupabase
@@ -35,7 +38,17 @@ export default async function ScheduleDetailPage({
     .eq("id", schedule.team_id)
     .single()
 
-  if (!meeting) redirect("/schedule")
+  if (!meeting) redirect("/member-dashboard")
+
+  const { data: memberRow } = await serviceSupabase
+    .from("member_submissions")
+    .select("id")
+    .eq("meeting_id", schedule.team_id)
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle()
+
+  if (!memberRow) redirect("/member-dashboard")
 
   const { data: members } = await serviceSupabase
     .from("member_submissions")
@@ -57,6 +70,14 @@ export default async function ScheduleDetailPage({
     ownerAuthProfile ?? undefined
   )
 
+  const baseParams =
+    token && memberId
+      ? `token=${encodeURIComponent(token)}&memberId=${encodeURIComponent(memberId)}`
+      : ""
+  const backHref = baseParams
+    ? `/member-dashboard?${baseParams}&tab=schedule`
+    : "/member-dashboard"
+
   return (
     <ScheduleDetailContent
       scheduleId={scheduleId}
@@ -65,6 +86,9 @@ export default async function ScheduleDetailPage({
       members={members ?? []}
       weeks={weeks}
       membersDisplay={membersDisplay}
+      scheduleBasePath="/member/schedule"
+      backHref={backHref}
+      scheduleLinkParams={baseParams || undefined}
     />
   )
 }

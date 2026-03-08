@@ -31,6 +31,7 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const redirectTo = pathname + request.nextUrl.search
+
   if (pathname.startsWith("/join/") && !user) {
     return NextResponse.redirect(
       new URL(`/?redirect=${encodeURIComponent(redirectTo)}`, request.url)
@@ -42,7 +43,15 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  return supabaseResponse
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set("x-pathname", pathname)
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  })
+  supabaseResponse.cookies.getAll().forEach((c) =>
+    response.cookies.set(c.name, c.value, c)
+  )
+  return response
 }
 
 export const config = {

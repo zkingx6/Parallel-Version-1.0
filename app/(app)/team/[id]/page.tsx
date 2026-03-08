@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation"
 import { createServerSupabase } from "@/lib/supabase-server"
 import { TeamSection } from "@/components/parallel/team-section"
+import {
+  resolveMembersDisplay,
+  authUserToProfile,
+} from "@/lib/profile-resolver"
 
 export default async function TeamPage({
   params,
@@ -34,16 +38,11 @@ export default async function TeamPage({
   } = await supabase.auth.getUser()
 
   const userEmail = user?.email || ""
-  const profileDisplayName =
-    (user?.user_metadata?.full_name as string) ||
-    (user?.user_metadata?.name as string) ||
-    ""
-  const userName = profileDisplayName || user?.email?.split("@")[0] || ""
-  const baseAvatar =
-    (user?.user_metadata?.avatar_url as string) ||
-    (user?.user_metadata?.picture as string) ||
-    ""
-  const userAvatar = baseAvatar ? `${baseAvatar}?v=${user?.updated_at ?? ""}` : ""
+  const ownerAuthProfile = user ? authUserToProfile(user) : null
+  const membersDisplay = await resolveMembersDisplay(
+    members ?? [],
+    ownerAuthProfile ?? undefined
+  )
 
   return (
     <TeamSection
@@ -51,8 +50,7 @@ export default async function TeamPage({
       members={members || []}
       hasOwnerParticipant={hasOwnerParticipant}
       userEmail={userEmail}
-      ownerProfileName={profileDisplayName || userName}
-      ownerProfileAvatar={userAvatar}
+      membersDisplay={membersDisplay}
     />
   )
 }

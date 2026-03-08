@@ -1,0 +1,146 @@
+---
+alwaysApply: true
+---
+
+Parallel has two clearly separated user roles and a unified avatar system.
+These behaviors are locked and must not be changed unless explicitly requested.
+
+1. Role System (Owner vs Member)
+
+Parallel has two roles:
+
+Owner
+
+The user who created the team/meeting.
+
+Owners manage teams, generate rotations, and publish schedules.
+
+Owner routes live under the main app routes.
+
+Example owner routes:
+
+/teams
+/rotation
+/schedule
+/schedule/[scheduleId]
+/schedule/[scheduleId]/analysis
+
+Owners can:
+
+create teams
+
+invite members
+
+generate rotations
+
+publish schedules
+
+Member
+
+Members are users invited by the owner through the invite link.
+
+Members:
+
+submit availability
+
+view schedules
+
+cannot edit or regenerate schedules
+
+Members must always use member routes, not owner routes.
+
+Example member routes:
+
+/member-dashboard
+/member/schedule
+/member/schedule/[scheduleId]
+
+Members must never be redirected to owner dashboards.
+
+Routing must always depend on team role, not billing plan.
+
+2. Schedule Access Rules
+
+Schedule viewing rules:
+
+Owner:
+
+Can access all schedules for teams they manage.
+
+Member:
+
+Can access schedules only if they belong to that team.
+
+Member schedule pages must be read-only.
+
+Members must NOT see:
+
+publish buttons
+
+regenerate buttons
+
+editing tools
+
+3. Avatar System (Global Sync)
+
+Avatars must stay consistent across the entire application.
+
+Avatar resolution priority:
+
+member_submissions.avatar_url
+→ profiles.avatar_url
+→ auth.user_metadata.avatar_url
+→ initials fallback
+
+If avatar_url is null:
+
+The UI must display the initials fallback avatar.
+
+Example:
+
+Rongerrrr → R
+Zion Xu → ZX
+
+The avatar component must never render an empty circle.
+
+4. Avatar Editing Behavior
+
+Profile editing allows:
+
+Upload avatar
+
+Replace avatar
+
+Remove avatar
+
+Removing an avatar must:
+
+set avatar_url = null
+
+After saving, all pages must update automatically:
+
+navbar
+
+schedule pages
+
+team members
+
+profile page
+
+No page should cache stale avatar URLs.
+
+5. Important Stability Rule
+
+Do NOT change:
+
+role routing logic
+
+member vs owner route separation
+
+avatar resolver priority
+
+schedule permission rules
+
+unless explicitly requested.
+
+These systems are considered stable core architecture.

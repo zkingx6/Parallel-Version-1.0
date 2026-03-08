@@ -4,6 +4,7 @@ import {
   formatHourLabel,
 } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { MemberAvatar } from "@/components/ui/avatar"
 import {
   utcToLocalInZone,
   convertUtcToLocal,
@@ -74,16 +75,16 @@ function WeekCard({
               )}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <div
+                <MemberAvatar
+                  avatarUrl={member.avatar_url || undefined}
+                  name={member.name}
+                  size="xs"
                   className={cn(
-                    "w-5 h-5 rounded-full text-[8px] font-semibold flex items-center justify-center shrink-0",
-                    mt.discomfort !== "comfortable"
-                      ? "bg-stretch/60 text-stretch-foreground"
-                      : "bg-primary/10 text-primary/70"
+                    "shrink-0",
+                    mt.discomfort !== "comfortable" &&
+                      "[&_[data-slot=avatar-fallback]]:bg-stretch/60 [&_[data-slot=avatar-fallback]]:text-stretch-foreground"
                   )}
-                >
-                  {member.initials}
-                </div>
+                />
                 <span className="text-sm truncate">{member.name}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">

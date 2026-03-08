@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createServerSupabase } from "@/lib/supabase-server"
+import { resolvePostLoginRedirect } from "@/lib/actions"
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -19,5 +20,7 @@ export async function GET(request: Request) {
     await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
   }
 
-  return NextResponse.redirect(`${origin}/dashboard`)
+  const target = await resolvePostLoginRedirect()
+  const url = target.startsWith("/") ? `${origin}${target}` : `${origin}/dashboard`
+  return NextResponse.redirect(url)
 }

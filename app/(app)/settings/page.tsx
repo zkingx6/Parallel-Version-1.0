@@ -1,5 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase-server"
 import { SettingsContent } from "./content"
+import { resolveOwnerAvatar } from "@/lib/avatar-resolver"
 
 export default async function SettingsPage() {
   const supabase = await createServerSupabase()
@@ -16,13 +17,7 @@ export default async function SettingsPage() {
         user?.email?.split("@")[0] ||
         ""
       }
-      userAvatar={(() => {
-        const url =
-          (user?.user_metadata?.avatar_url as string) ||
-          (user?.user_metadata?.picture as string) ||
-          ""
-        return url ? `${url}?v=${user?.updated_at ?? ""}` : ""
-      })()}
+      userAvatar={user ? resolveOwnerAvatar(user) : ""}
     />
   )
 }

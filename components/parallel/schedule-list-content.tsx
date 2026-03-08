@@ -19,11 +19,17 @@ export function ScheduleListContent({
   teamTitles,
   showDeleteButton = true,
   emptyStateHref,
+  scheduleBasePath = "/schedule",
+  scheduleLinkParams,
 }: {
   schedules: ScheduleItem[]
   teamTitles: Record<string, string>
   showDeleteButton?: boolean
   emptyStateHref?: string
+  /** Base path for schedule detail links. Use "/member/schedule" for member dashboard. */
+  scheduleBasePath?: string
+  /** Query params to append (e.g. token=...&memberId=...) for member context. */
+  scheduleLinkParams?: string
 }) {
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [items, setItems] = useState(schedules)
@@ -70,7 +76,7 @@ export function ScheduleListContent({
               className="rounded-xl border border-border/50 bg-card p-4 sm:p-5 shadow-sm flex items-start justify-between gap-3 hover:border-border/80 transition-colors"
             >
               <Link
-                href={`/schedule/${s.id}`}
+                href={`${scheduleBasePath}/${s.id}${scheduleLinkParams ? `?${scheduleLinkParams}` : ""}`}
                 className="flex-1 min-w-0"
               >
                 <h3 className="text-sm font-semibold text-foreground">

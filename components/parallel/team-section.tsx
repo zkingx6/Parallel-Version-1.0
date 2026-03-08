@@ -27,23 +27,21 @@ import {
 import { Input } from "@/components/ui/input"
 import { PencilIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { MemberAvatar } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 
 export function TeamSection({
   meeting: initialMeeting,
   members: initialMembers,
   userEmail,
-  ownerProfileName = "",
-  ownerProfileAvatar = "",
+  membersDisplay,
 }: {
   meeting: DbMeeting
   members: DbMemberSubmission[]
   hasOwnerParticipant: boolean
   userEmail: string
-  /** Profile display name/avatar for owner row. Source of truth for owner card. */
-  ownerProfileName?: string
-  ownerProfileAvatar?: string
+  /** Resolved display data from profiles/auth (canonical). memberId -> { name, avatarUrl } */
+  membersDisplay: Map<string, { name: string; avatarUrl: string }>
 }) {
   const [meeting, setMeeting] = useState(initialMeeting)
   const [members, setMembers] = useState(initialMembers)
@@ -136,13 +134,17 @@ export function TeamSection({
 
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-      <Link
-        href="/meetings"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="-ml-2 mb-6 text-muted-foreground hover:text-foreground"
       >
-        <span aria-hidden>←</span>
-        Back to Teams
-      </Link>
+        <Link href="/meetings" className="inline-flex items-center gap-1.5">
+          <span aria-hidden>←</span>
+          Back to Teams
+        </Link>
+      </Button>
       <div className="mb-10">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
@@ -228,8 +230,14 @@ export function TeamSection({
             <div className="flex-1 min-h-0 overflow-y-auto">
             <ParticipantForm
               defaultName={
-                members.find((m) => m.is_owner_participant)?.name ??
-                ((ownerProfileName || userEmail?.split("@")[0]) ?? "")
+                (() => {
+                  const owner = members.find((m) => m.is_owner_participant)
+                  if (owner) {
+                    const resolved = membersDisplay.get(owner.id)
+                    return resolved?.name ?? owner.name ?? userEmail?.split("@")[0] ?? ""
+                  }
+                  return userEmail?.split("@")[0] ?? ""
+                })()
               }
               defaultTimezone={
                 members.find((m) => m.is_owner_participant)?.timezone ??
@@ -335,20 +343,12 @@ export function TeamSection({
                     : rawRanges
                   const hasRanges = ranges.length > 0
                   const isOwner = m.is_owner_participant === true
-                  const displayName = isOwner
-                    ? (ownerProfileName || m.name || userEmail)
-                    : m.name
-                  const displayAvatar = isOwner
-                    ? ownerProfileAvatar
-                    : (m.avatar_url ? `${m.avatar_url}?v=${m.updated_at ?? ""}` : "")
-                  const nameForInitials = (displayName || m.name || "").trim()
-                  const isRoleLabel = /^(member|owner)$/i.test(nameForInitials)
-                  const displayInitials = isRoleLabel
-                    ? "?"
-                    : dbMemberToTeamMember({
-                        ...m,
-                        name: displayName || m.name,
-                      }).initials
+                  const resolved = membersDisplay.get(m.id)
+                  const displayName =
+                    resolved?.name ||
+                    (isOwner ? userEmail : m.name) ||
+                    "?"
+                  const displayAvatarUrl = resolved?.avatarUrl ?? ""
 
                   return (
                     <div
@@ -367,18 +367,12 @@ export function TeamSection({
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1.5 min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            {displayAvatar ? (
-                              <Avatar className="size-7 shrink-0">
-                                <AvatarImage src={displayAvatar} alt="" />
-                                <AvatarFallback className="text-[10px] font-semibold">
-                                  {displayInitials}
-                                </AvatarFallback>
-                              </Avatar>
-                            ) : (
-                              <div className="w-7 h-7 rounded-full bg-primary/10 text-primary text-[10px] font-semibold flex items-center justify-center shrink-0">
-                                {displayInitials}
-                              </div>
-                            )}
+                            <MemberAvatar
+                              avatarUrl={displayAvatarUrl || undefined}
+                              name={(displayName || m.name || "").trim() || "?"}
+                              size="sm"
+                              className="size-7 shrink-0"
+                            />
                             <span className="text-sm font-medium truncate">
                               {displayName || m.name || "—"}
                             </span>
@@ -492,12 +486,19 @@ export function TeamSection({
         </section>
 
         <div className="pt-4">
-          <Link
-            href={`/rotation/${meeting.id}`}
-            className="text-sm text-primary hover:text-primary/80 transition-colors"
+          <Button
+            asChild
+            variant="default"
+            size="sm"
           >
-            → Configure rotation & plan schedule
-          </Link>
+            <Link
+              href={`/rotation/${meeting.id}`}
+              className="inline-flex items-center gap-1.5"
+            >
+              <span aria-hidden>→</span>
+              Configure rotation & plan schedule
+            </Link>
+          </Button>
         </div>
       </div>
     </main>

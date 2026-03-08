@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input"
 type MemberData = {
   meeting: { id: string; title: string }
   member: { id: string; name: string; avatar_url?: string | null; updated_at?: string }
+  memberDisplay: { name: string; avatarUrl: string }
 }
 
 export default function MemberAccountPage() {
@@ -34,6 +35,7 @@ export default function MemberAccountPage() {
   const [saving, setSaving] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarRemoved, setAvatarRemoved] = useState(false)
 
   useEffect(() => {
     if (!token || !memberId) return
@@ -43,9 +45,9 @@ export default function MemberAccountPage() {
         const d = result.data as MemberData
         setData(d)
         setCachedMember(token, memberId, {
-          name: d.member.name,
-          avatar_url: d.member.avatar_url,
-          updated_at: d.member.updated_at,
+          name: d.memberDisplay.name,
+          avatar_url: d.memberDisplay.avatarUrl,
+          updated_at: undefined,
         })
       }
     })
@@ -85,14 +87,14 @@ export default function MemberAccountPage() {
     )
   }
 
-  const { meeting, member } = data
+  const { meeting, member, memberDisplay } = data
   const baseParams = `token=${encodeURIComponent(token ?? "")}&memberId=${encodeURIComponent(member.id)}`
   const teamUrl = `/member-dashboard?${baseParams}`
   const scheduleUrl = `/member-dashboard?${baseParams}&tab=schedule`
   const accountUrl = `/member-dashboard/account?${baseParams}`
 
-  const initials = member.name
-    ? member.name
+  const initials = memberDisplay.name
+    ? memberDisplay.name
         .split(" ")
         .map((n) => n[0])
         .join("")
@@ -105,18 +107,21 @@ export default function MemberAccountPage() {
     setSaving(true)
     try {
       const fd = new FormData(e.currentTarget)
+      if (avatarRemoved) fd.set("removeAvatar", "1")
       const res = await updateMemberProfile(token!, memberId!, fd)
       if (res.error) throw new Error(res.error)
       setEditOpen(false)
+      setAvatarPreview(null)
+      setAvatarRemoved(false)
       setSuccessMessage("Profile updated.")
       getMemberDashboardData(token!, memberId!).then((r) => {
         if (r.data) {
           const d = r.data as MemberData
           setData(d)
           setCachedMember(token!, memberId!, {
-            name: d.member.name,
-            avatar_url: d.member.avatar_url,
-            updated_at: d.member.updated_at,
+            name: d.memberDisplay.name,
+            avatar_url: d.memberDisplay.avatarUrl,
+            updated_at: undefined,
           })
         }
       })
@@ -132,12 +137,8 @@ export default function MemberAccountPage() {
   return (
     <div className="min-h-screen bg-background">
       <MemberTopNav
-        memberName={member.name}
-        memberAvatarUrl={
-          member.avatar_url
-            ? `${member.avatar_url}?v=${member.updated_at ?? ""}`
-            : ""
-        }
+        memberName={memberDisplay.name}
+        memberAvatarUrl={memberDisplay.avatarUrl || undefined}
         meetingTitle={meeting.title}
         teamUrl={teamUrl}
         scheduleUrl={scheduleUrl}
@@ -170,21 +171,18 @@ export default function MemberAccountPage() {
           )}
           <div className="flex items-center gap-4">
             <Avatar className="size-12">
-              {(avatarPreview || member.avatar_url) ? (
+              {(avatarPreview || memberDisplay.avatarUrl?.trim()) ? (
                 <AvatarImage
-                  src={
-                    avatarPreview ||
-                    (member.avatar_url
-                      ? `${member.avatar_url}?v=${member.updated_at ?? ""}`
-                      : "")
-                  }
+                  src={avatarPreview || memberDisplay.avatarUrl || ""}
                   alt=""
                 />
               ) : null}
-              <AvatarFallback className="text-base">{initials}</AvatarFallback>
+              <AvatarFallback className="text-base" delayMs={(avatarPreview || memberDisplay.avatarUrl?.trim()) ? 600 : 0}>
+                {initials}
+              </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{member.name || "—"}</p>
+              <p className="text-sm font-medium truncate">{memberDisplay.name || "—"}</p>
               <p className="text-sm text-muted-foreground truncate">
                 Member of {meeting.title}
               </p>
@@ -194,6 +192,7 @@ export default function MemberAccountPage() {
               onClick={() => {
                 setSuccessMessage(null)
                 setAvatarPreview(null)
+                setAvatarRemoved(false)
                 setEditOpen(true)
               }}
               className="text-sm font-medium text-primary hover:text-primary/80 transition-colors shrink-0"
@@ -209,6 +208,7 @@ export default function MemberAccountPage() {
               <DialogTitle>Edit profile</DialogTitle>
             </DialogHeader>
             <form
+              id="member-edit-profile-form"
               encType="multipart/form-data"
               onSubmit={handleSave}
               className="space-y-4"
@@ -223,7 +223,7 @@ export default function MemberAccountPage() {
                 <Input
                   id="member-display-name"
                   name="displayName"
-                  defaultValue={member.name}
+                  defaultValue={memberDisplay.name}
                   placeholder="Your name"
                   required
                   disabled={saving}
@@ -234,19 +234,14 @@ export default function MemberAccountPage() {
                 <label className="block text-sm font-medium mb-1.5">Avatar</label>
                 <div className="flex items-center gap-4 mt-2">
                   <Avatar className="size-14 shrink-0">
-                    {(avatarPreview || member.avatar_url) ? (
+                    {(avatarPreview || (memberDisplay.avatarUrl?.trim() && !avatarRemoved)) ? (
                       <AvatarImage
-                        src={
-                          avatarPreview ||
-                          (member.avatar_url
-                            ? `${member.avatar_url}?v=${member.updated_at ?? ""}`
-                            : "")
-                        }
+                        src={avatarPreview || memberDisplay.avatarUrl || ""}
                         alt=""
                       />
                     ) : null}
-                    <AvatarFallback className="text-base">
-                      {member.name ? member.name[0].toUpperCase() : "?"}
+                    <AvatarFallback className="text-base" delayMs={(avatarPreview || (memberDisplay.avatarUrl?.trim() && !avatarRemoved)) ? 600 : 0}>
+                      {memberDisplay.name ? memberDisplay.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) : "?"}
                     </AvatarFallback>
                   </Avatar>
                   <Input
@@ -257,14 +252,40 @@ export default function MemberAccountPage() {
                     className="w-full"
                     onChange={(e) => {
                       const f = e.target.files?.[0]
-                      if (f) setAvatarPreview(URL.createObjectURL(f))
-                      else setAvatarPreview(null)
+                      if (f) {
+                        setAvatarPreview(URL.createObjectURL(f))
+                        setAvatarRemoved(false)
+                      } else {
+                        setAvatarPreview(null)
+                      }
                     }}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   JPG, PNG, GIF, or WebP. Optional.
                 </p>
+                {(memberDisplay.avatarUrl?.trim() || avatarPreview) && !avatarRemoved ? (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => {
+                      setAvatarPreview(null)
+                      setAvatarRemoved(true)
+                    }}
+                    className="text-xs text-muted-foreground hover:text-destructive transition-colors mt-2"
+                  >
+                    Remove avatar
+                  </button>
+                ) : avatarRemoved ? (
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => setAvatarRemoved(false)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
+                  >
+                    Undo
+                  </button>
+                ) : null}
               </div>
               <DialogFooter showCloseButton={false}>
                 <Button

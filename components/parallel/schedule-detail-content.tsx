@@ -9,17 +9,21 @@ import {
 import { ensureDisplayTimezoneIana } from "@/lib/timezone"
 import { getBurdenCounts, hasConsecutiveStretch } from "@/lib/rotation"
 import { RotationOutput } from "./rotation-output"
+import { MemberAvatar } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { RotationWeekData } from "@/lib/types"
+import { getInitials, type RotationWeekData } from "@/lib/types"
 
 function BurdenBar({
   name,
+  avatarUrl,
   count,
   sacrificeCount,
   sacrificePoints,
   max,
 }: {
   name: string
+  avatarUrl?: string | null
   count: number
   sacrificeCount: number
   sacrificePoints?: number
@@ -32,6 +36,12 @@ function BurdenBar({
       : 0
   return (
     <div className="flex items-center gap-3">
+      <MemberAvatar
+        avatarUrl={avatarUrl}
+        name={name}
+        size="sm"
+        className="shrink-0"
+      />
       <span className="text-sm w-28 sm:w-36 truncate">{name}</span>
       <div className="flex-1 h-2 rounded-full bg-muted/60 overflow-hidden">
         <div
@@ -54,17 +64,40 @@ function BurdenBar({
 }
 
 export function ScheduleDetailContent({
+  scheduleId,
   scheduleName,
   meeting,
   members,
   weeks,
+  membersDisplay,
+  scheduleBasePath = "/schedule",
+  backHref,
+  scheduleLinkParams,
 }: {
+  scheduleId: string
   scheduleName: string
   meeting: DbMeeting
   members: DbMemberSubmission[]
   weeks: RotationWeekData[]
+  membersDisplay: Map<string, { name: string; avatarUrl: string }>
+  /** Base path for schedule links (e.g. /member/schedule for member context). */
+  scheduleBasePath?: string
+  /** Override "Back to schedules" link (e.g. member dashboard schedule tab). */
+  backHref?: string
+  /** Query params for schedule links (e.g. token=...&memberId=...) */
+  scheduleLinkParams?: string
 }) {
-  const team = members.map(dbMemberToTeamMember)
+  const backLink = backHref ?? scheduleBasePath
+  const team = members.map(dbMemberToTeamMember).map((tm) => {
+    const display = membersDisplay.get(tm.id)
+    const name = display?.name ?? tm.name
+    return {
+      ...tm,
+      name,
+      initials: getInitials(name),
+      avatar_url: display?.avatarUrl ?? undefined,
+    }
+  })
   const displayTimezone = ensureDisplayTimezoneIana(
     meeting.display_timezone ?? "America/New_York"
   )
@@ -74,13 +107,17 @@ export function ScheduleDetailContent({
   if (!weeks.length) {
     return (
       <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <Link
-          href="/schedule"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="-ml-2 mb-6 text-muted-foreground hover:text-foreground"
         >
-          <span aria-hidden>←</span>
-          Back to schedules
-        </Link>
+          <Link href={backLink} className="inline-flex items-center gap-1.5">
+            <span aria-hidden>←</span>
+            Back to schedules
+          </Link>
+        </Button>
         <div className="mb-10">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
             {scheduleName}
@@ -90,12 +127,17 @@ export function ScheduleDetailContent({
           <p className="text-sm text-muted-foreground">
             No schedule data available.
           </p>
-          <Link
-            href="/schedule"
-            className="inline-block text-sm text-primary hover:text-primary/80 transition-colors mt-2"
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="mt-2 text-muted-foreground hover:text-foreground"
           >
-            ← Back to schedules
-          </Link>
+            <Link href={backLink} className="inline-flex items-center gap-1.5">
+              <span aria-hidden>←</span>
+              Back to schedules
+            </Link>
+          </Button>
         </div>
       </main>
     )
@@ -116,20 +158,38 @@ export function ScheduleDetailContent({
 
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-      <Link
-        href="/schedule"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="-ml-2 mb-6 text-muted-foreground hover:text-foreground"
       >
-        <span aria-hidden>←</span>
-        Back to schedules
-      </Link>
+        <Link href={backLink} className="inline-flex items-center gap-1.5">
+          <span aria-hidden>←</span>
+          Back to schedules
+        </Link>
+      </Button>
       <div className="mb-10">
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
           {scheduleName}
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {meeting.title} — time rotates, burden distributed transparently.
-        </p>
+        <div className="mt-2 flex items-baseline justify-between gap-4">
+          <p className="min-w-0 text-sm text-muted-foreground">
+            {meeting.title} — time rotates, burden distributed transparently.
+          </p>
+          <Button
+            asChild
+            variant="default"
+            size="sm"
+            className="shrink-0"
+          >
+            <Link
+              href={`${scheduleBasePath}/${scheduleId}/analysis${scheduleLinkParams ? `?${scheduleLinkParams}` : ""}`}
+            >
+              Rotation analysis
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-10 sm:space-y-12">
@@ -178,6 +238,7 @@ export function ScheduleDetailContent({
                 <BurdenBar
                   key={d.memberId}
                   name={d.name}
+                  avatarUrl={membersDisplay.get(d.memberId)?.avatarUrl}
                   count={d.count}
                   sacrificeCount={d.sacrificeCount}
                   sacrificePoints={d.sacrificePoints}
@@ -189,12 +250,17 @@ export function ScheduleDetailContent({
         </section>
 
         <div className="pt-4">
-          <Link
-            href="/schedule"
-            className="text-sm text-primary hover:text-primary/80 transition-colors"
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="-ml-2 text-muted-foreground hover:text-foreground"
           >
-            ← Back to schedules
-          </Link>
+            <Link href={backLink} className="inline-flex items-center gap-1.5">
+              <span aria-hidden>←</span>
+              Back to schedules
+            </Link>
+          </Button>
         </div>
       </div>
     </main>

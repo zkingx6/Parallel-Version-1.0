@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
 // We store all scheduling rules in team base timezone.
 // Display times are always converted to viewer's timezone before rendering.
@@ -144,12 +145,17 @@ export default function RotationSettingsPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-5 py-10 sm:px-8">
-      <Link
-        href="/meetings"
-        className="mb-8 inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="-ml-2 mb-8 text-muted-foreground hover:text-foreground"
       >
-        ← Back to Teams
-      </Link>
+        <Link href="/meetings" className="inline-flex items-center gap-1.5">
+          <span aria-hidden>←</span>
+          Back to Teams
+        </Link>
+      </Button>
 
       <header className="mb-10">
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">

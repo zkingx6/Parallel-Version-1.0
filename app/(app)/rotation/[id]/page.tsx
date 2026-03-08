@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation"
 import { createServerSupabase } from "@/lib/supabase-server"
 import { RotationSection } from "@/components/parallel/rotation-section"
+import {
+  resolveMembersDisplay,
+  authUserToProfile,
+} from "@/lib/profile-resolver"
 
 export default async function RotationPage({
   params,
@@ -25,10 +29,22 @@ export default async function RotationPage({
     .order("is_owner_participant", { ascending: false })
     .order("created_at")
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const isOwner = meeting.manager_id === user?.id
+  const ownerAuthProfile =
+    isOwner && user ? authUserToProfile(user) : null
+  const membersDisplay = await resolveMembersDisplay(
+    members ?? [],
+    ownerAuthProfile ?? undefined
+  )
+
   return (
     <RotationSection
       meeting={meeting}
       members={members || []}
+      membersDisplay={membersDisplay}
     />
   )
 }

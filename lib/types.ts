@@ -16,6 +16,9 @@ export type TeamMember = {
   workEndHour: number
   hardNoRanges: HardNoRange[]
   initials: string
+  /** Avatar URL from member_submissions. Used for display in schedule/rotation UI. */
+  avatar_url?: string | null
+  updated_at?: string
 }
 
 export type MeetingConfig = {

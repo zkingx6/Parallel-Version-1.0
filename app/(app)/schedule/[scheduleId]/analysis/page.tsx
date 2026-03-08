@@ -1,13 +1,30 @@
 import { redirect } from "next/navigation"
 import { createServerSupabase, createServiceSupabase } from "@/lib/supabase-server"
-import { ScheduleDetailContent } from "@/components/parallel/schedule-detail-content"
-import type { RotationWeekData } from "@/lib/types"
+import { ScheduleAnalysisContent } from "@/components/parallel/schedule-analysis-content"
 import {
   resolveMembersDisplay,
   authUserToProfile,
 } from "@/lib/profile-resolver"
 
-export default async function ScheduleDetailPage({
+function getModeLabel(modeUsed: string | undefined): string {
+  if (!modeUsed) return "Auto Fair"
+  switch (modeUsed) {
+    case "FAIRNESS_GUARANTEE":
+      return "Auto Fair"
+    case "FIXED_ANCHOR":
+      return "Fixed Time"
+    case "STRICT":
+      return "Fair rotation"
+    case "RELAXED":
+      return "Best possible"
+    case "FALLBACK":
+      return "Best possible"
+    default:
+      return "Auto Fair"
+  }
+}
+
+export default async function ScheduleAnalysisPage({
   params,
 }: {
   params: Promise<{ scheduleId: string }>
@@ -44,11 +61,19 @@ export default async function ScheduleDetailPage({
     .order("is_owner_participant", { ascending: false })
     .order("created_at")
 
-  const rotationResult = schedule.rotation_result as { weeks: RotationWeekData[] } | null
-  const weeks: RotationWeekData[] =
+  const rotationResult = schedule.rotation_result as
+    | { weeks: unknown[]; modeUsed?: string; explain?: unknown }
+    | null
+  const weeks =
     rotationResult && Array.isArray(rotationResult.weeks)
       ? rotationResult.weeks
       : []
+  const modeUsed = rotationResult?.modeUsed
+  const explain = rotationResult?.explain as {
+    shareablePlanExists?: boolean
+    forcedSummary?: string
+    forcedReason?: string
+  } | undefined
 
   const isOwner = meeting.manager_id === user.id
   const ownerAuthProfile = isOwner ? authUserToProfile(user) : null
@@ -58,13 +83,17 @@ export default async function ScheduleDetailPage({
   )
 
   return (
-    <ScheduleDetailContent
+    <ScheduleAnalysisContent
       scheduleId={scheduleId}
       scheduleName={schedule.name}
-      meeting={meeting}
+      teamName={meeting.title}
+      weeksCount={schedule.weeks ?? weeks.length}
+      modeLabel={getModeLabel(modeUsed)}
+      explain={explain}
       members={members ?? []}
       weeks={weeks}
       membersDisplay={membersDisplay}
+      displayTimezone={meeting.display_timezone}
     />
   )
 }

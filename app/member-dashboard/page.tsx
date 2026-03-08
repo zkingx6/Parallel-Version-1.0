@@ -40,7 +40,7 @@ export default function MemberDashboardPage() {
   const tab = searchParams.get("tab") || "team"
 
   const [teams, setTeams] = useState<TeamSummary[]>([])
-  const [navMember, setNavMember] = useState<{ name: string; avatar_url?: string | null; updated_at?: string } | null>(null)
+  const [navMemberDisplay, setNavMemberDisplay] = useState<{ name: string; avatarUrl: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -71,12 +71,12 @@ export default function MemberDashboardPage() {
             ? { token, memberId }
             : { token: allTeams[0].token, memberId: allTeams[0].memberId }
         const d = await getMemberDashboardData(teamForNav.token, teamForNav.memberId)
-        if (d.data?.member) {
-          setNavMember(d.data.member)
+        if (d.data?.memberDisplay) {
+          setNavMemberDisplay(d.data.memberDisplay)
           setCachedMember(teamForNav.token, teamForNav.memberId, {
-            name: d.data.member.name,
-            avatar_url: d.data.member.avatar_url,
-            updated_at: d.data.member.updated_at,
+            name: d.data.memberDisplay.name,
+            avatar_url: d.data.memberDisplay.avatarUrl,
+            updated_at: undefined,
           })
         }
       }
@@ -113,11 +113,8 @@ export default function MemberDashboardPage() {
         ? { token: firstTeam.token, memberId: firstTeam.memberId }
         : null
   const cached = teamForDisplay ? getCachedMember(teamForDisplay.token, teamForDisplay.memberId) : null
-  const displayName = navMember?.name ?? cached?.name ?? ""
-  const avatarUrl = navMember?.avatar_url ?? cached?.avatar_url
-  const displayAvatarUrl = avatarUrl
-    ? `${avatarUrl}?v=${navMember?.updated_at ?? cached?.updated_at ?? ""}`
-    : ""
+  const displayName = navMemberDisplay?.name ?? cached?.name ?? ""
+  const displayAvatarUrl = navMemberDisplay?.avatarUrl ?? cached?.avatar_url ?? ""
 
   if (tab === "schedule") {
     return (
@@ -125,7 +122,8 @@ export default function MemberDashboardPage() {
         teamUrl={teamUrl}
         scheduleUrl={scheduleUrl}
         accountUrl={accountUrl}
-        navMember={navMember}
+        scheduleLinkParams={baseParams}
+        navMemberDisplay={navMemberDisplay}
         cachedMember={cached}
         meetingTitle={firstTeam?.meeting.title ?? ""}
       />
@@ -188,22 +186,21 @@ function ScheduleTab({
   teamUrl,
   scheduleUrl,
   accountUrl,
-  navMember,
+  scheduleLinkParams,
+  navMemberDisplay,
   cachedMember,
   meetingTitle,
 }: {
   teamUrl: string
   scheduleUrl: string
   accountUrl: string
-  navMember: { name: string; avatar_url?: string | null; updated_at?: string } | null
+  scheduleLinkParams: string
+  navMemberDisplay: { name: string; avatarUrl: string } | null
   cachedMember: { name: string; avatar_url?: string | null; updated_at?: string } | null
   meetingTitle: string
 }) {
-  const displayName = navMember?.name ?? cachedMember?.name ?? ""
-  const avatarUrl = navMember?.avatar_url ?? cachedMember?.avatar_url
-  const displayAvatarUrl = avatarUrl
-    ? `${avatarUrl}?v=${navMember?.updated_at ?? cachedMember?.updated_at ?? ""}`
-    : ""
+  const displayName = navMemberDisplay?.name ?? cachedMember?.name ?? ""
+  const displayAvatarUrl = navMemberDisplay?.avatarUrl ?? cachedMember?.avatar_url ?? ""
   const [schedules, setSchedules] = useState<{ id: string; name: string; weeks: number; created_at: string; team_id: string }[]>([])
   const [teamTitles, setTeamTitles] = useState<Record<string, string>>({})
   const [scheduleLoading, setScheduleLoading] = useState(true)
@@ -250,6 +247,8 @@ function ScheduleTab({
             teamTitles={teamTitles}
             showDeleteButton={false}
             emptyStateHref={teamUrl}
+            scheduleBasePath="/member/schedule"
+            scheduleLinkParams={scheduleLinkParams}
           />
         )}
       </main>

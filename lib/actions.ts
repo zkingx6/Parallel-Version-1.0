@@ -5,9 +5,12 @@ import { revalidatePath } from "next/cache"
 
 /**
  * Resolve post-login redirect based on user role.
- * - Owner (has meetings where manager_id = auth.uid()) → /meetings
- * - Member only (has member_submissions with user_id, no owned meetings) → /member-dashboard
- * - Neither → /meetings (default)
+ * Routing depends ONLY on relationship to teams (owner vs member).
+ * Plan type (starter/pro) must NOT determine routing.
+ *
+ * - Owner: meetings.manager_id === user.id → /meetings
+ * - Member: member_submissions.user_id === user.id, NOT a manager → /member-dashboard
+ * - Neither → /meetings (default for new users)
  */
 export async function resolvePostLoginRedirect(): Promise<string> {
   const serverSupabase = await createServerSupabase()
@@ -37,9 +40,12 @@ export async function resolvePostLoginRedirect(): Promise<string> {
       .select("invite_token")
       .eq("id", m.meeting_id)
       .single()
+    const params = new URLSearchParams()
     if (meeting?.invite_token) {
-      return `/member-dashboard?token=${encodeURIComponent(meeting.invite_token)}&memberId=${encodeURIComponent(m.id)}`
+      params.set("token", meeting.invite_token)
+      params.set("memberId", m.id)
     }
+    return `/member-dashboard${params.toString() ? `?${params.toString()}` : ""}`
   }
 
   return "/meetings"
@@ -226,13 +232,16 @@ export async function updateProfile(formData: FormData) {
   const displayName = (formData.get("displayName") as string)?.trim() ?? ""
   if (!displayName) return { error: "Display name is required." }
 
+  const removeAvatar = formData.get("removeAvatar") === "1" || formData.get("removeAvatar") === "true"
   const avatarFile = formData.get("avatar") as File | null
   let avatarUrl: string | null =
     (user.user_metadata?.avatar_url as string) ||
     (user.user_metadata?.picture as string) ||
     null
 
-  if (avatarFile && avatarFile.size > 0) {
+  if (removeAvatar) {
+    avatarUrl = null
+  } else if (avatarFile && avatarFile.size > 0) {
     const ext = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg"
     const validExts = ["jpg", "jpeg", "png", "gif", "webp"]
     if (!validExts.includes(ext)) {
@@ -261,13 +270,36 @@ export async function updateProfile(formData: FormData) {
     data: {
       ...existing,
       full_name: displayName,
-      avatar_url: avatarUrl ?? existing.avatar_url ?? existing.picture ?? undefined,
+      avatar_url: removeAvatar ? null : (avatarUrl ?? existing.avatar_url ?? existing.picture ?? undefined),
     },
   })
 
   if (error) return { error: error.message }
+
+  // Upsert profiles table (canonical source for display)
+  try {
+    const serviceSupabase = createServiceSupabase()
+    await serviceSupabase.from("profiles").upsert(
+      {
+        id: user.id,
+        full_name: displayName,
+        avatar_url: removeAvatar ? null : (avatarUrl ?? null),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    )
+  } catch {
+    /* profiles table may not exist yet; auth still has the data */
+  }
+
   revalidatePath("/settings")
   revalidatePath("/settings/profile")
+  revalidatePath("/")
+  revalidatePath("/meetings", "layout")
+  revalidatePath("/schedule", "layout")
+  revalidatePath("/team", "layout")
+  revalidatePath("/rotation", "layout")
+  revalidatePath("/dashboard", "layout")
   return { success: true }
 }
 
@@ -297,7 +329,10 @@ export async function upsertOwnerParticipant(
         "Invalid hard boundaries: pattern looks like corrupted data. Please set your availability again.",
     }
   }
-  const persistPayload = { ...payload, hard_no_ranges: userDefined }
+  const persistPayload = {
+    ...payload,
+    hard_no_ranges: userDefined,
+  }
 
   const { data: existing } = await supabase
     .from("member_submissions")
@@ -420,7 +455,7 @@ export async function getMemberDashboardData(token: string, memberId: string) {
 
   const { data: meeting, error: meetingError } = await supabase
     .from("meetings")
-    .select("id, title, day_of_week, duration_minutes")
+    .select("id, title, day_of_week, duration_minutes, manager_id")
     .eq("invite_token", token)
     .single()
 
@@ -428,13 +463,26 @@ export async function getMemberDashboardData(token: string, memberId: string) {
 
   const { data: member, error: memberError } = await supabase
     .from("member_submissions")
-    .select("id, name, timezone, work_start_hour, work_end_hour, hard_no_ranges, role, avatar_url, updated_at")
+    .select("id, name, timezone, work_start_hour, work_end_hour, hard_no_ranges, role, avatar_url, updated_at, user_id, is_owner_participant")
     .eq("meeting_id", meeting.id)
     .eq("id", memberId)
     .maybeSingle()
 
   if (memberError) return { error: memberError.message }
   if (!member) return { error: "Member not found." }
+
+  const { resolveMembersDisplay, fetchProfilesForUserIds } = await import("@/lib/profile-resolver")
+  const ownerProfiles = meeting.manager_id
+    ? await fetchProfilesForUserIds([meeting.manager_id])
+    : new Map()
+  const ownerAuthProfile = meeting.manager_id
+    ? ownerProfiles.get(meeting.manager_id) ?? null
+    : null
+  const membersDisplay = await resolveMembersDisplay([member], ownerAuthProfile ?? undefined)
+  const memberDisplay = membersDisplay.get(member.id) ?? {
+    name: member.name ?? "?",
+    avatarUrl: member.avatar_url ?? "",
+  }
 
   const { count } = await supabase
     .from("member_submissions")
@@ -443,17 +491,21 @@ export async function getMemberDashboardData(token: string, memberId: string) {
 
   const { data: members } = await supabase
     .from("member_submissions")
-    .select("id, name, role, is_owner_participant")
+    .select("id, name, role, is_owner_participant, user_id")
     .eq("meeting_id", meeting.id)
     .order("is_owner_participant", { ascending: false })
     .order("name")
+
+  const membersDisplayAll = await resolveMembersDisplay(members ?? [], ownerAuthProfile ?? undefined)
 
   return {
     data: {
       meeting,
       member,
+      memberDisplay,
       memberCount: count ?? 0,
       members: members ?? [],
+      membersDisplay: Object.fromEntries(membersDisplayAll),
     },
   }
 }
@@ -463,7 +515,7 @@ export async function getExistingMemberForJoin(token: string, memberId: string) 
 
   const { data: meeting } = await supabase
     .from("meetings")
-    .select("id")
+    .select("id, manager_id")
     .eq("invite_token", token)
     .single()
 
@@ -471,14 +523,33 @@ export async function getExistingMemberForJoin(token: string, memberId: string) 
 
   const { data: member, error } = await supabase
     .from("member_submissions")
-    .select("name, timezone, work_start_hour, work_end_hour, hard_no_ranges, role, avatar_url, updated_at")
+    .select("id, name, timezone, work_start_hour, work_end_hour, hard_no_ranges, role, avatar_url, updated_at, user_id, is_owner_participant")
     .eq("meeting_id", meeting.id)
     .eq("id", memberId)
     .maybeSingle()
 
   if (error) return { error: error.message }
   if (!member) return { error: "Member not found." }
-  return { data: member }
+
+  const { resolveMembersDisplay, fetchProfilesForUserIds } = await import("@/lib/profile-resolver")
+  const ownerProfiles = meeting.manager_id
+    ? await fetchProfilesForUserIds([meeting.manager_id])
+    : new Map()
+  const ownerAuthProfile = meeting.manager_id
+    ? ownerProfiles.get(meeting.manager_id) ?? null
+    : null
+  const membersDisplay = await resolveMembersDisplay([member], ownerAuthProfile ?? undefined)
+  const memberDisplay = membersDisplay.get(member.id) ?? {
+    name: member.name ?? "?",
+    avatarUrl: member.avatar_url ?? "",
+  }
+
+  return {
+    data: {
+      ...member,
+      memberDisplay,
+    },
+  }
 }
 
 export async function submitMember(
@@ -574,7 +645,7 @@ export async function updateMemberProfile(
 
   const { data: member } = await supabase
     .from("member_submissions")
-    .select("avatar_url")
+    .select("avatar_url, user_id")
     .eq("id", memberId)
     .eq("meeting_id", meeting.id)
     .maybeSingle()
@@ -584,8 +655,13 @@ export async function updateMemberProfile(
   const name = (formData.get("displayName") as string)?.trim() ?? ""
   if (!name) return { error: "Display name is required." }
 
-  let avatarUrl: string | null = (member as { avatar_url?: string }).avatar_url ?? null
+  const removeAvatar = formData.get("removeAvatar") === "1" || formData.get("removeAvatar") === "true"
+  const memberWithUserId = member as { avatar_url?: string; user_id?: string | null }
+  let avatarUrl: string | null = memberWithUserId.avatar_url ?? null
 
+  if (removeAvatar) {
+    avatarUrl = null
+  } else {
   const avatarFile = formData.get("avatar") as File | null
   if (avatarFile && avatarFile.size > 0) {
     const ext = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg"
@@ -610,14 +686,56 @@ export async function updateMemberProfile(
     } = supabase.storage.from("avatars").getPublicUrl(path)
     avatarUrl = publicUrl
   }
+  }
+
+  const userId = memberWithUserId.user_id
+
+  if (userId) {
+    const serverSupabase = await createServerSupabase()
+    const { data: { user } } = await serverSupabase.auth.getUser()
+    if (user?.id === userId) {
+      const existing = (user.user_metadata || {}) as Record<string, unknown>
+      await serverSupabase.auth.updateUser({
+        data: {
+          ...existing,
+          full_name: name,
+          avatar_url: removeAvatar ? null : (avatarUrl ?? existing.avatar_url ?? existing.picture ?? undefined),
+        },
+      })
+    } else {
+      await supabase.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          full_name: name,
+          avatar_url: removeAvatar ? null : (avatarUrl ?? undefined),
+        },
+      })
+    }
+    try {
+      await supabase.from("profiles").upsert(
+        {
+          id: userId,
+          full_name: name,
+          avatar_url: removeAvatar ? null : (avatarUrl ?? null),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      )
+    } catch {
+      /* profiles table may not exist */
+    }
+  }
+
+  const updatePayload: { name?: string; avatar_url?: string | null; updated_at: string } = {
+    updated_at: new Date().toISOString(),
+    avatar_url: avatarUrl,
+  }
+  if (!userId) {
+    updatePayload.name = name
+  }
 
   const { data, error } = await supabase
     .from("member_submissions")
-    .update({
-      name,
-      avatar_url: avatarUrl,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", memberId)
     .eq("meeting_id", meeting.id)
     .select()
@@ -626,5 +744,10 @@ export async function updateMemberProfile(
   if (error) return { error: error.message }
   if (!data) return { error: "Member not found." }
   revalidatePath(`/team/${meeting.id}`)
+  revalidatePath("/schedule", "layout")
+  revalidatePath("/member-dashboard", "layout")
+  revalidatePath("/meetings", "layout")
+  revalidatePath("/team", "layout")
+  revalidatePath("/rotation", "layout")
   return { data }
 }

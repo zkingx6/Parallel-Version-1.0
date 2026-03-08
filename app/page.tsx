@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
+import { resolvePostLoginRedirect } from "@/lib/actions"
 
 export default function Home() {
   const [email, setEmail] = useState("")
@@ -40,7 +41,7 @@ export default function Home() {
         redirectTo &&
         redirectTo.startsWith("/") &&
         !redirectTo.startsWith("//")
-      const target = safeRedirect ? redirectTo : "/dashboard"
+      const target = safeRedirect ? redirectTo : await resolvePostLoginRedirect()
       router.push(target)
       router.refresh()
     } catch {

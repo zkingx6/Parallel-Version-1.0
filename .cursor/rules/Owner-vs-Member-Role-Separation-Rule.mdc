@@ -1,0 +1,157 @@
+---
+alwaysApply: true
+---
+
+# Parallel — Owner vs Member Role Separation Rule
+
+## Purpose
+
+Parallel has two distinct user types with separate dashboards and permissions. This rule prevents future changes from accidentally merging or breaking role-based routing, dashboards, or the invite flow.
+
+---
+
+## 1. Owner Definition
+
+An **Owner** is a user who has purchased a plan (Starter / Pro / Enterprise).
+
+**Current MVP:** Determined by `meetings.manager_id = auth.uid()` (has at least one owned meeting).
+
+**Future:** Will be determined by:
+- Stripe subscription (active)
+- or `plan` field in database
+
+### Owner Capabilities
+- Create teams
+- Invite members
+- Generate rotation schedules
+- Publish schedules
+- Manage billing
+- Manage team settings
+
+### Owner Dashboard Routes
+- `/meetings` (teams list)
+- `/team/[id]` (team detail)
+- `/rotation/[id]` (rotation planning)
+- `/schedule` (schedule list)
+- `/schedule/[id]` (schedule detail)
+- `/settings` (billing, profile, setup)
+
+Owners see the full product interface.
+
+---
+
+## 2. Member Definition
+
+A **Member** is someone invited by an Owner. Members always enter the system through an invite link.
+
+### Invite Flow
+1. Owner sends invite link
+2. Member opens link → `/join/[token]`
+3. Member fills availability
+4. Member creates account (or signs in)
+5. Member becomes linked to the team via `member_submissions.user_id`
+
+**Members never purchase a plan.**
+
+### Member Capabilities (ONLY)
+- View their teams
+- View schedules
+- View meeting times
+- View fairness explanations
+- Update their availability
+- Manage their own profile
+
+### Member Restrictions (NEVER)
+- Create teams
+- Generate rotation schedules
+- Access billing
+- Manage team settings
+
+### Member Dashboard Routes
+Members must always be routed to:
+- `/member-dashboard`
+- `/member-dashboard/team`
+- `/member-dashboard/account`
+
+**Members must never see owner dashboard pages.**
+
+---
+
+## 3. Login Routing Rule
+
+After login, the system must determine user role and route accordingly.
+
+**Logic:**
+```
+if user has paid plan (or owned meetings in MVP)
+  → route to owner dashboard (/meetings)
+
+else if user exists in member_submissions (user_id = auth.uid())
+  → route to member dashboard (/member-dashboard?token=...&memberId=...)
+
+else
+  → route to /meetings (default for new users)
+```
+
+**Members must never land on owner dashboard after normal login.**
+
+---
+
+## 4. Invite Link Rule
+
+- Invite links (`/join/[token]`) must always open the member onboarding flow.
+- Invite links must never create owner accounts.
+- Members created through invite links must always remain members, not owners.
+
+---
+
+## 5. Security Rule — Owner Route Protection
+
+Members attempting to access owner routes must be redirected to `/member-dashboard`.
+
+Owner-only routes (under `(app)` layout) must:
+- Check auth
+- Call `resolvePostLoginRedirect()` — if result starts with `/member-dashboard`, redirect there
+- Never render owner UI to pure members
+
+---
+
+## 6. Future Stripe Integration
+
+When Stripe is added:
+- **Owner role** will be determined by: active Stripe subscription
+- **Member role** will still be determined by: presence in `member_submissions` with `user_id = auth.uid()`
+
+Stripe integration must **not** break the member routing logic. Member detection via `member_submissions` remains the source of truth for members.
+
+---
+
+## 7. Non-Negotiable Principle
+
+**Do NOT merge owner and member dashboards.**
+
+Parallel intentionally separates:
+- **Owner product interface** — full management, billing, rotation
+- **Member viewing interface** — teams, schedules, profile only
+
+This is a core product design principle. Any change that blurs this boundary must be rejected.
+
+---
+
+## 8. Change Control
+
+When modifying:
+- `lib/actions.ts` → `resolvePostLoginRedirect`
+- `app/(app)/layout.tsx` (owner layout)
+- `middleware.ts` (auth gates)
+- `app/join/[token]/` (invite flow)
+- `app/member-dashboard/` (member routes)
+
+Verify:
+1. Pure members never see owner dashboard
+2. Owners can access owner routes
+3. Invite link flow always creates/links members
+4. Post-login routing respects role
+```
+
+---

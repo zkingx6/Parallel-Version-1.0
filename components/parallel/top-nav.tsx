@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useSetup } from "@/lib/setup-context"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { MemberAvatar } from "@/components/ui/avatar"
 
 type TopNavProps = {
   userEmail: string
@@ -107,14 +107,11 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
             )}
             aria-label="Account"
           >
-            <Avatar className="size-8">
-              {userAvatar ? (
-                <AvatarImage src={userAvatar} alt="" />
-              ) : null}
-              <AvatarFallback className="text-xs">
-                {userName ? userName[0].toUpperCase() : userEmail ? userEmail[0].toUpperCase() : "?"}
-              </AvatarFallback>
-            </Avatar>
+            <MemberAvatar
+              avatarUrl={userAvatar || undefined}
+              name={userName || userEmail?.split("@")[0] || "?"}
+              size="default"
+            />
           </Link>
         </div>
       </div>

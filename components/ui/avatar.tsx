@@ -1,23 +1,29 @@
 "use client"
 
 import * as React from "react"
-import { Avatar as AvatarPrimitive } from "radix-ui"
+import {
+  Avatar as AvatarRoot,
+  AvatarImage as AvatarImagePrimitive,
+  AvatarFallback as AvatarFallbackPrimitive,
+} from "@radix-ui/react-avatar"
 
 import { cn } from "@/lib/utils"
+import { getInitials } from "@/lib/types"
 
 function Avatar({
   className,
   size = "default",
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Root> & {
-  size?: "default" | "sm" | "lg"
+}: React.ComponentProps<typeof AvatarRoot> & {
+  size?: "default" | "sm" | "lg" | "xs"
 }) {
   return (
-    <AvatarPrimitive.Root
+    <AvatarRoot
       data-slot="avatar"
       data-size={size}
       className={cn(
-        "group/avatar relative flex size-8 shrink-0 overflow-hidden rounded-full select-none data-[size=lg]:size-10 data-[size=sm]:size-6",
+        "group/avatar relative flex size-8 shrink-0 overflow-hidden rounded-full select-none",
+        "data-[size=lg]:size-10 data-[size=sm]:size-6 data-[size=xs]:size-5",
         className
       )}
       {...props}
@@ -28,9 +34,9 @@ function Avatar({
 function AvatarImage({
   className,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Image>) {
+}: React.ComponentProps<typeof AvatarImagePrimitive>) {
   return (
-    <AvatarPrimitive.Image
+    <AvatarImagePrimitive
       data-slot="avatar-image"
       className={cn("aspect-square size-full", className)}
       {...props}
@@ -41,9 +47,9 @@ function AvatarImage({
 function AvatarFallback({
   className,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Fallback>) {
+}: React.ComponentProps<typeof AvatarFallbackPrimitive>) {
   return (
-    <AvatarPrimitive.Fallback
+    <AvatarFallbackPrimitive
       data-slot="avatar-fallback"
       className={cn(
         "bg-muted text-muted-foreground flex size-full items-center justify-center rounded-full text-sm group-data-[size=sm]/avatar:text-xs",
@@ -99,6 +105,36 @@ function AvatarGroupCount({
   )
 }
 
+/**
+ * Unified member avatar component.
+ * Renders avatar image when avatarUrl exists; otherwise initials fallback.
+ * Never renders blank — always shows image or initials.
+ */
+function MemberAvatar({
+  avatarUrl,
+  name,
+  size = "default",
+  className,
+}: {
+  avatarUrl?: string | null
+  name: string
+  size?: "xs" | "sm" | "default" | "lg"
+  className?: string
+}) {
+  const hasValidUrl = Boolean(avatarUrl && String(avatarUrl).trim())
+  const initials = getInitials(name || "?") || "?"
+  const textSize =
+    size === "xs" ? "text-[8px]" : size === "sm" ? "text-[10px]" : size === "lg" ? "text-base" : "text-xs"
+  return (
+    <Avatar size={size} className={className}>
+      {hasValidUrl ? <AvatarImage src={avatarUrl!} alt="" /> : null}
+      <AvatarFallback className={textSize} delayMs={hasValidUrl ? 600 : 0}>
+        {initials}
+      </AvatarFallback>
+    </Avatar>
+  )
+}
+
 export {
   Avatar,
   AvatarImage,
@@ -106,4 +142,5 @@ export {
   AvatarBadge,
   AvatarGroup,
   AvatarGroupCount,
+  MemberAvatar,
 }

@@ -34,6 +34,7 @@ export type DbMemberSubmission = {
   role: string | null
   is_owner_participant?: boolean
   avatar_url?: string | null
+  user_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -66,5 +67,7 @@ export function dbMemberToTeamMember(s: DbMemberSubmission): TeamMember {
     workEndHour: s.work_end_hour,
     hardNoRanges,
     initials: getInitials(s.name),
+    avatar_url: s.avatar_url ?? undefined,
+    updated_at: s.updated_at,
   }
 }

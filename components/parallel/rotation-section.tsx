@@ -37,6 +37,7 @@ import {
   verifyInputIntegrity,
 } from "@/lib/rotation"
 import { RotationOutput } from "./rotation-output"
+import { ScheduleAnalysisContent } from "./schedule-analysis-content"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -49,6 +50,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { MemberAvatar } from "@/components/ui/avatar"
 
 const DAYS = [
   { label: "Monday", value: 1 },
@@ -71,6 +73,24 @@ const ROTATION_WEEKS = [
   { label: "10 weeks", value: 10 },
   { label: "12 weeks", value: 12 },
 ]
+
+function getModeLabel(modeUsed: string | undefined): string {
+  if (!modeUsed) return "Auto Fair"
+  switch (modeUsed) {
+    case "FAIRNESS_GUARANTEE":
+      return "Auto Fair"
+    case "FIXED_ANCHOR":
+      return "Fixed Time"
+    case "STRICT":
+      return "Fair rotation"
+    case "RELAXED":
+      return "Best possible"
+    case "FALLBACK":
+      return "Best possible"
+    default:
+      return "Auto Fair"
+  }
+}
 
 /** Next occurrence of weekday (1=Mon..7=Sun) as YYYY-MM-DD. */
 function getNextOccurrenceOfWeekday(dayOfWeek: number): string {
@@ -295,12 +315,14 @@ function BaseTimePicker({
 
 function BurdenBar({
   name,
+  avatarUrl,
   count,
   sacrificeCount,
   sacrificePoints,
   max,
 }: {
   name: string
+  avatarUrl?: string | null
   count: number
   sacrificeCount: number
   sacrificePoints?: number
@@ -313,6 +335,12 @@ function BurdenBar({
       : 0
   return (
     <div className="flex items-center gap-3">
+      <MemberAvatar
+        avatarUrl={avatarUrl}
+        name={name}
+        size="sm"
+        className="shrink-0"
+      />
       <span className="text-sm w-28 sm:w-36 truncate">{name}</span>
       <div className="flex-1 h-2 rounded-full bg-muted/60 overflow-hidden">
         <div
@@ -527,9 +555,12 @@ function getOwnerTimezoneIana(members: DbMemberSubmission[]): string | null {
 export function RotationSection({
   meeting: initialMeeting,
   members: initialMembers,
+  membersDisplay,
 }: {
   meeting: DbMeeting
   members: DbMemberSubmission[]
+  /** Resolved display data from profiles/auth (canonical). memberId -> { name, avatarUrl } */
+  membersDisplay: Map<string, { name: string; avatarUrl: string }>
 }) {
   const [meeting, setMeeting] = useState(initialMeeting)
   const ownerTimezoneIana = getOwnerTimezoneIana(initialMembers)
@@ -564,11 +595,20 @@ export function RotationSection({
   const [isGenerating, setIsGenerating] = useState(false)
   const [rotationError, setRotationError] = useState<string | null>(null)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [analysisOpen, setAnalysisOpen] = useState(false)
   const router = useRouter()
 
   const rotation = rotationResult?.weeks ?? null
 
-  const team = initialMembers.map(dbMemberToTeamMember)
+  const team = initialMembers.map((m) => {
+    const tm = dbMemberToTeamMember(m)
+    const resolved = membersDisplay.get(m.id)
+    return {
+      ...tm,
+      name: resolved?.name ?? tm.name,
+      avatar_url: resolved?.avatarUrl ?? tm.avatar_url,
+    }
+  })
   const useFixedBaseTime = meeting.base_time_minutes != null
   const effectiveAnchorOffset = useFixedBaseTime ? meeting.anchor_offset : 0
   if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
@@ -999,24 +1039,32 @@ export function RotationSection({
                 {burdenData && (
                   <div className="space-y-2.5 pt-1">
                     {burdenData.map((d) => (
-                      <BurdenBar
-                        key={d.memberId}
-                        name={d.name}
-                        count={d.count}
-                        sacrificeCount={d.sacrificeCount}
-                        sacrificePoints={d.sacrificePoints}
-                        max={maxCount * 1.2}
-                      />
+                        <BurdenBar
+                          key={d.memberId}
+                          name={d.name}
+                          avatarUrl={membersDisplay.get(d.memberId)?.avatarUrl}
+                          count={d.count}
+                          sacrificeCount={d.sacrificeCount}
+                          sacrificePoints={d.sacrificePoints}
+                          max={maxCount * 1.2}
+                        />
                     ))}
                   </div>
                 )}
               </div>
             </section>
 
-            <div className="pt-6">
+            <div className="pt-6 flex flex-col sm:flex-row sm:justify-end sm:items-center gap-3">
+              <Button
+                variant="outline"
+                size="default"
+                onClick={() => setAnalysisOpen(true)}
+              >
+                View rotation analysis
+              </Button>
               <Button
                 size="lg"
-                className="w-full h-12 text-sm font-medium rounded-xl shadow-sm"
+                className="w-full sm:w-auto h-12 text-sm font-medium rounded-xl shadow-sm"
                 onClick={handlePublishSchedule}
                 disabled={isPublishing}
               >
@@ -1027,12 +1075,17 @@ export function RotationSection({
         )}
 
         <div className="pt-4">
-          <Link
-            href={`/team/${meeting.id}`}
-            className="text-sm text-primary hover:text-primary/80 transition-colors"
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="-ml-2 text-muted-foreground hover:text-foreground"
           >
-            ← Back to team
-          </Link>
+            <Link href={`/team/${meeting.id}`} className="inline-flex items-center gap-1.5">
+              <span aria-hidden>←</span>
+              Back to team
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -1043,6 +1096,34 @@ export function RotationSection({
           </p>
         </div>
       </footer>
+
+      <Dialog open={analysisOpen} onOpenChange={setAnalysisOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Rotation Analysis</DialogTitle>
+            <DialogDescription>
+              Fairness report for {meeting.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {rotation && (
+              <ScheduleAnalysisContent
+                scheduleId="preview"
+                scheduleName={meeting.title}
+                teamName={meeting.title}
+                weeksCount={rotation.length}
+                modeLabel={getModeLabel(rotationResult?.modeUsed)}
+                explain={rotationResult?.explain as { shareablePlanExists?: boolean; forcedSummary?: string; forcedReason?: string } | undefined}
+                members={initialMembers}
+                weeks={rotation}
+                membersDisplay={membersDisplay}
+                embedded
+                displayTimezone={meeting.display_timezone}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }

@@ -45,6 +45,7 @@ export default function JoinPage() {
     role: string | null
     avatar_url?: string | null
     updated_at?: string
+    memberDisplay?: { name: string; avatarUrl: string }
   } | null>(null)
 
   useEffect(() => {
@@ -132,11 +133,9 @@ export default function JoinPage() {
   return (
     <div className="min-h-screen bg-background">
       <MemberTopNav
-        memberName={existingMember?.name ?? ""}
+        memberName={existingMember?.memberDisplay?.name ?? existingMember?.name ?? ""}
         memberAvatarUrl={
-          existingMember?.avatar_url
-            ? `${existingMember.avatar_url}?v=${existingMember.updated_at ?? ""}`
-            : ""
+          existingMember?.memberDisplay?.avatarUrl ?? existingMember?.avatar_url ?? undefined
         }
         meetingTitle={meeting.title}
         teamUrl={teamUrl}
@@ -159,7 +158,7 @@ export default function JoinPage() {
         </div>
 
         <ParticipantForm
-          defaultName={existingMember?.name ?? ""}
+          defaultName={existingMember?.memberDisplay?.name ?? existingMember?.name ?? ""}
           defaultTimezone={existingMember?.timezone ?? "America/New_York"}
           defaultWorkStart={existingMember?.work_start_hour ?? 9}
           defaultWorkEnd={existingMember?.work_end_hour ?? 18}
