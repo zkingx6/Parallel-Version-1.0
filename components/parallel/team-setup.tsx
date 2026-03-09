@@ -273,7 +273,7 @@ function MemberCard({
         {canRemove && (
           <button
             onClick={onRemove}
-            className="text-muted-foreground/30 hover:text-destructive transition-colors text-lg leading-none shrink-0 mt-0.5 px-0.5"
+            className="text-muted-foreground/30 hover:text-destructive transition-colors text-lg leading-none shrink-0 mt-0.5 px-0.5 cursor-pointer"
             aria-label="Remove member"
           >
             ×

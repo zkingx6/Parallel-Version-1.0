@@ -62,9 +62,6 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
           href="/teams"
           className="flex items-center gap-2 bg-transparent border-0 cursor-pointer p-0"
         >
-          <div className="w-7 h-7 rounded-lg bg-[#0d9488] flex items-center justify-center">
-            <span className="text-white text-[0.7rem] font-bold">P</span>
-          </div>
           <span className="text-[#1a1a2e] text-[0.95rem] tracking-[-0.02em] font-semibold">
             Parallel
           </span>

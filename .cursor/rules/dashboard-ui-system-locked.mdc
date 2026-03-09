@@ -1,0 +1,249 @@
+---
+alwaysApply: true
+---
+
+Purpose
+
+The dashboard UI system for Parallel has reached a stable refinement stage.
+
+All major UI refinements have been completed across:
+
+Owner dashboard
+
+Member dashboard
+
+Rotation analysis
+
+Schedule views
+
+Navigation system
+
+Cards and layout system
+
+This rule locks the current UI design system to prevent unintended visual regressions.
+
+Future Cursor changes must respect the current UI structure and styling unless explicitly instructed otherwise.
+
+Scope
+
+This rule applies to all dashboard UI including:
+
+Owner pages
+
+Member pages
+
+Rotation pages
+
+Schedule pages
+
+Team pages
+
+Settings pages
+
+Analysis pages
+
+Shared UI components
+
+Locked UI Principles
+1. Owner and Member UI Consistency
+
+Owner and Member dashboards must follow the same visual design language.
+
+They must share:
+
+spacing rhythm
+
+card structure
+
+typography hierarchy
+
+button styles
+
+navigation layout
+
+hover behaviors
+
+pointer interactions
+
+badge styling
+
+stat block styling
+
+Member pages must not fall behind in refinement compared to owner pages.
+
+2. Layout System Is Locked
+
+Dashboard layout structure must remain stable.
+
+Key layout characteristics that must not change:
+
+consistent content width
+
+centered dashboard container
+
+card-based information structure
+
+section spacing hierarchy
+
+visual grouping of components
+
+Do not introduce arbitrary layout changes.
+
+3. Navigation System Is Locked
+
+The product navbar structure is fixed as:
+
+Teams
+Rotation
+Schedule
+
+Rules:
+
+No additional tabs unless explicitly approved
+
+No visual redesign of the navbar
+
+Active tab indicator must remain consistent
+
+Hover and active states must remain consistent
+
+Landing page demo navigation must match the real product navigation.
+
+4. Component Styling Is Locked
+
+Shared components must retain the current design system:
+
+Buttons
+
+Cards
+
+Inputs
+
+Dropdowns
+
+Tabs
+
+Badges
+
+Modals
+
+Section headers
+
+Do not modify:
+
+border radius
+
+shadow usage
+
+color hierarchy
+
+spacing scale
+
+typography hierarchy
+
+unless explicitly instructed.
+
+5. Cursor Behavior Is Locked
+
+Interactive elements must follow these rules:
+
+Clickable elements
+→ cursor-pointer
+
+Drag handles
+→ cursor-grab
+→ cursor-grabbing while dragging
+
+Non-interactive elements
+→ default cursor
+
+Inputs
+→ text cursor
+
+Do not introduce inconsistent cursor behaviors.
+
+6. Rotation UI Is Visual Only
+
+Rotation result UI components are visual representations of algorithm output.
+
+Rules:
+
+Do not change:
+
+rotation logic
+
+scheduling logic
+
+fairness scoring
+
+burden distribution
+
+algorithm data structure
+
+UI may display the data but must never modify the algorithm.
+
+7. UI Changes Require Explicit Instruction
+
+Cursor must not refactor UI components proactively.
+
+Avoid:
+
+redesigning layouts
+
+renaming components
+
+restructuring visual hierarchy
+
+changing spacing patterns
+
+unless explicitly instructed.
+
+Allowed Changes
+
+Cursor may:
+
+fix minor visual bugs
+
+fix cursor interaction bugs
+
+fix alignment issues
+
+fix responsive behavior
+
+match Figma UI specifications
+
+improve UI consistency without altering layout structure
+
+Forbidden Changes
+
+Cursor must not:
+
+redesign dashboard layouts
+
+change navigation structure
+
+modify algorithm-related UI logic
+
+alter card architecture
+
+introduce new UI patterns that break consistency
+
+Guiding Principle
+
+Parallel uses a stable dashboard design system.
+
+The UI should evolve carefully and intentionally, not through automated refactors.
+
+When in doubt:
+
+Preserve the existing UI structure.
+
+Relation to Other Rules
+
+This rule complements:
+
+rotation_engine_locked.md
+
+Algorithm logic and UI system are independently locked.
+
+Algorithm stability and UI stability must both be preserved.

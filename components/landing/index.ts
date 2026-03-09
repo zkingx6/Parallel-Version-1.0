@@ -7,5 +7,6 @@ export { NoPerfectTime } from "./NoPerfectTime";
 export { HowItWorks } from "./HowItWorks";
 export { PricingPreview } from "./PricingPreview";
 export { FAQ } from "./FAQ";
+export { FeedbackSection } from "./FeedbackSection";
 export { FinalCTA } from "./FinalCTA";
 export { Footer } from "./Footer";

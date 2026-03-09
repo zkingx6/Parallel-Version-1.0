@@ -1,6 +1,8 @@
 "use client"
 
+import { useRef, useEffect, useState } from "react"
 import Link from "next/link"
+import { Share2, ChevronDown, Link2, Calendar } from "lucide-react"
 import {
   DbMeeting,
   DbMemberSubmission,
@@ -13,6 +15,137 @@ import { MemberAvatar } from "@/components/ui/avatar"
 import { PageBackLink } from "@/components/ui/page-back-link"
 import { cn } from "@/lib/utils"
 import { getInitials, type RotationWeekData } from "@/lib/types"
+
+function formatUtcForIcs(dateIso: string, utcHour: number): string {
+  const d = dateIso.replace(/-/g, "")
+  const h = String(utcHour).padStart(2, "0")
+  return `${d}T${h}0000Z`
+}
+
+function generateIcsContent(
+  meetingTitle: string,
+  weeks: RotationWeekData[],
+  durationMinutes: number
+): string {
+  const lines: string[] = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Parallel//Rotation Schedule//EN",
+    "CALSCALE:GREGORIAN",
+  ]
+  const durationIcs = `PT${Math.floor(durationMinutes / 60)}H${durationMinutes % 60}M`
+  for (const w of weeks) {
+    const dateIso = w.utcDateIso
+    if (!dateIso || dateIso.length < 10) continue
+    const start = formatUtcForIcs(dateIso.slice(0, 10), w.utcHour)
+    lines.push(
+      "BEGIN:VEVENT",
+      `DTSTART:${start}`,
+      `DURATION:${durationIcs}`,
+      `SUMMARY:${meetingTitle.replace(/\n/g, " ")}`,
+      `DESCRIPTION:Week ${w.week} rotation`,
+      "END:VEVENT"
+    )
+  }
+  lines.push("END:VCALENDAR")
+  return lines.join("\r\n")
+}
+
+function ShareScheduleDropdown({
+  scheduleName,
+  meeting,
+  weeks,
+  shareToken,
+}: {
+  scheduleName: string
+  meeting: DbMeeting
+  weeks: RotationWeekData[]
+  shareToken: string | undefined
+}) {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDocClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", onDocClick)
+    return () => document.removeEventListener("mousedown", onDocClick)
+  }, [open])
+
+  const scheduleUrl =
+    typeof window !== "undefined" && shareToken
+      ? `${window.location.origin}/s/${shareToken}`
+      : ""
+
+  const handleCopyLink = async () => {
+    if (!scheduleUrl) return
+    try {
+      await navigator.clipboard.writeText(scheduleUrl)
+      setCopied(true)
+      setOpen(false)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const handleExportIcs = () => {
+    const content = generateIcsContent(
+      meeting.title,
+      weeks,
+      meeting.duration_minutes ?? 60
+    )
+    const blob = new Blob([content], { type: "text/calendar;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${scheduleName.replace(/[^a-z0-9]/gi, "_")}.ics`
+    a.click()
+    URL.revokeObjectURL(url)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={containerRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-[#1a1a2e] text-[0.82rem] border border-[#d1d5db] cursor-pointer font-medium hover:border-[#0d9488] hover:text-[#0d9488] hover:shadow-[0_2px_12px_rgba(13,148,136,0.08)] transition-all shrink-0"
+      >
+        <Share2 size={14} />
+        Share schedule
+        <ChevronDown size={14} className={cn("transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute top-full right-0 mt-1.5 z-50 min-w-[180px] rounded-lg border border-[#e8e8e8] bg-white shadow-[0_4px_16px_rgba(0,0,0,0.08)] py-1">
+          {shareToken ? (
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-[0.88rem] text-[#1a1a2e] hover:bg-[#f5f5f5] cursor-pointer transition-colors"
+            >
+              <Link2 size={14} className="text-[#9ca3af] shrink-0" />
+              {copied ? "Copied!" : "Copy schedule link"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleExportIcs}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-[0.88rem] text-[#1a1a2e] hover:bg-[#f5f5f5] cursor-pointer transition-colors"
+          >
+            <Calendar size={14} className="text-[#9ca3af] shrink-0" />
+            Export calendar (.ics)
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function BurdenBar({
   name,
@@ -73,6 +206,8 @@ export function ScheduleDetailContent({
   scheduleBasePath = "/schedule",
   backHref,
   scheduleLinkParams,
+  showShareActions = false,
+  shareToken,
   demoMode,
   onBack,
   onAnalysisClick,
@@ -89,6 +224,10 @@ export function ScheduleDetailContent({
   backHref?: string
   /** Query params for schedule links (e.g. token=...&memberId=...) */
   scheduleLinkParams?: string
+  /** When true, show Share schedule dropdown (owner only). Members must not see this. */
+  showShareActions?: boolean
+  /** Share token for public schedule link. Required for Copy schedule link when showShareActions. */
+  shareToken?: string
   /** When true, use demo handlers for navigation. */
   demoMode?: boolean
   onBack?: () => void
@@ -163,21 +302,31 @@ export function ScheduleDetailContent({
             <p className="text-[#9ca3af] text-[0.88rem]">
               {meeting.title} — time rotates, burden distributed transparently.
             </p>
-            {demoMode && onAnalysisClick ? (
-              <button
-                onClick={onAnalysisClick}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0d9488] text-white text-[0.82rem] border-0 cursor-pointer shrink-0 font-medium hover:bg-[#0f766e] hover:shadow-[0_4px_16px_rgba(13,148,136,0.2)] transition-all"
-              >
-                Rotation analysis
-              </button>
-            ) : (
-              <Link
-                href={`${scheduleBasePath}/${scheduleId}/analysis${scheduleLinkParams ? `?${scheduleLinkParams}` : ""}`}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0d9488] text-white text-[0.82rem] border-0 shrink-0 font-medium hover:bg-[#0f766e] hover:shadow-[0_4px_16px_rgba(13,148,136,0.2)] transition-all cursor-pointer"
-              >
-                Rotation analysis
-              </Link>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              {showShareActions && (
+                <ShareScheduleDropdown
+                  scheduleName={scheduleName}
+                  meeting={meeting}
+                  weeks={weeks}
+                  shareToken={shareToken}
+                />
+              )}
+              {demoMode && onAnalysisClick ? (
+                <button
+                  onClick={onAnalysisClick}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0d9488] text-white text-[0.82rem] border-0 cursor-pointer shrink-0 font-medium hover:bg-[#0f766e] hover:shadow-[0_4px_16px_rgba(13,148,136,0.2)] transition-all"
+                >
+                  Rotation analysis
+                </button>
+              ) : (
+                <Link
+                  href={`${scheduleBasePath}/${scheduleId}/analysis${scheduleLinkParams ? `?${scheduleLinkParams}` : ""}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0d9488] text-white text-[0.82rem] border-0 shrink-0 font-medium hover:bg-[#0f766e] hover:shadow-[0_4px_16px_rgba(13,148,136,0.2)] transition-all cursor-pointer"
+                >
+                  Rotation analysis
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 

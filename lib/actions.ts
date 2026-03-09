@@ -160,6 +160,15 @@ export async function updateMeetingConfig(
   return { success: true }
 }
 
+function generateShareToken(): string {
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const bytes = new Uint8Array(12)
+    crypto.getRandomValues(bytes)
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")
+  }
+  return Math.random().toString(36).slice(2, 26)
+}
+
 export async function createScheduleRecord(
   teamId: string,
   name: string,
@@ -172,6 +181,7 @@ export async function createScheduleRecord(
   if (!user) return { error: "Not authenticated" }
 
   const weeks = rotationResult.weeks?.length ?? 0
+  const shareToken = generateShareToken()
   const { data, error } = await supabase
     .from("schedules")
     .insert({
@@ -179,6 +189,7 @@ export async function createScheduleRecord(
       name,
       rotation_result: rotationResult,
       weeks,
+      share_token: shareToken,
     })
     .select("id")
     .single()

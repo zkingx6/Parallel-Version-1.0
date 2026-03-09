@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { DateTime } from "luxon"
-import { ChevronRight, X } from "lucide-react"
+import { ChevronRight, X, Calendar, Clock, Users } from "lucide-react"
 import { deleteSchedule } from "@/lib/actions"
 import { cn } from "@/lib/utils"
 
@@ -47,6 +47,31 @@ export function ScheduleListContent({
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [items, setItems] = useState(schedules)
 
+  const totalSchedules = items.length
+  const uniqueTeams = new Set(items.map((s) => s.team_id)).size
+  const activeNow = items.filter((s) => {
+    const end = DateTime.fromISO(s.created_at).plus({ weeks: s.weeks || 8 })
+    return end > DateTime.now()
+  }).length
+
+  const statCards = [
+    {
+      icon: Calendar,
+      value: totalSchedules,
+      label: "Total schedules",
+    },
+    {
+      icon: Clock,
+      value: activeNow,
+      label: "Active now",
+    },
+    {
+      icon: Users,
+      value: uniqueTeams,
+      label: "Teams",
+    },
+  ]
+
   const handleDeleteSchedule = async (scheduleId: string) => {
     if (demoMode && onDeleteScheduleProp) {
       await onDeleteScheduleProp(scheduleId)
@@ -62,7 +87,22 @@ export function ScheduleListContent({
   if (items.length === 0) {
     const showGoToTeams = !emptyStateMessage && (demoMode ? !!onEmptyStateClick : true)
     return (
-      <div className="rounded-xl border border-[#edeef0] bg-white p-8 shadow-[0_1px_4px_rgba(0,0,0,0.03)] text-center space-y-3">
+      <div className="space-y-6">
+        <div className="grid grid-cols-3 gap-3">
+          {statCards.map(({ icon: Icon, value, label }) => (
+            <div
+              key={label}
+              className="rounded-xl border border-[#edeef0] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.03)]"
+            >
+              <div className="w-8 h-8 rounded-lg bg-[#f0fdfa] flex items-center justify-center mb-3">
+                <Icon size={16} className="text-[#0d9488]" />
+              </div>
+              <p className="text-[1.25rem] font-semibold text-[#1a1a2e]">{value}</p>
+              <p className="text-[0.78rem] text-[#9ca3af] mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-xl border border-[#edeef0] bg-white p-8 shadow-[0_1px_4px_rgba(0,0,0,0.03)] text-center space-y-3">
         <p className="text-[0.88rem] text-[#9ca3af]">
           {emptyStateMessage ?? "No schedules published yet."}
         </p>
@@ -87,13 +127,28 @@ export function ScheduleListContent({
             Go to Teams →
           </Link>
         ) : null)}
+        </div>
       </div>
     )
   }
 
   return (
-    <section>
-      <h3 className="text-[#1a1a2e] text-[0.92rem] mb-3 font-semibold">
+    <section className="space-y-6">
+      <div className="grid grid-cols-3 gap-3">
+        {statCards.map(({ icon: Icon, value, label }) => (
+          <div
+            key={label}
+            className="rounded-xl border border-[#edeef0] bg-white p-4 shadow-[0_1px_4px_rgba(0,0,0,0.03)]"
+          >
+            <div className="w-8 h-8 rounded-lg bg-[#f0fdfa] flex items-center justify-center mb-3">
+              <Icon size={16} className="text-[#0d9488]" />
+            </div>
+            <p className="text-[1.25rem] font-semibold text-[#1a1a2e]">{value}</p>
+            <p className="text-[0.78rem] text-[#9ca3af] mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+      <h3 className="text-[#1a1a2e] text-[0.92rem] font-semibold mb-3">
         Published schedules
       </h3>
       <div className="space-y-2">

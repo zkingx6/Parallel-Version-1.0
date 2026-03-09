@@ -37,7 +37,7 @@ export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="scroll-mt-24 py-24 md:py-32 bg-card">
+    <section id="faq" className="scroll-mt-24 py-24 md:py-32 bg-accent">
       <Container size="narrow">
         <div className="text-center mb-12">
           <p className="section-label">FAQ</p>
@@ -53,7 +53,7 @@ export function FAQ() {
               className="rounded-lg border border-border overflow-hidden shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200"
             >
               <button
-                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-accent/30 transition-colors duration-200"
+                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left bg-white hover:bg-white transition-colors duration-200"
                 onClick={() => setOpenIndex(openIndex === i ? null : i)}
                 aria-expanded={openIndex === i}
               >
@@ -66,7 +66,7 @@ export function FAQ() {
                 />
               </button>
               {openIndex === i && (
-                <div className="border-t border-border px-5 py-4">
+                <div className="border-t border-white bg-white px-5 py-4">
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {faq.answer}
                   </p>

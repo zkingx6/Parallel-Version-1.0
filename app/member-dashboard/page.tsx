@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { Users, ChevronRight } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { getMemberTeamSummary, getMemberDashboardData, getSchedulesForCurrentUser } from "@/lib/actions"
 import { getStoredMemberTeams, addStoredMemberTeam } from "@/lib/member-teams-storage"
@@ -19,13 +20,13 @@ type TeamSummary = {
 
 function MissingParamsMessage() {
   return (
-    <main className="min-h-screen flex items-center justify-center px-5">
+    <main className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
       <div className="text-center space-y-3 max-w-sm">
-        <h1 className="text-[17px] font-semibold tracking-tight text-primary">
+        <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
           Parallel
         </h1>
-        <p className="text-sm text-muted-foreground">Missing token or member ID.</p>
-        <p className="text-xs text-muted-foreground/70">
+        <p className="text-[0.88rem] text-[#9ca3af]">Missing token or member ID.</p>
+        <p className="text-[0.82rem] text-[#9ca3af]/80">
           Use your invite link to join and access your dashboard.
         </p>
       </div>
@@ -96,8 +97,8 @@ export default function MemberDashboardPage() {
 
   if (loading && teams.length === 0) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-5">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+      <main className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
+        <p className="text-[0.88rem] text-[#9ca3af]">Loading…</p>
       </main>
     )
   }
@@ -131,7 +132,7 @@ export default function MemberDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#f7f8fa]">
       <MemberTopNav
         memberName={displayName}
         memberAvatarUrl={displayAvatarUrl || undefined}
@@ -142,41 +143,51 @@ export default function MemberDashboardPage() {
         activeTab="team"
       />
 
-      <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <section className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-            Teams
-          </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Teams you&apos;ve joined. Click a team to view details.
-          </p>
-        </section>
-
-        {teams.length === 0 ? (
-          <section className="rounded-xl border border-border/50 bg-card p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              No teams yet. Use an invite link to join a team.
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        <div className="max-w-2xl mx-auto">
+          <section className="mb-8">
+            <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] mb-1 font-semibold">
+              Teams
+            </h1>
+            <p className="text-[#9ca3af] text-[0.88rem]">
+              Teams you&apos;ve joined. Click a team to view details.
             </p>
           </section>
-        ) : (
-          <div className="space-y-2">
-            {teams.map((t) => (
-              <Link
-                key={`${t.token}-${t.memberId}`}
-                href={`/member-dashboard/team?token=${encodeURIComponent(t.token)}&memberId=${encodeURIComponent(t.memberId)}`}
-                className="block rounded-xl border border-border/50 bg-card p-4 shadow-sm hover:border-primary/20 transition-colors"
-              >
-                <p className="font-medium">{t.meeting.title}</p>
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  {t.cadence}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Members: {t.memberCount}
-                </p>
-              </Link>
-            ))}
-          </div>
-        )}
+
+          {teams.length === 0 ? (
+            <section className="rounded-xl border border-[#edeef0] bg-white p-8 shadow-[0_1px_4px_rgba(0,0,0,0.03)] text-center">
+              <p className="text-[0.88rem] text-[#9ca3af]">
+                No teams yet. Use an invite link to join a team.
+              </p>
+            </section>
+          ) : (
+            <div className="space-y-2">
+              {teams.map((t) => (
+                <Link
+                  key={`${t.token}-${t.memberId}`}
+                  href={`/member-dashboard/team?token=${encodeURIComponent(t.token)}&memberId=${encodeURIComponent(t.memberId)}`}
+                  className="group block bg-white rounded-xl border border-[#edeef0] px-5 py-4 shadow-[0_1px_4px_rgba(0,0,0,0.03)] hover:border-[#d1d5db] hover:shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200 cursor-pointer"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#f0fdfa] flex items-center justify-center shrink-0 group-hover:bg-[#ccfbf1] transition-colors duration-200">
+                      <Users size={17} className="text-[#0d9488]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[#1a1a2e] text-[0.9rem] font-medium truncate">{t.meeting.title}</p>
+                      <p className="text-[#b0b4bc] text-[0.78rem] mt-0.5">
+                        {t.cadence}
+                      </p>
+                      <p className="text-[#b0b4bc] text-[0.78rem] mt-0.5">
+                        {t.memberCount} members
+                      </p>
+                    </div>
+                    <ChevronRight size={16} className="text-[#d1d5db] group-hover:text-[#9ca3af] transition-colors shrink-0" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   )
@@ -216,7 +227,7 @@ function ScheduleTab({
   }, [])
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#f7f8fa]">
       <MemberTopNav
         memberName={displayName}
         memberAvatarUrl={displayAvatarUrl || undefined}
@@ -227,30 +238,32 @@ function ScheduleTab({
         activeTab="schedule"
       />
 
-      <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <section className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-            Schedule
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Assigned meeting times and rotation entries across your teams.
-          </p>
-        </section>
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] mb-1 font-semibold">
+              Schedule
+            </h1>
+            <p className="text-[#9ca3af] text-[0.88rem]">
+              Assigned meeting times and rotation entries across your teams.
+            </p>
+          </div>
 
-        {scheduleLoading ? (
-          <section className="rounded-xl border border-border/50 bg-card p-8 mb-6 shadow-sm text-center">
-            <p className="text-sm text-muted-foreground">Loading schedules…</p>
-          </section>
-        ) : (
-          <ScheduleListContent
-            schedules={schedules}
-            teamTitles={teamTitles}
-            showDeleteButton={false}
-            emptyStateHref={teamUrl}
-            scheduleBasePath="/member/schedule"
-            scheduleLinkParams={scheduleLinkParams}
-          />
-        )}
+          {scheduleLoading ? (
+            <section className="rounded-xl border border-[#edeef0] bg-white p-8 shadow-[0_1px_4px_rgba(0,0,0,0.03)] text-center">
+              <p className="text-[0.88rem] text-[#9ca3af]">Loading schedules…</p>
+            </section>
+          ) : (
+            <ScheduleListContent
+              schedules={schedules}
+              teamTitles={teamTitles}
+              showDeleteButton={false}
+              emptyStateHref={teamUrl}
+              scheduleBasePath="/member/schedule"
+              scheduleLinkParams={scheduleLinkParams}
+            />
+          )}
+        </div>
       </main>
     </div>
   )

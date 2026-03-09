@@ -61,12 +61,12 @@ export default function MemberAccountPage() {
 
   if (!token || !memberId) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-5">
+      <main className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
         <div className="text-center space-y-3 max-w-sm">
-          <h1 className="text-[17px] font-semibold tracking-tight text-primary">
+          <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
             Parallel
           </h1>
-          <p className="text-sm text-muted-foreground">Missing token or member ID.</p>
+          <p className="text-[0.88rem] text-[#9ca3af]">Missing token or member ID.</p>
         </div>
       </main>
     )
@@ -74,12 +74,12 @@ export default function MemberAccountPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-5">
+      <main className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
         <div className="text-center space-y-3 max-w-sm">
-          <h1 className="text-[17px] font-semibold tracking-tight text-primary">
+          <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
             Parallel
           </h1>
-          <p className="text-sm text-muted-foreground">{error}</p>
+          <p className="text-[0.88rem] text-[#9ca3af]">{error}</p>
         </div>
       </main>
     )
@@ -87,8 +87,8 @@ export default function MemberAccountPage() {
 
   if (!data) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-5">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+      <main className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
+        <p className="text-[0.88rem] text-[#9ca3af]">Loading…</p>
       </main>
     )
   }
@@ -141,7 +141,7 @@ export default function MemberAccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#f7f8fa]">
       <MemberTopNav
         memberName={memberDisplay.name}
         memberAvatarUrl={memberDisplay.avatarUrl || undefined}
@@ -152,20 +152,21 @@ export default function MemberAccountPage() {
         activeTab="team"
       />
 
-      <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <PageBackLink onClick={() => router.back()}>Back</PageBackLink>
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        <div className="max-w-2xl mx-auto">
+          <PageBackLink onClick={() => router.back()} className="mb-6">Back</PageBackLink>
 
-        <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-          Account
-        </h2>
-        <p className="mt-1.5 text-sm text-muted-foreground mb-10">
-          Manage your profile and identity.
-        </p>
+          <h2 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
+            Account
+          </h2>
+          <p className="text-[#9ca3af] text-[0.88rem] mt-1 mb-10">
+            Manage your profile and identity.
+          </p>
 
-        <section className="rounded-xl border border-border/50 bg-card p-5 mb-6">
-          <h3 className="text-sm font-semibold mb-4">Profile</h3>
+          <section className="rounded-xl border border-[#edeef0] bg-white p-5 mb-6 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
+            <h3 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-4">Profile</h3>
           {successMessage && (
-            <p className="text-sm text-green-600 dark:text-green-500 mb-4">
+            <p className="text-[0.88rem] text-[#0d9488] mb-4">
               {successMessage}
             </p>
           )}
@@ -182,8 +183,8 @@ export default function MemberAccountPage() {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{memberDisplay.name || "—"}</p>
-              <p className="text-sm text-muted-foreground truncate">
+              <p className="text-[0.88rem] font-medium text-[#1a1a2e] truncate">{memberDisplay.name || "—"}</p>
+              <p className="text-[0.88rem] text-[#9ca3af] truncate">
                 {data.memberEmail ?? "—"}
               </p>
             </div>
@@ -195,14 +196,14 @@ export default function MemberAccountPage() {
                 setAvatarRemoved(false)
                 setEditOpen(true)
               }}
-              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors shrink-0"
+              className="text-[0.84rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors shrink-0 cursor-pointer"
             >
               Edit profile
             </button>
           </div>
         </section>
 
-        <p className="text-xs text-muted-foreground mb-6">
+        <p className="text-[0.82rem] text-[#9ca3af] mb-6">
           Role: Member
         </p>
 
@@ -308,14 +309,14 @@ export default function MemberAccountPage() {
           </DialogContent>
         </Dialog>
 
-        <section className="rounded-xl border border-border/50 bg-card p-5 mb-6">
-          <h3 className="text-sm font-semibold mb-4">Security</h3>
+        <section className="rounded-xl border border-[#edeef0] bg-white p-5 mb-6 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
+          <h3 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-4">Security</h3>
           <div className="space-y-3">
             <div>
               <button
                 type="button"
                 onClick={() => setChangePasswordOpen(true)}
-                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                className="text-[0.88rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors cursor-pointer"
               >
                 Change password
               </button>
@@ -341,6 +342,7 @@ export default function MemberAccountPage() {
             }
           }}
         />
+        </div>
       </main>
     </div>
   )

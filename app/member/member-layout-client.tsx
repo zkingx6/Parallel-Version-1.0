@@ -64,14 +64,14 @@ export function MemberLayoutClient({
 
   if (!navContext) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+      <div className="min-h-screen bg-[#f7f8fa] flex items-center justify-center">
+        <p className="text-[0.88rem] text-[#9ca3af]">Loading…</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#f7f8fa]">
       <MemberTopNav
         memberName={navContext.memberName}
         memberAvatarUrl={navContext.memberAvatarUrl || undefined}

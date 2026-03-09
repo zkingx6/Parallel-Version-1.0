@@ -3,7 +3,7 @@
  * Isolated from main app. Safe to delete later.
  * Route: /rotation/[id]/test
  */
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import { createServerSupabase } from "@/lib/supabase-server"
 import { RotationTestView } from "@/components/parallel/rotation-test-view"
 
@@ -12,6 +12,8 @@ export default async function RotationTestPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  if (process.env.NODE_ENV !== "development") notFound()
+
   const { id } = await params
   const supabase = await createServerSupabase()
 

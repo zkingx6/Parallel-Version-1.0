@@ -35,38 +35,55 @@ export function MemberTopNav({
   const isAccount = pathname?.includes("/member-dashboard/account")
 
   const tabBase =
-    "inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-transparent transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-  const tabInactive =
-    "text-muted-foreground hover:bg-accent/50 hover:border-border hover:text-foreground"
-  const tabActive = "bg-accent/60 border-border text-foreground"
+    "relative inline-flex items-center justify-center min-w-[4.5rem] px-4 py-1.5 rounded-lg text-[0.84rem] font-medium border-0 shrink-0 cursor-pointer transition-colors duration-200 bg-transparent"
 
   return (
-    <header className="relative z-10 w-full shrink-0 border-b border-border/40 bg-navbar backdrop-blur-sm">
-      <div className="relative flex items-center justify-between h-16 pl-8 pr-8">
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#edeef0]">
+      <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
         {/* Left: Logo */}
-        <div className="shrink-0">
-          <Link
-            href={teamUrl}
-            className="text-lg font-semibold text-foreground hover:text-foreground/80 transition-colors cursor-pointer"
-          >
+        <Link
+          href={teamUrl}
+          className="flex items-center gap-2 bg-transparent border-0 cursor-pointer p-0 shrink-0"
+        >
+          <span className="text-[#1a1a2e] text-[0.95rem] tracking-[-0.02em] font-semibold">
             Parallel
-          </Link>
-        </div>
+          </span>
+        </Link>
 
         {/* Center: Tabs (Team | Schedule) */}
         {!hideNavTabs && (
-          <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 text-sm">
+          <nav className="flex items-center gap-1 shrink-0">
             <Link
               href={teamUrl}
-              className={cn(tabBase, "cursor-pointer", activeTab === "team" ? tabActive : tabInactive)}
+              className={cn(
+                tabBase,
+                activeTab === "team" ? "text-[#1a1a2e]" : "text-[#9ca3af] hover:text-[#6b7280]"
+              )}
             >
               Team
+              <span
+                className={cn(
+                  "absolute bottom-[-9px] left-2 right-2 h-[2px] bg-[#0d9488] rounded-full pointer-events-none transition-opacity duration-150",
+                  activeTab === "team" ? "opacity-100" : "opacity-0"
+                )}
+                aria-hidden
+              />
             </Link>
             <Link
               href={scheduleUrl}
-              className={cn(tabBase, "cursor-pointer", activeTab === "schedule" ? tabActive : tabInactive)}
+              className={cn(
+                tabBase,
+                activeTab === "schedule" ? "text-[#1a1a2e]" : "text-[#9ca3af] hover:text-[#6b7280]"
+              )}
             >
               Schedule
+              <span
+                className={cn(
+                  "absolute bottom-[-9px] left-2 right-2 h-[2px] bg-[#0d9488] rounded-full pointer-events-none transition-opacity duration-150",
+                  activeTab === "schedule" ? "opacity-100" : "opacity-0"
+                )}
+                aria-hidden
+              />
             </Link>
           </nav>
         )}
@@ -77,8 +94,8 @@ export function MemberTopNav({
             <Link
               href={accountUrl}
               className={cn(
-                "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer",
-                isAccount && "ring-2 ring-ring ring-offset-2 ring-offset-background"
+                "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0d9488]/30 focus-visible:ring-offset-2 cursor-pointer",
+                isAccount && "ring-2 ring-[#0d9488]/50 ring-offset-2"
               )}
               aria-label="Account"
             >

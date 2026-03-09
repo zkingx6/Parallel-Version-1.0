@@ -1658,6 +1658,14 @@ function fairnessGuaranteeBeamSearch(
       const concA = computeConsecutiveMax(a.maxMemberIdsPerWeek)
       const concB = computeConsecutiveMax(b.maxMemberIdsPerWeek)
       if (concA !== concB) return concA - concB
+      // Prefer plans where more distinct members become max-burden across weeks
+      const distinctMaxCountA =
+        new Set(a.maxMemberIdsPerWeek.filter(Boolean)).size
+      const distinctMaxCountB =
+        new Set(b.maxMemberIdsPerWeek.filter(Boolean)).size
+      if (distinctMaxCountA !== distinctMaxCountB) {
+        return distinctMaxCountB - distinctMaxCountA
+      }
       if (a.totalPenalty !== b.totalPenalty) return a.totalPenalty - b.totalPenalty
       if (a.totalSlotDeviation !== b.totalSlotDeviation)
         return a.totalSlotDeviation - b.totalSlotDeviation

@@ -125,7 +125,7 @@ export function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="scroll-mt-24 py-24 px-6 bg-[#f8f9fa] relative"
+      className="scroll-mt-24 py-24 px-6 bg-background relative"
     >
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#e0e0e0] to-transparent" />
 
@@ -138,7 +138,7 @@ export function HowItWorks() {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <span className="text-[#0d9488] text-sm tracking-widest uppercase mb-4 block">
+          <span className="text-[#0d9488] text-sm tracking-widest uppercase mb-4 block font-semibold">
             How It Works
           </span>
           <h2 className="text-[2.25rem] tracking-[-0.03em] text-[#1a1a2e] mb-5 max-w-2xl mx-auto leading-[1.15] mt-4">

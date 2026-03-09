@@ -6,6 +6,7 @@ import { getJoinData, getExistingMemberForJoin, submitMember } from "@/lib/actio
 import { addStoredMemberTeam } from "@/lib/member-teams-storage"
 import { ParticipantForm } from "@/components/parallel/participant-form"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
+import { PageBackLink } from "@/components/ui/page-back-link"
 import { isComplementOfOverlapPattern } from "@/lib/hard-no-ranges"
 import type { HardNoRange } from "@/lib/types"
 
@@ -98,12 +99,12 @@ export default function JoinPage() {
 
   if (loadError) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5">
+      <div className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
         <div className="text-center space-y-3 max-w-sm">
-          <h1 className="text-[17px] font-semibold tracking-tight text-primary">
+          <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
             Parallel
           </h1>
-          <p className="text-sm text-muted-foreground">{loadError}</p>
+          <p className="text-[0.88rem] text-[#9ca3af]">{loadError}</p>
         </div>
       </div>
     )
@@ -111,8 +112,8 @@ export default function JoinPage() {
 
   if (!meeting) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-5">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+      <div className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
+        <p className="text-[0.88rem] text-[#9ca3af]">Loading…</p>
       </div>
     )
   }
@@ -124,6 +125,9 @@ export default function JoinPage() {
   const teamUrl = existingId
     ? `/member-dashboard?${baseParams}`
     : editUrl
+  const teamDetailUrl = existingId
+    ? `/member-dashboard/team?${baseParams}`
+    : editUrl
   const scheduleUrl = existingId
     ? `/member-dashboard?${baseParams}&tab=schedule`
     : editUrl
@@ -131,8 +135,13 @@ export default function JoinPage() {
     ? `/member-dashboard/account?${baseParams}`
     : editUrl
 
+  const pageTitle = existingId ? "Edit availability" : `Join ${meeting.title}`
+  const pageDescription = existingId
+    ? "Update your timezone, working hours, and times you are never available."
+    : `Set your timezone, working hours, and times you are never available.${DAYS_LABEL[meeting.day_of_week] ? ` This is a weekly ${DAYS_LABEL[meeting.day_of_week]} meeting (${meeting.duration_minutes} min).` : ""}`
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#f7f8fa]">
       <MemberTopNav
         memberName={existingMember?.memberDisplay?.name ?? existingMember?.name ?? ""}
         memberAvatarUrl={
@@ -146,19 +155,23 @@ export default function JoinPage() {
         avatarLinksToAccount={!!existingId}
       />
 
-      <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <div className="mb-8">
-          <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">
-            Join {meeting.title}
-          </h2>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Set your timezone, working hours, and times you are never available.
-            {DAYS_LABEL[meeting.day_of_week] &&
-              ` This is a weekly ${DAYS_LABEL[meeting.day_of_week]} meeting (${meeting.duration_minutes} min).`}
-          </p>
-        </div>
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        <div className="max-w-2xl mx-auto">
+          {existingId && (
+            <PageBackLink href={teamDetailUrl} className="mb-6">
+              Back to team
+            </PageBackLink>
+          )}
+          <div className="mb-8">
+            <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
+              {pageTitle}
+            </h1>
+            <p className="text-[#9ca3af] text-[0.88rem] mt-1">
+              {pageDescription}
+            </p>
+          </div>
 
-        <ParticipantForm
+          <ParticipantForm
           defaultName={existingMember?.memberDisplay?.name ?? existingMember?.name ?? ""}
           defaultTimezone={existingMember?.timezone ?? "America/New_York"}
           defaultWorkStart={existingMember?.work_start_hour ?? 9}
@@ -177,6 +190,7 @@ export default function JoinPage() {
           }
           saving={saving}
         />
+        </div>
       </main>
     </div>
   )

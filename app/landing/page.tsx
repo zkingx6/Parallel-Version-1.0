@@ -7,7 +7,7 @@ import {
   HowItWorks,
   PricingPreview,
   FAQ,
-  FinalCTA,
+  FeedbackSection,
   Footer,
 } from "@/components/landing"
 
@@ -22,7 +22,7 @@ export default function LandingPage() {
       <HowItWorks />
       <PricingPreview />
       <FAQ />
-      <FinalCTA />
+      <FeedbackSection />
       <Footer />
     </div>
   )

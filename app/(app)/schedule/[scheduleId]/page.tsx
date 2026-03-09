@@ -22,7 +22,7 @@ export default async function ScheduleDetailPage({
 
   const { data: schedule } = await supabase
     .from("schedules")
-    .select("id, name, team_id, rotation_result, weeks")
+    .select("id, name, team_id, rotation_result, weeks, share_token")
     .eq("id", scheduleId)
     .single()
 
@@ -65,6 +65,8 @@ export default async function ScheduleDetailPage({
       members={members ?? []}
       weeks={weeks}
       membersDisplay={membersDisplay}
+      showShareActions
+      shareToken={schedule.share_token ?? undefined}
     />
   )
 }

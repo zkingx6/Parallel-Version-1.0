@@ -165,7 +165,7 @@ export function NoPerfectTime() {
   return (
     <section
       id="no-perfect-time"
-      className="scroll-mt-24 py-24 md:py-32 bg-muted/30 relative"
+      className="scroll-mt-24 py-24 md:py-32 bg-white relative"
     >
       {/* Subtle top border gradient */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />

@@ -4,74 +4,89 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { Check } from "lucide-react";
 
-const plans = [
+type Plan = {
+  name: string;
+  subtitle: string;
+  priceMonthly: string;
+  priceYearly: string;
+  badge: string | null;
+  highlight: boolean;
+  trialNote: string | null;
+  features: string[];
+  cta: string;
+  ctaNote: string | null;
+  ctaStyle: "outline" | "filled";
+};
+
+const plans: Plan[] = [
   {
     name: "Starter",
     subtitle: "For small distributed teams",
-    price: "$8",
-    priceSuffix: "/member/month",
+    priceMonthly: "$19",
+    priceYearly: "$15",
     badge: null,
     highlight: false,
     trialNote: "14-day free trial",
     features: [
       "Up to 5 team members",
       "Generate rotations up to 4 weeks",
-      "Individual meeting limits",
-      "IANA timezone support",
-      "Export rotations to calendar",
+      "Up to 3 active teams",
+      "Timezone-aware scheduling",
+      "Export rotations to your calendar (.ics)",
     ],
     cta: "Start free trial",
-    ctaNote: "No credit card required",
-    ctaStyle: "outline" as const,
+    ctaNote: null,
+    ctaStyle: "outline",
   },
   {
     name: "Pro",
-    subtitle: "For growing teams",
-    price: "$12",
-    priceSuffix: "/member/month",
+    subtitle: "For growing distributed teams",
+    priceMonthly: "$39",
+    priceYearly: "$31",
     badge: "Most popular",
     highlight: true,
     trialNote: null,
     features: [
       "Up to 20 team members",
       "Generate rotations up to 12 weeks",
-      "Everything in Starter",
-      "Rotation history tracking",
-      "Conflict visibility tools",
+      "Unlimited teams",
+      "Rotation analysis",
       "Priority support",
+      "Everything in Starter",
     ],
     cta: "Upgrade to Pro",
     ctaNote: null,
-    ctaStyle: "filled" as const,
+    ctaStyle: "filled",
   },
   {
     name: "Enterprise",
     subtitle: "For large organizations",
-    price: "Custom",
-    priceSuffix: null,
+    priceMonthly: "Custom",
+    priceYearly: "Custom",
     badge: null,
     highlight: false,
     trialNote: null,
     features: [
       "Unlimited team members",
       "Unlimited rotation planning",
-      "Advanced scheduling controls",
       "API access",
-      "Dedicated support",
       "Enterprise security",
+      "Dedicated support",
     ],
     cta: "Contact sales",
     ctaNote: null,
-    ctaStyle: "outline" as const,
+    ctaStyle: "outline",
   },
 ];
 
 function PricingCard({
   plan,
   index,
+  isYearly,
 }: {
-  plan: (typeof plans)[0];
+  plan: Plan;
   index: number;
+  isYearly: boolean;
 }) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -145,16 +160,19 @@ function PricingCard({
         </div>
 
         {/* Price */}
-        <div className="mb-1 flex items-baseline gap-1">
+        <div className="mb-1 flex items-baseline gap-1 flex-wrap">
           <span
             className="text-[#1a1a2e] text-[2.25rem] tracking-[-0.03em]"
             style={{ fontWeight: 700 }}
           >
-            {plan.price}
+            {isYearly ? plan.priceYearly : plan.priceMonthly}
           </span>
-          {plan.priceSuffix && (
+          {plan.priceMonthly !== "Custom" && (
             <span className="text-[#9ca3af] text-[0.88rem]">
-              {plan.priceSuffix}
+              / month
+              {isYearly && (
+                <span className="text-[#9ca3af]/90"> (billed yearly)</span>
+              )}
             </span>
           )}
         </div>
@@ -249,23 +267,25 @@ function PricingCard({
 }
 
 export function PricingPreview() {
+  const [isYearly, setIsYearly] = useState(false);
+
   return (
     <section
       id="pricing"
-      className="scroll-mt-24 py-24 px-6 bg-[#f8f9fa] relative"
+      className="scroll-mt-24 py-24 px-6 bg-white relative"
     >
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#e0e0e0] to-transparent" />
 
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <motion.div
-          className="text-center mb-16"
+          className="text-center mb-12"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <span className="text-[#0d9488] text-sm tracking-widest uppercase mb-4 block">
+          <span className="text-[#0d9488] text-sm tracking-widest uppercase mb-4 block font-semibold">
             Pricing
           </span>
           <h2 className="text-[2.25rem] tracking-[-0.03em] text-[#1a1a2e] mb-5 max-w-2xl mx-auto leading-[1.15] mt-4">
@@ -276,12 +296,65 @@ export function PricingPreview() {
           </p>
         </motion.div>
 
+        {/* Billing Toggle */}
+        <motion.div
+          className="flex justify-center mb-10"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.4 }}
+        >
+          <div className="inline-flex items-center gap-2 p-1 rounded-xl bg-[#f5f5f5] border border-[#e8e8e8]">
+            <button
+              type="button"
+              onClick={() => setIsYearly(false)}
+              className={`px-5 py-2 rounded-lg text-[0.88rem] font-medium transition-all cursor-pointer ${
+                !isYearly
+                  ? "bg-white text-[#1a1a2e] shadow-sm border border-[#e0e0e0]"
+                  : "text-[#6b7280] hover:text-[#1a1a2e]"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsYearly(true)}
+              className={`px-5 py-2 rounded-lg text-[0.88rem] font-medium transition-all cursor-pointer flex items-center gap-2 ${
+                isYearly
+                  ? "bg-white text-[#1a1a2e] shadow-sm border border-[#e0e0e0]"
+                  : "text-[#6b7280] hover:text-[#1a1a2e]"
+              }`}
+            >
+              Yearly
+              <span className="text-[0.75rem] text-[#0d9488] font-semibold">
+                Save 20%
+              </span>
+            </button>
+          </div>
+        </motion.div>
+
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
           {plans.map((plan, i) => (
-            <PricingCard key={plan.name} plan={plan} index={i} />
+            <PricingCard
+              key={plan.name}
+              plan={plan}
+              index={i}
+              isYearly={isYearly}
+            />
           ))}
         </div>
+
+        {/* Owner pays note */}
+        <motion.p
+          className="text-center text-chart-1 text-[0.88rem] font-semibold mt-8"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+        >
+          One owner pays. Invite your team for free.
+        </motion.p>
       </div>
     </section>
   );

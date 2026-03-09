@@ -44,50 +44,72 @@ function DemoTopNav({
   targetMeetingId: string | null
 }) {
   const tabBase =
-    "inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-transparent transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-  const tabInactive =
-    "text-muted-foreground hover:bg-accent/50 hover:border-border hover:text-foreground"
-  const tabActive = "bg-accent/60 border-border text-foreground"
+    "relative inline-flex items-center justify-center min-w-[4.5rem] px-4 py-1.5 rounded-lg text-[0.84rem] font-medium border-0 shrink-0 cursor-pointer transition-colors duration-200 bg-transparent"
+  const tabActive = "text-[#1a1a2e]"
+  const tabInactive = "text-[#9ca3af] hover:text-[#6b7280]"
   const tabDisabled =
-    "cursor-not-allowed pointer-events-none text-muted-foreground/60 border-transparent"
+    "cursor-not-allowed pointer-events-none text-[#9ca3af]/60"
 
-  const getTabClass = (isActive: boolean) =>
-    cn(tabBase, isActive ? tabActive : tabInactive)
+  const navItems = [
+    { label: "Teams", tab: "meetings" as const, isActive: activeTab === "meetings" },
+    ...(isOwner
+      ? [
+          {
+            label: "Rotation",
+            tab: "rotation" as const,
+            isActive: activeTab === "rotation",
+            disabled: !targetMeetingId,
+          },
+        ]
+      : []),
+    { label: "Schedule", tab: "schedule" as const, isActive: activeTab === "schedule" },
+  ]
 
   return (
-    <header className="relative z-10 w-full shrink-0 border-b border-border/40 bg-navbar backdrop-blur-sm">
-      <div className="relative flex items-center justify-between h-16 pl-8 pr-8">
+    <header className="sticky top-0 z-10 w-full shrink-0 bg-white/80 backdrop-blur-md border-b border-[#edeef0]">
+      <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
         <div className="shrink-0">
-          <span className="text-lg font-semibold text-foreground">Parallel</span>
+          <span className="text-[#1a1a2e] text-[0.95rem] tracking-[-0.02em] font-semibold">
+            Parallel
+          </span>
         </div>
 
-        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 text-sm">
-          <button
-            type="button"
-            onClick={() => onTabChange("meetings")}
-            className={getTabClass(activeTab === "meetings")}
-          >
-            Teams
-          </button>
-          {isOwner && (targetMeetingId || activeTab === "rotation") && (
-            <button
-              type="button"
-              onClick={() => targetMeetingId && onTabChange("rotation")}
-              className={getTabClass(activeTab === "rotation")}
-            >
-              Rotation
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => onTabChange("schedule")}
-            className={getTabClass(activeTab === "schedule")}
-          >
-            Schedule
-          </button>
+        <nav className="flex items-center gap-1 shrink-0">
+          {navItems.map((item) => {
+            if (item.disabled) {
+              return (
+                <span
+                  key={item.label}
+                  className={cn(tabBase, tabDisabled)}
+                >
+                  {item.label}
+                </span>
+              )
+            }
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => onTabChange(item.tab)}
+                className={cn(
+                  tabBase,
+                  item.isActive ? tabActive : tabInactive
+                )}
+              >
+                {item.label}
+                <span
+                  className={cn(
+                    "absolute bottom-[-9px] left-2 right-2 h-[2px] bg-[#0d9488] rounded-full pointer-events-none transition-opacity duration-150",
+                    item.isActive ? "opacity-100" : "opacity-0"
+                  )}
+                  aria-hidden
+                />
+              </button>
+            )
+          })}
         </nav>
 
-        <div className="shrink-0 text-xs text-muted-foreground">Demo</div>
+        <div className="w-8 h-8 shrink-0" aria-hidden />
       </div>
     </header>
   )
@@ -246,7 +268,7 @@ function DemoSandboxInner() {
           isOwner={isOwner}
           targetMeetingId={targetMeetingId}
         />
-        <main className="flex-1 min-h-0 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto bg-[#f7f8fa]">
           <DashboardContent
             meetings={meetings}
             memberCounts={Object.fromEntries(
@@ -272,7 +294,7 @@ function DemoSandboxInner() {
           isOwner={isOwner}
           targetMeetingId={targetMeetingId}
         />
-        <main className="flex-1 min-h-0 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto bg-[#f7f8fa]">
           <TeamSection
             meeting={selectedMeeting}
             members={selectedMembers}
@@ -301,7 +323,7 @@ function DemoSandboxInner() {
           isOwner={isOwner}
           targetMeetingId={targetMeetingId}
         />
-        <main className="flex-1 min-h-0 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto bg-[#f7f8fa]">
           <RotationSection
             meeting={selectedMeeting}
             members={selectedMembers}
@@ -325,7 +347,7 @@ function DemoSandboxInner() {
           isOwner={isOwner}
           targetMeetingId={targetMeetingId}
         />
-        <main className="flex-1 min-h-0 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto bg-[#f7f8fa]">
           <div className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
             <div className="mb-10">
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
@@ -370,7 +392,7 @@ function DemoSandboxInner() {
           isOwner={isOwner}
           targetMeetingId={targetMeetingId}
         />
-        <main className="flex-1 min-h-0 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto bg-[#f7f8fa]">
           <ScheduleDetailContent
             scheduleId={selectedSchedule.id}
             scheduleName={selectedSchedule.name}
@@ -378,6 +400,8 @@ function DemoSandboxInner() {
             members={selectedMembers}
             weeks={weeks}
             membersDisplay={getMembersDisplay(selectedMeeting.id)}
+            scheduleBasePath="/schedule"
+            showShareActions={isOwner}
             demoMode
             onBack={() => onNavigate("schedule")}
             onAnalysisClick={() =>
@@ -406,7 +430,7 @@ function DemoSandboxInner() {
           isOwner={isOwner}
           targetMeetingId={targetMeetingId}
         />
-        <main className="flex-1 min-h-0 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto bg-[#f7f8fa]">
           <ScheduleAnalysisContent
             scheduleId={selectedSchedule.id}
             scheduleName={selectedSchedule.name}

@@ -680,7 +680,9 @@ export function RotationSection({
   }, [demoMode, meeting.id, meeting.base_time_minutes, meeting.anchor_offset])
 
   const handleGenerate = () => {
-    console.log("[DEBUG] Plan button clicked")
+    if (process.env.NODE_ENV === "development") {
+      console.log("[DEBUG] Plan button clicked")
+    }
 
     if (
       typeof process !== "undefined" &&
@@ -690,7 +692,9 @@ export function RotationSection({
     }
 
     if (team.length < 2) {
-      console.log("[DEBUG] Early return triggered: team.length < 2")
+      if (process.env.NODE_ENV === "development") {
+        console.log("[DEBUG] Early return triggered: team.length < 2")
+      }
       setRotationError("At least 2 members needed. Share the invite link.")
       setNoViableResult(null)
       return
@@ -709,18 +713,26 @@ export function RotationSection({
         reason.includes("never ranges") ||
         reason.toLowerCase().includes("hard boundaries")
       if (isInfeasible) {
-        console.log(
-          "[DEBUG] validation invalid but continuing to generateRotation due to infeasible case"
-        )
+        if (process.env.NODE_ENV === "development") {
+          console.log(
+            "[DEBUG] validation invalid but continuing to generateRotation due to infeasible case"
+          )
+        }
       } else {
-        console.log("[DEBUG] Early return triggered: validation.valid=false", reason)
+        if (process.env.NODE_ENV === "development") {
+          console.log("[DEBUG] Early return triggered: validation.valid=false", reason)
+        }
         setRotationError(reason || "No viable rotation.")
         setRotationResult(null)
         setNoViableResult(null)
         return
       }
     }
-    console.log("[DEBUG] Team length:", team?.length)
+    if (process.env.NODE_ENV === "development") {
+      console.log("[DEBUG] Team length:", team?.length)
+      console.log("Rotation config:", config)
+      console.log("[DEBUG] Calling generateRotationGuarded")
+    }
     setIsGenerating(true)
     setRotationResult(null)
     setOrderedWeeks(null)
@@ -728,12 +740,12 @@ export function RotationSection({
     setRotationError(null)
     setIsPreviewFromRelaxedConstraint(false)
     setPreviewRelaxedMemberName(null)
-    console.log("Rotation config:", config)
-    console.log("[DEBUG] Calling generateRotationGuarded")
     setTimeout(() => {
       try {
         const result = generateRotationGuarded(team, config)
-        console.log("[DEBUG] generateRotationGuarded result:", result)
+        if (process.env.NODE_ENV === "development") {
+          console.log("[DEBUG] generateRotationGuarded result:", result)
+        }
         if (isInputContractViolation(result)) {
           const msg =
             result.error.details
@@ -757,7 +769,9 @@ export function RotationSection({
           }
         }
       } catch (error) {
-        console.error("[DEBUG] Error occurred:", error)
+        if (process.env.NODE_ENV === "development") {
+          console.error("[DEBUG] Error occurred:", error)
+        }
       }
       setIsGenerating(false)
     }, 1200)
@@ -816,7 +830,9 @@ export function RotationSection({
             }
           }
         } catch (error) {
-          console.error("[Preview] Error:", error)
+          if (process.env.NODE_ENV === "development") {
+            console.error("[Preview] Error:", error)
+          }
           setRotationError("PREVIEW_NO_OVERLAP")
           setRotationResult(null)
           setNoViableResult(null)
@@ -873,7 +889,7 @@ export function RotationSection({
   const consecutive = rotation ? hasConsecutiveStretch(rotation, team) : false
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-8">
+    <main className="max-w-5xl mx-auto px-6 py-8 bg-[#f7f8fa]">
       <div className="max-w-2xl mx-auto">
         <PageBackLink
           href={demoMode ? undefined : `/team/${meeting.id}`}

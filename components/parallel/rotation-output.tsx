@@ -253,7 +253,8 @@ function SortableWeekCard({
         burdenCategory={burdenCategory}
         dragHandle={
           <div
-            className="rotation-drag-handle group shrink-0 p-2 -m-1 rounded cursor-grab active:cursor-grabbing touch-none hover:bg-[#f4f5f7]"
+            className="rotation-drag-handle group relative z-10 shrink-0 min-w-[32px] min-h-[32px] flex items-center justify-center rounded touch-none hover:bg-[#f4f5f7]"
+            style={{ cursor: "grab" }}
             aria-label="Drag to reorder"
             {...attributes}
             {...listeners}
