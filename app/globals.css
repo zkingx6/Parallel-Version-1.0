@@ -179,3 +179,11 @@
   75%, 99.99% { transform: translateY(-75%); }
   100% { transform: translateY(0); }
 }
+
+/* Rotation schedule drag handle: force cursor so it reliably shows on hover */
+.rotation-drag-handle {
+  cursor: grab !important;
+}
+.rotation-drag-handle:active {
+  cursor: grabbing !important;
+}

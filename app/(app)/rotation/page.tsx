@@ -26,7 +26,7 @@ export default function RotationPlaceholderPage() {
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           Select a team from{" "}
-          <Link href="/teams" className="text-primary hover:underline">
+          <Link href="/teams" className="text-primary hover:underline cursor-pointer">
             Your teams
           </Link>{" "}
           to access the rotation planner.

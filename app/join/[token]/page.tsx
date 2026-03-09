@@ -7,6 +7,7 @@ import { addStoredMemberTeam } from "@/lib/member-teams-storage"
 import { ParticipantForm } from "@/components/parallel/participant-form"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
 import { isComplementOfOverlapPattern } from "@/lib/hard-no-ranges"
+import type { HardNoRange } from "@/lib/types"
 
 const DAYS_LABEL: Record<number, string> = {
   1: "Monday",
@@ -164,9 +165,9 @@ export default function JoinPage() {
           defaultWorkEnd={existingMember?.work_end_hour ?? 18}
           defaultHardNoRanges={
             existingMember?.hard_no_ranges && Array.isArray(existingMember.hard_no_ranges)
-              ? isComplementOfOverlapPattern(existingMember.hard_no_ranges)
+              ? isComplementOfOverlapPattern(existingMember.hard_no_ranges as HardNoRange[])
                 ? []
-                : (existingMember.hard_no_ranges as { start: number; end: number }[])
+                : (existingMember.hard_no_ranges as HardNoRange[])
               : []
           }
           defaultRole={existingMember?.role ?? ""}

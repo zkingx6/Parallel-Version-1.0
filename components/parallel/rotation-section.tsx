@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { ChevronDownIcon } from "lucide-react"
+import { ChevronDownIcon, Calendar, Info } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { updateMeetingConfig, createScheduleRecord } from "@/lib/actions"
@@ -119,7 +119,7 @@ function InlineSelect<T extends number | string>({
           (typeof value === "number" ? Number(e.target.value) : e.target.value) as T
         )
       }
-      className="bg-card border border-border/60 rounded-lg px-2.5 py-1.5 text-sm font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 appearance-none shadow-sm transition-colors hover:border-primary/30"
+      className="bg-white border border-[#e5e7eb] rounded-lg px-3 py-2 text-[0.84rem] font-medium text-[#1a1a2e] cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0d9488]/10 focus:border-[#0d9488] appearance-none transition-colors hover:border-[#d1d5db]"
     >
       {options.map((opt) => (
         <option key={String(opt.value)} value={opt.value}>
@@ -274,7 +274,7 @@ function BaseTimePicker({
           type="button"
           tabIndex={-1}
           onClick={() => (isOpen ? setIsOpen(false) : openDropdown())}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground focus:outline-none"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground focus:outline-none cursor-pointer"
           aria-label="Open time options"
         >
           <ChevronDownIcon
@@ -292,7 +292,7 @@ function BaseTimePicker({
               key={opt.value}
               type="button"
               className={cn(
-                "w-full text-left px-2.5 py-1.5 text-sm font-medium transition-colors",
+                "w-full text-left px-2.5 py-1.5 text-sm font-medium transition-colors cursor-pointer",
                 idx === highlightIndex
                   ? "bg-primary/15 text-foreground"
                   : "text-foreground/90 hover:bg-muted/60"
@@ -873,29 +873,41 @@ export function RotationSection({
   const consecutive = rotation ? hasConsecutiveStretch(rotation, team) : false
 
   return (
-    <main className="mx-auto max-w-3xl px-6 pt-8 sm:pt-12 pb-8">
-      <div className="mb-10">
-        <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-          {meeting.title}
-        </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Configure the meeting and plan a fair rotation.
-        </p>
-      </div>
+    <main className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-2xl mx-auto">
+        <PageBackLink
+          href={demoMode ? undefined : `/team/${meeting.id}`}
+          onClick={demoMode ? onBack : undefined}
+          className="mb-6"
+        >
+          Back to team
+        </PageBackLink>
 
-      <div className="space-y-10 sm:space-y-12">
-        <section>
-          <div className="mb-5">
-            <h2 className="text-lg font-semibold tracking-tight">
-              The meeting
-            </h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+        <div className="mb-8">
+          <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] mb-1 font-semibold">
+            {meeting.title}
+          </h1>
+          <p className="text-[#9ca3af] text-[0.88rem]">
+            Configure the meeting and plan a fair rotation.
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          {/* The meeting card */}
+          <section className="bg-white rounded-2xl border border-[#edeef0] shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar size={16} className="text-[#0d9488]" />
+              <h3 className="text-[#1a1a2e] text-[0.95rem] font-semibold">
+                The meeting
+              </h3>
+            </div>
+            <p className="text-[#9ca3af] text-[0.82rem] mb-5">
               Define cadence and cycle length.
             </p>
-          </div>
-          <div className="rounded-xl border border-border/50 bg-card p-4 sm:p-5 shadow-sm space-y-4">
-            {/* Row 1: Weekly on [Day] at [Time] for [Duration] over [Weeks] — matches demo */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-muted-foreground leading-relaxed">
+
+            <div className="bg-[#f9fafb] rounded-xl p-4 space-y-4 mb-4">
+              {/* Row 1: Weekly on [Day] at [Time] for [Duration] over [Weeks] */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[0.84rem] text-[#6b7280] leading-relaxed">
               <span>Weekly on</span>
               <InlineSelect
                 value={meeting.day_of_week}
@@ -926,10 +938,10 @@ export function RotationSection({
               />
             </div>
 
-            {/* Start week metadata — muted supporting text below main cadence row */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs text-muted-foreground/70">
+            {/* Start week metadata */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[0.84rem] text-[#6b7280]">
               <span>Start week:</span>
-              <label className="flex items-center gap-1.5" title="Week 1 date. Leave empty for next occurrence.">
+              <label className="flex items-center gap-2" title="Week 1 date. Leave empty for next occurrence.">
                 <input
                   type="date"
                   value={meeting.start_date ?? ""}
@@ -938,27 +950,19 @@ export function RotationSection({
                       start_date: e.target.value ? e.target.value : null,
                     })
                   }
-                  className="bg-card border border-border/60 rounded-lg px-2 py-1 text-sm font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="bg-white border border-[#e5e7eb] rounded-lg px-3 py-2 text-[0.84rem] font-medium text-[#1a1a2e] cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0d9488]/20 focus:border-[#0d9488]"
                 />
-                <span>{meeting.start_date ? "(Week 1)" : "(optional)"}</span>
+                <span className="text-[0.78rem] text-[#b0b4bc]">
+                  {meeting.start_date ? "(Week 1)" : "(optional)"}
+                  {!meeting.start_date && (
+                    <> → Next {DateTime.fromISO(getNextOccurrenceOfWeekday(meeting.day_of_week), { zone: "utc" }).toFormat("ccc, MMM d")} (auto)</>
+                  )}
+                </span>
               </label>
-              {!meeting.start_date && (
-                <>
-                  <span className="text-muted-foreground/50">—</span>
-                  <span>
-                    Next{" "}
-                    {DateTime.fromISO(
-                      getNextOccurrenceOfWeekday(meeting.day_of_week),
-                      { zone: "utc" }
-                    ).toFormat("ccc, MMM d")}{" "}
-                    (auto)
-                  </span>
-                </>
-              )}
             </div>
 
-            {/* Row 2: displayed in [Timezone] — matches demo */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-muted-foreground leading-relaxed">
+            {/* Row 2: displayed in [Timezone] */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[0.84rem] text-[#6b7280] leading-relaxed">
               <span>displayed in</span>
               <InlineSelect
                 value={displayTimezoneIana}
@@ -977,41 +981,45 @@ export function RotationSection({
               />
             </div>
 
-            {/* Row 3: helper / warning / boundary messages */}
-            <div className="space-y-1">
-              {!useFixedBaseTime && (
-                <p className="text-xs text-muted-foreground/70">
-                  Times displayed in {getTimezoneDisplayLabelNow(displayTimezoneIana)}. Algorithm runs in UTC.
-                </p>
-              )}
-              {useFixedBaseTime && (
-                <>
-                  <p className="text-xs text-muted-foreground/70">
-                    Anchor time in {getTimezoneDisplayLabelNow(displayTimezoneIana)}.
-                  </p>
-                  {fixedBaseTimeStatus && (
-                    <>
-                      {fixedBaseTimeStatus.blockedByHardNo && (
-                        <p className="text-xs text-destructive mt-1">
-                          Blocked by hard boundaries — choose a different time.
-                        </p>
-                      )}
-                      {fixedBaseTimeStatus.outsideWorkHoursCount > 0 && (
-                        <p className="text-xs text-muted-foreground/70 mt-1">
-                          Outside working hours for {fixedBaseTimeStatus.outsideWorkHoursCount} member
-                          {fixedBaseTimeStatus.outsideWorkHoursCount !== 1 ? "s" : ""} — burden will
-                          increase.
-                        </p>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
             </div>
 
-            {/* Row 4: Use a fixed base time checkbox — matches demo */}
-            <div className="pt-1 border-t border-border/30">
-              <label className="flex items-center gap-2.5 cursor-pointer">
+            {/* Helper / warning / boundary messages */}
+            <div className="flex items-start gap-2 text-[0.78rem] text-[#b0b4bc]">
+              <Info size={13} className="mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                {!useFixedBaseTime && (
+                  <p>
+                    Times displayed in {getTimezoneDisplayLabelNow(displayTimezoneIana)}. Algorithm runs in UTC.
+                  </p>
+                )}
+                {useFixedBaseTime && (
+                  <>
+                    <p>Anchor time in {getTimezoneDisplayLabelNow(displayTimezoneIana)}.</p>
+                    {fixedBaseTimeStatus && (
+                      <>
+                        {fixedBaseTimeStatus.blockedByHardNo && (
+                          <p className="text-destructive">
+                            Blocked by hard boundaries — choose a different time.
+                          </p>
+                        )}
+                        {fixedBaseTimeStatus.outsideWorkHoursCount > 0 && (
+                          <p>
+                            Outside working hours for {fixedBaseTimeStatus.outsideWorkHoursCount} member
+                            {fixedBaseTimeStatus.outsideWorkHoursCount !== 1 ? "s" : ""} — burden will increase.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* Fixed base time card */}
+          <section className="bg-white rounded-2xl border border-[#edeef0] shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-6">
+            <div className="flex items-start gap-3">
+              <label className="flex items-start gap-3 cursor-pointer flex-1">
                 <input
                   type="checkbox"
                   checked={meeting.base_time_minutes != null}
@@ -1033,26 +1041,27 @@ export function RotationSection({
                       console.log("[rotation-section] after toggle (displayTimezoneIana unchanged):", displayTimezoneIana)
                     }
                   }}
-                  className="rounded border-border/60 text-primary focus:ring-primary/20"
+                  className="mt-0.5 w-5 h-5 rounded border-[#d1d5db] text-[#0d9488] focus:ring-[#0d9488]/20 shrink-0"
                 />
-                <span className="text-sm text-foreground/90">
-                  Use a fixed base time
-                </span>
+                <div>
+                  <span className="text-[#1a1a2e] text-[0.88rem] font-medium block">
+                    Use a fixed base time
+                  </span>
+                  <p className="text-[#b0b4bc] text-[0.78rem] mt-0.5">
+                    {meeting.base_time_minutes != null
+                      ? "Meeting time is fixed. Some members may see a different local day."
+                      : "If disabled, Parallel will choose the fairest time for the team."}
+                  </p>
+                </div>
               </label>
-              <p className="text-xs text-muted-foreground/50 leading-relaxed mt-1 ml-6">
-                {meeting.base_time_minutes != null
-                  ? "Meeting time is fixed. Some members may see a different local day."
-                  : "If disabled, Parallel will choose the fairest time for the team."}
-              </p>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <div className="pt-2">
+          <div className="pt-2">
           <Button
             size="lg"
             className={cn(
-              "w-full h-12 text-sm font-medium rounded-xl shadow-sm transition-all duration-200",
+              "w-full py-3.5 text-[0.92rem] font-medium rounded-xl bg-[#0d9488] hover:bg-[#0f766e] hover:shadow-[0_6px_24px_rgba(13,148,136,0.20)] text-white border-0 transition-all duration-200",
               (team.length < 2 || isFixedBaseTimeBlocked) && "opacity-50 cursor-not-allowed"
             )}
             disabled={team.length < 2 || isGenerating || isFixedBaseTimeBlocked}
@@ -1211,6 +1220,7 @@ export function RotationSection({
             <PageBackLink href={`/team/${meeting.id}`} className="mb-0">Back to team</PageBackLink>
           )}
         </div>
+        </div>
       </div>
 
       <footer className="mt-16 sm:mt-24 border-t border-border/20 pt-8">
@@ -1242,7 +1252,7 @@ export function RotationSection({
                 weeks={rotation}
                 membersDisplay={membersDisplay}
                 embedded
-                displayTimezone={meeting.display_timezone}
+                displayTimezone={meeting.display_timezone ?? undefined}
                 modeUsed={rotationResult?.modeUsed}
                 useFixedBaseTime={useFixedBaseTime}
                 relaxedWorkingHours={isPreviewFromRelaxedConstraint && !previewRelaxedMemberName}

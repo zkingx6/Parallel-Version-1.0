@@ -2219,6 +2219,7 @@ function tryFixedAnchorPlan(
         rejectedBy: { burdenDiff: 0, consecutiveMax: 0 },
         failureReason: null,
       })),
+      modeUsed: "FIXED_ANCHOR",
       shareablePlanExists,
       currentPlanMetrics: {
         maxBurden,

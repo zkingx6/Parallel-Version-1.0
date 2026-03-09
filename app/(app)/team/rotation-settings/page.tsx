@@ -174,7 +174,7 @@ export default function RotationSettingsPage() {
             <button
               type="button"
               onClick={openEditDrawer}
-              className="mt-4 rounded-md border border-border bg-muted/50 px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent/50 transition-all duration-200"
+              className="mt-4 rounded-md border border-border bg-muted/50 px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent/50 transition-all duration-200 cursor-pointer"
             >
               Edit Window
             </button>
@@ -353,14 +353,14 @@ export default function RotationSettingsPage() {
                 <button
                   type="button"
                   onClick={cancelEdit}
-                  className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent/50 transition-all duration-200"
+                  className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent/50 transition-all duration-200 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={saveEdit}
-                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all duration-200"
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all duration-200 cursor-pointer"
                 >
                   Save
                 </button>

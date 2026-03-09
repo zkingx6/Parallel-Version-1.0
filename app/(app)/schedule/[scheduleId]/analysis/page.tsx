@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createServerSupabase, createServiceSupabase } from "@/lib/supabase-server"
 import { ScheduleAnalysisContent } from "@/components/parallel/schedule-analysis-content"
+import type { RotationWeekData } from "@/lib/types"
 import {
   resolveMembersDisplay,
   authUserToProfile,
@@ -64,9 +65,9 @@ export default async function ScheduleAnalysisPage({
   const rotationResult = schedule.rotation_result as
     | { weeks: unknown[]; modeUsed?: string; explain?: unknown }
     | null
-  const weeks =
+  const weeks: RotationWeekData[] =
     rotationResult && Array.isArray(rotationResult.weeks)
-      ? rotationResult.weeks
+      ? (rotationResult.weeks as RotationWeekData[])
       : []
   const modeUsed = rotationResult?.modeUsed
   const explain = rotationResult?.explain as {

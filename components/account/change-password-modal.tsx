@@ -191,7 +191,7 @@ export function ChangePasswordModal({
                   type="button"
                   onClick={handleForgotPassword}
                   disabled={loading}
-                  className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer disabled:cursor-not-allowed"
                 >
                   Forgot password?
                 </button>
@@ -206,7 +206,7 @@ export function ChangePasswordModal({
                 type="button"
                 onClick={handleForgotPassword}
                 disabled={loading}
-                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
                 Send password reset email
               </button>

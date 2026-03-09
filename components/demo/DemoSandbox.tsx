@@ -249,6 +249,9 @@ function DemoSandboxInner() {
         <main className="flex-1 min-h-0 overflow-y-auto">
           <DashboardContent
             meetings={meetings}
+            memberCounts={Object.fromEntries(
+              meetings.map((m) => [m.id, membersByMeeting[m.id]?.length ?? 0])
+            )}
             demoMode
             hideOwnerActions={!isOwner}
             onNavigate={handleNavigate}
@@ -322,16 +325,17 @@ function DemoSandboxInner() {
           isOwner={isOwner}
           targetMeetingId={targetMeetingId}
         />
-        <main className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-          <div className="mb-10">
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-              Schedule
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Published schedules and rotation history.
-            </p>
-          </div>
-          <ScheduleListContent
+        <main className="flex-1 min-h-0 overflow-y-auto">
+          <div className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
+            <div className="mb-10">
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+                Schedule
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Published schedules and rotation history.
+              </p>
+            </div>
+            <ScheduleListContent
             schedules={scheduleItems}
             teamTitles={teamTitles}
             demoMode
@@ -345,6 +349,7 @@ function DemoSandboxInner() {
                 : undefined
             }
           />
+          </div>
         </main>
       </>
     )

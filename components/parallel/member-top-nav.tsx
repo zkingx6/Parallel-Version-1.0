@@ -47,7 +47,7 @@ export function MemberTopNav({
         <div className="shrink-0">
           <Link
             href={teamUrl}
-            className="text-lg font-semibold text-foreground hover:text-foreground/80 transition-colors"
+            className="text-lg font-semibold text-foreground hover:text-foreground/80 transition-colors cursor-pointer"
           >
             Parallel
           </Link>
@@ -58,13 +58,13 @@ export function MemberTopNav({
           <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 text-sm">
             <Link
               href={teamUrl}
-              className={cn(tabBase, activeTab === "team" ? tabActive : tabInactive)}
+              className={cn(tabBase, "cursor-pointer", activeTab === "team" ? tabActive : tabInactive)}
             >
               Team
             </Link>
             <Link
               href={scheduleUrl}
-              className={cn(tabBase, activeTab === "schedule" ? tabActive : tabInactive)}
+              className={cn(tabBase, "cursor-pointer", activeTab === "schedule" ? tabActive : tabInactive)}
             >
               Schedule
             </Link>
@@ -77,7 +77,7 @@ export function MemberTopNav({
             <Link
               href={accountUrl}
               className={cn(
-                "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer",
                 isAccount && "ring-2 ring-ring ring-offset-2 ring-offset-background"
               )}
               aria-label="Account"

@@ -22,17 +22,14 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
     return teamMatch?.[1] ?? rotationMatch?.[1] ?? null
   })()
 
-  // Use URL meeting ID if valid (not "rotation-settings"), else first meeting from context.
   const targetMeetingId =
     meetingIdFromUrl && meetingIdFromUrl !== "rotation-settings"
       ? meetingIdFromUrl
       : firstMeetingId
 
-  // Team/Rotation enabled when: isSetupComplete (meetings.length > 0 from /teams) OR valid meetingId in URL.
   const teamRotationEnabled =
     isSetupComplete || (meetingIdFromUrl && meetingIdFromUrl !== "rotation-settings")
 
-  // Explicit route-to-tab mapping.
   const activeTab = (() => {
     if (pathname === "/teams") return "meetings"
     if (pathname?.startsWith("/team/rotation-settings")) return "meetings"
@@ -46,74 +43,87 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
   const isSchedule = activeTab === "schedule"
   const isAccount = pathname?.startsWith("/settings")
 
-  const tabBase =
-    "inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-transparent transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-  const tabInactive =
-    "text-muted-foreground hover:bg-accent/50 hover:border-border hover:text-foreground"
-  const tabActive =
-    "bg-accent/60 border-border text-foreground"
-  const tabDisabled =
-    "cursor-not-allowed pointer-events-none text-muted-foreground/60 border-transparent"
-
-  const getTabClass = (isActive: boolean) =>
-    cn(tabBase, isActive ? tabActive : tabInactive)
+  const navItems = [
+    { label: "Teams", path: "/teams", isActive: isMeetings },
+    {
+      label: "Rotation",
+      path: teamRotationEnabled && targetMeetingId ? `/rotation/${targetMeetingId}` : null,
+      isActive: isRotation,
+      disabled: !teamRotationEnabled || !targetMeetingId,
+    },
+    { label: "Schedule", path: "/schedule", isActive: isSchedule },
+  ]
 
   return (
-    <header className="relative z-10 w-full shrink-0 border-b border-border/40 bg-navbar backdrop-blur-sm">
-      {/* z-10 + bg-navbar: navbar has subtle secondary tint for visual separation from content.
-          Without this, page content (e.g. on /team/rotation-settings) can create stacking
-          contexts that overlay the center nav (Team/Rotation) and block pointer events. */}
-      <div className="relative flex items-center justify-between h-16 pl-8 pr-8">
-        {/* Left: Logo */}
-        <div className="shrink-0">
-          <Link
-            href="/teams"
-            className="text-lg font-semibold text-foreground hover:text-foreground/80 transition-colors"
-          >
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#edeef0]">
+      <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+        {/* Logo */}
+        <Link
+          href="/teams"
+          className="flex items-center gap-2 bg-transparent border-0 cursor-pointer p-0"
+        >
+          <div className="w-7 h-7 rounded-lg bg-[#0d9488] flex items-center justify-center">
+            <span className="text-white text-[0.7rem] font-bold">P</span>
+          </div>
+          <span className="text-[#1a1a2e] text-[0.95rem] tracking-[-0.02em] font-semibold">
             Parallel
-          </Link>
-        </div>
+          </span>
+        </Link>
 
-        {/* Center: Tabs (Teams | Rotation | Schedule) */}
-        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 text-sm">
-          <Link
-            href="/teams"
-            className={getTabClass(isMeetings)}
-          >
-            Teams
-          </Link>
-          {teamRotationEnabled && targetMeetingId ? (
-            <Link
-              href={`/rotation/${targetMeetingId}`}
-              className={getTabClass(isRotation)}
-            >
-              Rotation
-            </Link>
-          ) : (
-            <span className={cn(tabBase, tabDisabled)}>Rotation</span>
-          )}
-          <Link href="/schedule" className={getTabClass(isSchedule)}>
-            Schedule
-          </Link>
+        {/* Nav tabs — stable layout: same font-weight for all, absolute underline, no layout animation */}
+        <nav className="flex items-center gap-1 shrink-0">
+          {navItems.map((item) => {
+            const tabBase =
+              "relative inline-flex items-center justify-center min-w-[4.5rem] px-4 py-1.5 rounded-lg text-[0.84rem] font-medium border-0 shrink-0"
+            if (item.disabled) {
+              return (
+                <span
+                  key={item.label}
+                  className={cn(tabBase, "cursor-not-allowed pointer-events-none text-[#9ca3af]/60")}
+                >
+                  {item.label}
+                </span>
+              )
+            }
+            return (
+              <Link
+                key={item.label}
+                href={item.path!}
+                className={cn(
+                  tabBase,
+                  "cursor-pointer transition-colors duration-200 bg-transparent",
+                  item.isActive ? "text-[#1a1a2e]" : "text-[#9ca3af] hover:text-[#6b7280]"
+                )}
+              >
+                {item.label}
+                {/* Underline: absolutely positioned, does not affect flow; no layoutId to avoid animation-induced shift */}
+                <span
+                  className={cn(
+                    "absolute bottom-[-9px] left-2 right-2 h-[2px] bg-[#0d9488] rounded-full pointer-events-none transition-opacity duration-150",
+                    item.isActive ? "opacity-100" : "opacity-0"
+                  )}
+                  aria-hidden
+                />
+              </Link>
+            )
+          })}
         </nav>
 
-        {/* Right: Account avatar */}
-        <div className="shrink-0">
-          <Link
-            href="/settings"
-            className={cn(
-              "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-              isAccount && "ring-2 ring-ring ring-offset-2 ring-offset-background"
-            )}
-            aria-label="Account"
-          >
-            <MemberAvatar
+        {/* Avatar */}
+        <Link
+          href="/settings"
+          className={cn(
+            "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0d9488]/30 focus-visible:ring-offset-2 cursor-pointer",
+            isAccount && "ring-2 ring-[#0d9488]/50 ring-offset-2"
+          )}
+          aria-label="Account"
+        >
+          <MemberAvatar
               avatarUrl={userAvatar || undefined}
               name={userName || userEmail?.split("@")[0] || "?"}
               size="default"
             />
-          </Link>
-        </div>
+        </Link>
       </div>
     </header>
   )

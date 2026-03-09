@@ -120,7 +120,7 @@ export type ForcedPlanEvidence = {
 export type RotationExplain = {
   weeks: WeekExplain[]
   /** Mode used for the whole plan. */
-  modeUsed: "FAIRNESS_GUARANTEE" | "STRICT" | "RELAXED" | "FALLBACK"
+  modeUsed: "FAIRNESS_GUARANTEE" | "STRICT" | "RELAXED" | "FALLBACK" | "FIXED_ANCHOR"
   /** True if the plan satisfies shareable fairness thresholds. */
   shareablePlanExists: boolean
   /** True if current plan is not lexicographically best. */
@@ -137,7 +137,7 @@ export type RotationExplain = {
 /** Successful rotation result with explainability. */
 export type RotationResult = {
   weeks: RotationWeekData[]
-  modeUsed: "FAIRNESS_GUARANTEE" | "STRICT" | "RELAXED" | "FALLBACK"
+  modeUsed: "FAIRNESS_GUARANTEE" | "STRICT" | "RELAXED" | "FALLBACK" | "FIXED_ANCHOR"
   explain: RotationExplain
 }
 

@@ -8,6 +8,9 @@ import {
   ChevronUp,
   ShieldCheck,
   RotateCw,
+  Users,
+  BarChart3,
+  Zap,
 } from "lucide-react"
 import {
   DbMemberSubmission,
@@ -125,20 +128,6 @@ export function ScheduleAnalysisContent({
           ? "Moderate imbalance"
           : "Poor balance"
 
-  const fairnessBadgeStyle =
-    fairnessScore >= 70
-      ? "bg-primary/15 text-primary"
-      : fairnessScore >= 40
-        ? "bg-accent/30 text-accent-foreground"
-        : "bg-stretch/20 text-stretch-foreground"
-
-  const rotationBarColor = (localHour: number) => {
-    const h = ((localHour % 24) + 24) % 24
-    if (h < 8) return "bg-comfortable/70"
-    if (h >= 18) return "bg-stretch/70"
-    return "bg-muted-foreground/40"
-  }
-
   const weekTimes = weeks.map((w) => {
     const dateIso = w.utcDateIso ?? "2025-03-05"
     const localHour = convertUtcToLocal(dateIso, w.utcHour, displayTimezone)
@@ -226,222 +215,234 @@ export function ScheduleAnalysisContent({
       className={
         embedded
           ? `${maxWidth} px-4 py-6`
-          : `mx-auto ${maxWidth} px-5 sm:px-8 pt-8 sm:pt-12 pb-8`
+          : `max-w-5xl mx-auto px-6 py-8`
       }
     >
       {!embedded && (
         <PageBackLink
           href={demoMode ? undefined : `${scheduleBasePathResolved}/${scheduleId}${scheduleLinkSuffix}`}
           onClick={demoMode ? onBackToSchedule : undefined}
-          className="mb-4"
+          className="mb-6"
         >
           Back to schedule
         </PageBackLink>
       )}
 
       {!embedded && (
-        <div className="mb-5">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">
+        <div className="mb-8">
+          <span className="text-[#0d9488] text-[0.75rem] tracking-widest uppercase block mb-1 font-semibold">
             Rotation Analysis
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+          </span>
+          <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
             {scheduleName}
           </h1>
         </div>
       )}
 
       {/* Schedule Overview — combined Fairness Score + Schedule Summary */}
-      <section className="rounded-2xl border border-border/50 bg-card shadow-sm hover:shadow-md transition-shadow p-5 sm:p-6 mb-6">
-        <h2 className="text-lg font-semibold tracking-tight mb-4">
+      <section className="rounded-2xl border border-[#edeef0] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-5 sm:p-6 mb-6 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-shadow">
+        <h2 className="text-[#1a1a2e] text-[0.95rem] font-semibold mb-5">
           Schedule Overview
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
           {/* Left: Fairness Score */}
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-1">
-              Fairness Score
-            </h3>
-            <p className="text-4xl sm:text-5xl font-semibold tabular-nums">
-              {fairnessScore}
-              <span className="text-2xl sm:text-3xl font-normal text-muted-foreground ml-1">
-                / 100
+            <p className="text-[#9ca3af] text-[0.82rem] mb-2">Fairness Score</p>
+            <div className="flex items-baseline gap-1 mb-3">
+              <span className="text-[2.6rem] text-[#1a1a2e] tracking-[-0.04em] leading-none font-bold tabular-nums">
+                {fairnessScore}
               </span>
-            </p>
-            <div className="mt-3 w-full max-w-xs">
-              <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary/80 transition-all"
-                  style={{ width: `${fairnessScore}%` }}
-                />
-              </div>
+              <span className="text-[1.1rem] text-[#c4c7cc] font-normal">/ 100</span>
+            </div>
+            <div className="w-full h-2 bg-[#f0f0f2] rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#0d9488] to-[#14b8a6] transition-all duration-500"
+                style={{ width: `${fairnessScore}%` }}
+              />
             </div>
             <span
-              className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium mt-2 ${fairnessBadgeStyle}`}
+              className={`inline-flex rounded-md px-2.5 py-1 text-[0.72rem] font-medium ${
+                fairnessScore >= 70
+                  ? "text-[#0d9488] bg-[#f0fdfa] border border-[#0d9488]/15"
+                  : fairnessScore >= 40
+                    ? "text-[#d97706] bg-[#fffbeb] border border-[#f59e0b]/20"
+                    : "text-[#d97706] bg-[#fffbeb] border border-[#f59e0b]/20"
+              }`}
             >
               {fairnessStatus}
             </span>
-            <p className="text-sm text-muted-foreground mt-3 max-w-sm">
+            <p className="text-[#9ca3af] text-[0.78rem] mt-2 leading-relaxed">
               Measures how evenly meeting inconvenience is distributed.
             </p>
           </div>
 
           {/* Right: Schedule Summary metrics */}
           <div>
-            <p className="text-base font-medium">{teamName}</p>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="text-[#1a1a2e] text-[0.88rem] font-medium mb-0.5">
+              {teamName}
+            </p>
+            <p className="text-[#9ca3af] text-[0.78rem] mb-4">
               {weeksCount}-week rotation cycle
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-4">
-              <div>
-                <p className="text-xl font-semibold tabular-nums text-primary">
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              <div className="text-center">
+                <div className="text-[1.2rem] text-[#0d9488] font-bold tabular-nums">
                   {maxMemberCount}
-                </p>
-                <p className="text-[11px] text-muted-foreground">Max</p>
+                </div>
+                <div className="text-[0.7rem] text-[#9ca3af] mt-0.5">Max</div>
               </div>
-              <div>
-                <p className="text-xl font-semibold tabular-nums text-primary">
+              <div className="text-center">
+                <div className="text-[1.2rem] text-[#0d9488] font-bold tabular-nums">
                   {isEven ? 0 : spread}
-                </p>
-                <p className="text-[11px] text-muted-foreground">Spread</p>
+                </div>
+                <div className="text-[0.7rem] text-[#9ca3af] mt-0.5">Spread</div>
               </div>
-              <div>
-                <p className="text-xl font-semibold tabular-nums text-primary">
+              <div className="text-center">
+                <div className="text-[1.2rem] text-[#0d9488] font-bold tabular-nums">
                   {burdenData.length}
-                </p>
-                <p className="text-[11px] text-muted-foreground">Members</p>
+                </div>
+                <div className="text-[0.7rem] text-[#9ca3af] mt-0.5">Members</div>
               </div>
-              <div>
-                <p className="text-xl font-semibold tabular-nums text-primary">
+              <div className="text-center">
+                <div className="text-[1.2rem] text-[#0d9488] font-bold tabular-nums">
                   {weeksCount}
-                </p>
-                <p className="text-[11px] text-muted-foreground">Weeks</p>
+                </div>
+                <div className="text-[0.7rem] text-[#9ca3af] mt-0.5">Weeks</div>
               </div>
             </div>
-            <div className="flex flex-col gap-1 mt-3">
-              <span className="inline-flex w-fit items-center rounded-md bg-primary/15 text-primary px-2.5 py-0.5 text-xs font-medium">
-                {modeDisplayLabel}
-              </span>
-              <p className="text-xs text-muted-foreground">
-                {modeDescription}
-              </p>
+            <span className="inline-flex text-[0.68rem] font-semibold text-white bg-[#0d9488] px-2.5 py-1 rounded-md">
+              {modeDisplayLabel}
+            </span>
+            <div className="mt-2 space-y-0.5">
+              <p className="text-[#6b7280] text-[0.78rem]">{modeDescription}</p>
+              {explain?.shareablePlanExists === false && explain?.forcedSummary ? (
+                <p className="text-[#9ca3af] text-[0.75rem]">
+                  Schedule generated using fallback optimization mode.
+                </p>
+              ) : null}
             </div>
-            {explain?.shareablePlanExists === false && explain?.forcedSummary ? (
-              <p className="text-xs text-muted-foreground mt-2">
-                Schedule generated using fallback optimization mode.
-              </p>
-            ) : null}
           </div>
         </div>
-        <p className="text-sm text-muted-foreground leading-relaxed mt-4 pt-4 border-t border-border/30">
-          This schedule balances inconvenience across the team while respecting
-          working hours and blocked time ranges.
-        </p>
+        <div className="mt-5 pt-4 border-t border-[#f0f0f2]">
+          <p className="text-[#6b7280] text-[0.82rem] leading-relaxed">
+            This schedule balances inconvenience across the team while respecting
+            working hours and blocked time ranges.
+          </p>
+        </div>
       </section>
 
       {/* Dashboard Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* Left column: Member Burden Distribution */}
         <div>
-          <section className="rounded-2xl border border-border/50 bg-card shadow-sm hover:shadow-md transition-shadow p-5 sm:p-6">
-            <h2 className="text-lg font-semibold tracking-tight">
-              Member Burden Distribution
-            </h2>
-          <p className="text-xs text-muted-foreground mt-1 mb-4">
-            Total inconvenience score across the {weeksCount}-week cycle.
-          </p>
-          {burdenData.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No burden data available for this schedule.
+          <section className="rounded-2xl border border-[#edeef0] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-5 sm:p-6 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-shadow">
+            <div className="flex items-center gap-2 mb-1">
+              <Users size={15} className="text-[#0d9488] shrink-0" />
+              <h2 className="text-[#1a1a2e] text-[0.9rem] font-semibold">
+                Member Burden Distribution
+              </h2>
+            </div>
+            <p className="text-[#9ca3af] text-[0.78rem] mb-5">
+              Total inconvenience score across the {weeksCount}-week cycle.
             </p>
-          ) : (
-            <div className="space-y-4">
-              {burdenData.map((d) => {
-                const isMax = d.count === maxMemberCount && maxMemberCount > 0
-                return (
-                  <div
-                    key={d.memberId}
-                    className={`flex items-center gap-3 rounded-lg px-2 py-1.5 -mx-2 -my-0.5 transition-colors ${
-                      isMax ? "bg-muted/40" : ""
-                    }`}
-                  >
-                    <MemberAvatar
-                      avatarUrl={membersDisplay.get(d.memberId)?.avatarUrl}
-                      name={d.name}
-                      size="sm"
-                      className="shrink-0"
-                    />
-                    <span className="text-sm font-medium w-24 sm:w-28 truncate">
-                      {d.name}
-                    </span>
-                    <div className="flex-1 h-2.5 rounded-full bg-muted/60 overflow-hidden min-w-0">
-                      <div
-                        className="h-full rounded-full bg-stretch/80 transition-all duration-500 relative overflow-hidden"
-                        style={{
-                          width: `${maxCount > 0 ? (d.count / maxCount) * 100 : 0}%`,
-                        }}
-                      >
-                        {d.sacrificeCount > 0 && d.count > 0 && (
-                          <div
-                            className="absolute right-0 top-0 bottom-0 bg-stretch-foreground/20 rounded-r-full"
-                            style={{
-                              width: `${Math.min(100, ((d.sacrificePoints ?? d.sacrificeCount) / d.count) * 100)}%`,
-                            }}
-                          />
-                        )}
-                      </div>
-                    </div>
-                    <span
-                      className={`text-sm tabular-nums w-8 text-right shrink-0 ${
-                        isMax ? "font-bold text-foreground" : "font-medium"
+            {burdenData.length === 0 ? (
+              <p className="text-[#9ca3af] text-[0.82rem]">
+                No burden data available for this schedule.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {burdenData.map((d) => {
+                  const isMax = d.count === maxMemberCount && maxMemberCount > 0
+                  return (
+                    <div
+                      key={d.memberId}
+                      className={`flex items-center gap-2.5 ${
+                        isMax ? "rounded-lg bg-[#fef8f0]/50 px-2 py-1 -mx-2" : ""
                       }`}
                     >
-                      {d.count}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground/80 mt-4 leading-relaxed">
-            Burden scores represent early or late meetings outside ideal working
-            hours. Lower scores indicate more comfortable schedules.
-          </p>
-        </section>
+                      <MemberAvatar
+                        avatarUrl={membersDisplay.get(d.memberId)?.avatarUrl}
+                        name={d.name}
+                        size="sm"
+                        className="shrink-0 size-7"
+                      />
+                      <span className="text-[0.82rem] text-[#1a1a2e] font-medium w-24 sm:w-28 truncate shrink-0">
+                        {d.name}
+                      </span>
+                      <div className="flex-1 h-2 bg-[#f0f0f2] rounded-full overflow-hidden min-w-0">
+                        <div
+                          className="h-full rounded-full transition-all duration-500 relative overflow-hidden"
+                          style={{
+                            width: `${maxCount > 0 ? (d.count / maxCount) * 100 : 4}%`,
+                            backgroundColor: d.count > 0 ? "#f5c882" : "#e5e7eb",
+                          }}
+                        >
+                          {d.sacrificeCount > 0 && d.count > 0 && (
+                            <div
+                              className="absolute right-0 top-0 bottom-0 bg-[#d97706]/20 rounded-r-full"
+                              style={{
+                                width: `${Math.min(100, ((d.sacrificePoints ?? d.sacrificeCount) / d.count) * 100)}%`,
+                              }}
+                            />
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        className={`text-[0.84rem] tabular-nums w-5 text-right shrink-0 ${
+                          d.count > 0 ? "text-[#d97706] font-semibold" : "text-[#c4c7cc] font-normal"
+                        }`}
+                      >
+                        {d.count}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <p className="text-[#b0b4bc] text-[0.75rem] mt-5 leading-relaxed">
+              Burden scores represent early or late meetings outside ideal working
+              hours. Lower scores indicate more comfortable schedules.
+            </p>
+          </section>
         </div>
 
         {/* Right column: Meeting Time Rotation */}
         <div>
-          <section className="rounded-2xl border border-border/50 bg-card shadow-sm hover:shadow-md transition-shadow p-5 sm:p-6">
-            <h2 className="text-lg font-semibold tracking-tight">
-              Meeting Time Rotation
-            </h2>
-            <p className="text-xs text-muted-foreground mt-1 mb-4">
+          <section className="rounded-2xl border border-[#edeef0] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-5 sm:p-6 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-shadow">
+            <div className="flex items-center gap-2 mb-1">
+              <BarChart3 size={15} className="text-[#0d9488] shrink-0" />
+              <h2 className="text-[#1a1a2e] text-[0.9rem] font-semibold">
+                Meeting Time Rotation
+              </h2>
+            </div>
+            <p className="text-[#9ca3af] text-[0.78rem] mb-5">
               How meeting time shifts across weeks.
             </p>
             {weekTimes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-[#9ca3af] text-[0.82rem]">
                 No week data available.
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {weekTimes.map(({ week, label, localHour }) => {
                   const h = ((localHour % 24) + 24) % 24
                   const dayPct = (h / 24) * 100
+                  const isHeaviest = h < 8 || h >= 18
                   return (
-                    <div
-                      key={week}
-                      className="flex items-center gap-3"
-                    >
-                      <span className="text-xs font-medium text-muted-foreground w-14 shrink-0">
+                    <div key={week} className="flex items-center gap-3">
+                      <span className="text-[0.78rem] text-[#9ca3af] w-12 shrink-0">
                         Week {week}
                       </span>
-                      <span className="text-sm tabular-nums w-20 shrink-0">
+                      <span className="text-[0.84rem] text-[#1a1a2e] font-medium w-20 shrink-0 tabular-nums">
                         {label}
                       </span>
-                      <div className="flex-1 h-1.5 rounded-full bg-muted/60 overflow-hidden min-w-0">
+                      <div className="flex-1 h-3 bg-[#f0f0f2] rounded-full overflow-hidden min-w-0">
                         <div
-                          className={`h-full rounded-full transition-all ${rotationBarColor(localHour)}`}
-                          style={{ width: `${dayPct}%` }}
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${dayPct}%`,
+                            backgroundColor: isHeaviest ? "#374151" : "#a7e8de",
+                          }}
                         />
                       </div>
                     </div>
@@ -454,18 +455,15 @@ export function ScheduleAnalysisContent({
       </div>
 
       {/* Sacrifice Timeline — horizontal, 2 rows of 6, compact */}
-      <section className="rounded-2xl border border-border/50 bg-card shadow-sm hover:shadow-md transition-shadow p-4 sm:p-5 mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">
+      <section className="rounded-2xl border border-[#edeef0] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-5 sm:p-6 mb-6 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-shadow">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-4">
+          <div className="flex items-center gap-2">
+            <Zap size={15} className="text-[#0d9488] shrink-0" />
+            <h2 className="text-[#1a1a2e] text-[0.9rem] font-semibold">
               Sacrifice Timeline
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              How meeting inconvenience is distributed each week. Each dot = one
-              member outside preferred hours.
-            </p>
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 sm:mt-1 text-[11px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-4 text-[0.72rem] text-[#9ca3af]">
             <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-comfortable/70 shrink-0" />
               Early meeting
@@ -480,13 +478,17 @@ export function ScheduleAnalysisContent({
             </span>
           </div>
         </div>
+        <p className="text-[#9ca3af] text-[0.78rem] mb-5">
+          How meeting inconvenience is distributed each week. Each dot = one
+          member outside preferred hours.
+        </p>
         {sacrificeTimeline.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-[#9ca3af] text-[0.82rem]">
             No week data available.
           </p>
         ) : (
           <TooltipProvider delayDuration={100}>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-4 gap-y-4">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-x-6 gap-y-4">
               {sacrificeTimeline.map(({ week, label, members }) => {
                 const dotColor = (h: number) => {
                   const nh = ((h % 24) + 24) % 24
@@ -500,10 +502,10 @@ export function ScheduleAnalysisContent({
                     className="flex flex-col gap-1 min-w-0"
                   >
                     <div className="flex items-baseline gap-1.5">
-                      <span className="text-xs font-medium text-muted-foreground shrink-0">
+                      <span className="text-[0.75rem] font-medium text-[#9ca3af] shrink-0">
                         Week {week}
                       </span>
-                      <span className="text-[11px] tabular-nums text-muted-foreground truncate">
+                      <span className="text-[0.78rem] tabular-nums text-[#6b7280] truncate font-medium">
                         {label}
                       </span>
                     </div>
@@ -542,25 +544,25 @@ export function ScheduleAnalysisContent({
       </section>
 
       {/* Timezone Impact — collapsible, full width */}
-      <section className="rounded-2xl border border-border/50 bg-card shadow-sm hover:shadow-md transition-shadow overflow-hidden mb-6">
+      <section className="rounded-2xl border border-[#edeef0] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] overflow-hidden mb-6 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-shadow">
         <button
           type="button"
           onClick={() => setTimezoneExpanded((v) => !v)}
-          className="flex w-full items-center justify-between gap-4 p-5 sm:p-6 text-left hover:bg-muted/30 transition-colors"
+          className="flex w-full items-center justify-between gap-4 px-5 py-5 text-left hover:bg-[#f9fafb]/50 transition-colors cursor-pointer"
         >
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">
+            <h2 className="text-[#1a1a2e] text-[0.9rem] font-semibold">
               Timezone Impact
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-[#9ca3af] text-[0.78rem] mt-0.5">
               Relative meeting time range per timezone.
             </p>
           </div>
-          <span className="shrink-0 text-muted-foreground">
+          <span className="shrink-0 text-[#9ca3af]">
             {timezoneExpanded ? (
-              <ChevronUp className="size-5" />
+              <ChevronUp size={18} />
             ) : (
-              <ChevronDown className="size-5" />
+              <ChevronDown size={18} />
             )}
           </span>
         </button>
@@ -570,22 +572,22 @@ export function ScheduleAnalysisContent({
             maxHeight: timezoneExpanded ? "400px" : "0",
           }}
         >
-          <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-0">
+          <div className="px-5 pb-5 pt-0">
               {timezoneRanges.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[#9ca3af] text-[0.82rem]">
                   No timezone data available.
                 </p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-0">
                   {timezoneRanges.map(({ city, range }) => (
                     <div
                       key={city}
-                      className="flex items-center justify-between gap-4 py-1.5"
+                      className="flex items-center justify-between py-3 border-b border-[#f5f5f7] last:border-b-0"
                     >
-                      <span className="text-sm font-medium shrink-0">
+                      <span className="text-[0.86rem] text-[#1a1a2e] font-medium shrink-0">
                         {city}
                       </span>
-                      <span className="text-xs text-muted-foreground tabular-nums text-right min-w-[140px]">
+                      <span className="text-[0.84rem] text-[#6b7280] tabular-nums text-right">
                         {range}
                       </span>
                     </div>
@@ -597,61 +599,61 @@ export function ScheduleAnalysisContent({
       </section>
 
       {/* Explanation Section — Bottom */}
-      <section className="rounded-2xl border border-border/50 bg-card shadow-sm hover:shadow-md transition-shadow p-5 sm:p-6">
-        <h2 className="text-lg font-semibold tracking-tight mb-4">
+      <section className="rounded-2xl border border-[#edeef0] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-5 sm:p-6 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-shadow">
+        <h2 className="text-[#1a1a2e] text-[0.95rem] font-semibold mb-5">
           Why this schedule was selected
         </h2>
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {relaxedWorkingHours ? (
-            <div className="rounded-xl border border-border/40 bg-muted/20 p-4 space-y-2 transition-all duration-200 hover:border-primary/20 hover:shadow-sm">
-              <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <CalendarCheck className="size-5" />
+            <div className="bg-[#f9fafb] rounded-xl p-4 hover:bg-[#f0fdfa] transition-colors duration-200">
+              <div className="w-9 h-9 rounded-xl bg-[#f0fdfa] border border-[#0d9488]/10 flex items-center justify-center mb-3">
+                <CalendarCheck size={17} className="text-[#0d9488]" />
               </div>
-              <h3 className="text-sm font-semibold">Working hours relaxed</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              <h3 className="text-[#1a1a2e] text-[0.84rem] font-semibold mb-1">Working hours relaxed</h3>
+              <p className="text-[#9ca3af] text-[0.78rem] leading-relaxed">
                 This preview allows meeting times slightly outside normal working hours.
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-border/40 bg-muted/20 p-4 space-y-2 transition-all duration-200 hover:border-primary/20 hover:shadow-sm">
-              <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <CalendarCheck className="size-5" />
+            <div className="bg-[#f9fafb] rounded-xl p-4 hover:bg-[#f0fdfa] transition-colors duration-200">
+              <div className="w-9 h-9 rounded-xl bg-[#f0fdfa] border border-[#0d9488]/10 flex items-center justify-center mb-3">
+                <CalendarCheck size={17} className="text-[#0d9488]" />
               </div>
-              <h3 className="text-sm font-semibold">Availability checked</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              <h3 className="text-[#1a1a2e] text-[0.84rem] font-semibold mb-1">Availability checked</h3>
+              <p className="text-[#9ca3af] text-[0.78rem] leading-relaxed">
                 All members&apos; working hours were evaluated.
               </p>
             </div>
           )}
           {relaxedHardBoundaryMemberName ? (
-            <div className="rounded-xl border border-border/40 bg-muted/20 p-4 space-y-2 transition-all duration-200 hover:border-primary/20 hover:shadow-sm">
-              <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <ShieldCheck className="size-5" />
+            <div className="bg-[#f9fafb] rounded-xl p-4 hover:bg-[#f0fdfa] transition-colors duration-200">
+              <div className="w-9 h-9 rounded-xl bg-[#f0fdfa] border border-[#0d9488]/10 flex items-center justify-center mb-3">
+                <ShieldCheck size={17} className="text-[#0d9488]" />
               </div>
-              <h3 className="text-sm font-semibold">Hard boundary temporarily relaxed</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              <h3 className="text-[#1a1a2e] text-[0.84rem] font-semibold mb-1">Hard boundary temporarily relaxed</h3>
+              <p className="text-[#9ca3af] text-[0.78rem] leading-relaxed">
                 {relaxedHardBoundaryMemberName
                   ? `One blocked time range was relaxed for ${relaxedHardBoundaryMemberName} in this preview.`
                   : "One blocked time range was temporarily relaxed in this preview."}
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-border/40 bg-muted/20 p-4 space-y-2 transition-all duration-200 hover:border-primary/20 hover:shadow-sm">
-              <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <ShieldCheck className="size-5" />
+            <div className="bg-[#f9fafb] rounded-xl p-4 hover:bg-[#f0fdfa] transition-colors duration-200">
+              <div className="w-9 h-9 rounded-xl bg-[#f0fdfa] border border-[#0d9488]/10 flex items-center justify-center mb-3">
+                <ShieldCheck size={17} className="text-[#0d9488]" />
               </div>
-              <h3 className="text-sm font-semibold">Hard boundaries respected</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              <h3 className="text-[#1a1a2e] text-[0.84rem] font-semibold mb-1">Hard boundaries respected</h3>
+              <p className="text-[#9ca3af] text-[0.78rem] leading-relaxed">
                 No meetings were scheduled during blocked time ranges.
               </p>
             </div>
           )}
-          <div className="rounded-xl border border-border/40 bg-muted/20 p-4 space-y-2 transition-all duration-200 hover:border-primary/20 hover:shadow-sm">
-            <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <RotateCw className="size-5" />
+          <div className="bg-[#f9fafb] rounded-xl p-4 hover:bg-[#f0fdfa] transition-colors duration-200">
+            <div className="w-9 h-9 rounded-xl bg-[#f0fdfa] border border-[#0d9488]/10 flex items-center justify-center mb-3">
+              <RotateCw size={17} className="text-[#0d9488]" />
             </div>
-            <h3 className="text-sm font-semibold">Rotation generated</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
+            <h3 className="text-[#1a1a2e] text-[0.84rem] font-semibold mb-1">Rotation generated</h3>
+            <p className="text-[#9ca3af] text-[0.78rem] leading-relaxed">
               The schedule distributes meeting inconvenience across the cycle.
             </p>
           </div>

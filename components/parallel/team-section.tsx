@@ -25,7 +25,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { PencilIcon } from "lucide-react"
+import { PencilIcon, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageBackLink } from "@/components/ui/page-back-link"
 import { MemberAvatar } from "@/components/ui/avatar"
@@ -168,34 +168,35 @@ export function TeamSection({
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-      <PageBackLink
-        href={demoMode ? undefined : "/teams"}
-        onClick={demoMode ? onBack : undefined}
-        className="mb-6"
-      >
-        Back to Teams
-      </PageBackLink>
-      <div className="mb-10">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-            {meeting.title}
-          </h1>
-          {!hideOwnerActions && (
-            <button
-              type="button"
-              onClick={handleRenameOpen}
-              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-              aria-label="Rename team"
-            >
-              <PencilIcon className="size-4" />
-            </button>
-          )}
+    <main className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-2xl mx-auto">
+        <PageBackLink
+          href={demoMode ? undefined : "/teams"}
+          onClick={demoMode ? onBack : undefined}
+          className="mb-6"
+        >
+          Back to Teams
+        </PageBackLink>
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
+              {meeting.title}
+            </h1>
+            {!hideOwnerActions && (
+              <button
+                type="button"
+                onClick={handleRenameOpen}
+                className="p-1.5 rounded-lg bg-transparent border-0 cursor-pointer text-[#c4c7cc] hover:text-[#6b7280] hover:bg-[#f0f0f2] transition-all"
+                aria-label="Rename team"
+              >
+                <PencilIcon className="size-4" />
+              </button>
+            )}
+          </div>
+          <p className="text-[#9ca3af] text-[0.88rem]">
+            Invite your team, then plan a fair rotation.
+          </p>
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Invite your team, then plan a fair rotation.
-        </p>
-      </div>
 
       <Dialog open={renameModalOpen} onOpenChange={setRenameModalOpen}>
         <DialogContent className="sm:max-w-md">
@@ -306,62 +307,67 @@ export function TeamSection({
         </Dialog>
 
         {!hideOwnerActions && (
-          <section>
-            <div className="mb-5">
-              <h2 className="text-lg font-semibold tracking-tight">
-                Invite link
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                Share this link with your team. They set their own timezone and
-                boundaries.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm flex items-center gap-3">
-              <code className="flex-1 text-xs text-muted-foreground truncate bg-muted/30 rounded-lg px-3 py-2">
+          <section className="mb-10">
+            <h3 className="text-[#1a1a2e] text-[0.95rem] mb-1 font-semibold">
+              Invite link
+            </h3>
+            <p className="text-[#9ca3af] text-[0.82rem] mb-3">
+              Share this link with your team. They set their own timezone and boundaries.
+            </p>
+            <div className="bg-white rounded-xl border border-[#edeef0] px-4 py-3 flex items-center gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+              <code className="flex-1 text-[0.8rem] text-[#6b7280] truncate font-mono">
                 {inviteUrl || "Loading…"}
               </code>
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={handleCopyLink}
                 className={cn(
-                  "text-xs h-8 shrink-0",
-                  copied && "bg-primary/10 text-primary border-primary/30"
+                  "flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e5e7eb] bg-white text-[0.8rem] cursor-pointer hover:border-[#d1d5db] hover:bg-[#f9fafb] transition-all font-medium",
+                  copied && "text-[#0d9488] border-[#0d9488]/30"
                 )}
               >
-                {copied ? "Copied" : "Copy"}
-              </Button>
+                {copied ? (
+                  <>
+                    <Check size={13} />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={13} />
+                    Copy
+                  </>
+                )}
+              </button>
             </div>
           </section>
         )}
 
         <section>
-          <div className="mb-5 flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-semibold tracking-tight">
+              <h3 className="text-[#1a1a2e] text-[0.95rem] font-semibold">
                 Team ({members.length})
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
+              </h3>
+              <p className="text-[#9ca3af] text-[0.82rem] mt-0.5">
                 Members who have submitted their availability.
               </p>
             </div>
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="text-xs text-primary hover:text-primary/80 transition-colors cursor-pointer disabled:opacity-50"
+              className="text-[0.8rem] text-[#0d9488] hover:text-[#0f766e] bg-transparent border-0 cursor-pointer transition-colors disabled:opacity-50 font-medium"
             >
               {refreshing ? "Refreshing…" : "Refresh"}
             </button>
           </div>
 
           {members.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/60 p-8 text-center">
-              <p className="text-sm text-muted-foreground/50">
+            <div className="rounded-xl border border-dashed border-[#e0e2e6] p-8 text-center bg-white/50">
+              <p className="text-[0.88rem] text-[#9ca3af]/50">
                 No members yet. Share the invite link above.
               </p>
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {[...members]
                 .sort(
                   (a, b) =>
@@ -389,15 +395,13 @@ export function TeamSection({
                     <div
                       key={m.id}
                       onClick={() => {
-                      if (confirmRemoveId === m.id) {
-                        setConfirmRemoveId(null)
-                      } else {
-                        setExpandedMemberId(isExpanded ? null : m.id)
-                      }
-                    }}
-                      className={cn(
-                        "rounded-xl border border-border/50 bg-card p-3.5 shadow-sm cursor-pointer hover:border-border/80 transition-colors"
-                      )}
+                        if (confirmRemoveId === m.id) {
+                          setConfirmRemoveId(null)
+                        } else {
+                          setExpandedMemberId(isExpanded ? null : m.id)
+                        }
+                      }}
+                      className="group bg-white rounded-xl border border-[#edeef0] px-5 py-4 hover:border-[#d1d5db] hover:shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200 cursor-pointer"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1.5 min-w-0 flex-1">
@@ -412,12 +416,12 @@ export function TeamSection({
                               {displayName || m.name || "—"}
                             </span>
                             {m.is_owner_participant && (
-                              <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-medium">
+                              <span className="text-[0.68rem] text-[#0d9488] bg-[#f0fdfa] px-2 py-0.5 rounded-full border border-[#0d9488]/15 font-medium">
                                 Owner
                               </span>
                             )}
-                            {m.role && (
-                              <span className="text-[10px] text-muted-foreground/50 bg-muted/40 px-1.5 py-0.5 rounded">
+                            {m.role && !m.is_owner_participant && (
+                              <span className="text-[0.68rem] text-[#9ca3af] bg-[#f4f5f7] px-2 py-0.5 rounded-full">
                                 {m.role}
                               </span>
                             )}
@@ -523,34 +527,27 @@ export function TeamSection({
         </section>
 
         {!hideOwnerActions && (
-          <div className="pt-4">
+          <div className="mt-8 flex justify-center">
             {demoMode && onConfigureRotation ? (
-              <Button
-                variant="default"
-                size="sm"
+              <button
                 onClick={onConfigureRotation}
-                className="inline-flex items-center gap-1.5"
+                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0d9488] text-white text-[0.88rem] border-0 cursor-pointer font-medium hover:bg-[#0f766e] hover:shadow-[0_4px_16px_rgba(13,148,136,0.25)] transition-all"
               >
                 <span aria-hidden>→</span>
                 Configure rotation & plan schedule
-              </Button>
+              </button>
             ) : (
-              <Button
-                asChild
-                variant="default"
-                size="sm"
+              <Link
+                href={`/rotation/${meeting.id}`}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#0d9488] text-white text-[0.88rem] border-0 font-medium hover:bg-[#0f766e] hover:shadow-[0_4px_16px_rgba(13,148,136,0.25)] transition-all"
               >
-                <Link
-                  href={`/rotation/${meeting.id}`}
-                  className="inline-flex items-center gap-1.5"
-                >
-                  <span aria-hidden>→</span>
-                  Configure rotation & plan schedule
-                </Link>
-              </Button>
+                <span aria-hidden>→</span>
+                Configure rotation & plan schedule
+              </Link>
             )}
           </div>
         )}
+      </div>
       </div>
     </main>
   )

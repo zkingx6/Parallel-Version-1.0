@@ -140,7 +140,7 @@ export async function fetchAuthProfilesForUserIds(
     const { data } = await supabase.auth.admin.getUserById(uid)
     if (data?.user) {
       const u = data.user
-      const meta = u.user_metadata as { full_name?: string; avatar_url?: string; picture?: string } | undefined
+      const meta = u.user_metadata as { full_name?: string; name?: string; avatar_url?: string; picture?: string } | undefined
       const fullName = meta?.full_name ?? meta?.name ?? u.email?.split("@")[0] ?? ""
       const avatarUrl = meta?.avatar_url ?? meta?.picture ?? ""
       map.set(uid, {

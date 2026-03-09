@@ -20,7 +20,7 @@ function LiveTime({ timezone }: { timezone: string }) {
     const update = () => {
       const local = DateTime.now().setZone(timezone)
       setTime(
-        local.toLocaleString(DateTime.TIME_SIMPLE, { hour12: true })
+        local.toFormat("h:mm a")
       )
     }
     update()

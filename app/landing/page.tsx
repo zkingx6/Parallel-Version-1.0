@@ -2,7 +2,6 @@ import {
   Navbar,
   Hero,
   Problem,
-  WhyCurrentToolsFail,
   ParallelSolution,
   NoPerfectTime,
   HowItWorks,
@@ -18,7 +17,6 @@ export default function LandingPage() {
       <Navbar />
       <Hero />
       <Problem />
-      <WhyCurrentToolsFail />
       <ParallelSolution />
       <NoPerfectTime />
       <HowItWorks />

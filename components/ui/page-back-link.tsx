@@ -1,24 +1,19 @@
 "use client"
 
 import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const pageBackLinkClass =
-  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-primary/10 dark:hover:bg-primary/15 transition-colors duration-150 -ml-2 mb-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+  "inline-flex items-center gap-1.5 text-[0.82rem] text-[#9ca3af] hover:text-[#6b7280] bg-transparent border-0 cursor-pointer p-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0d9488]/30 focus-visible:ring-offset-2"
 
 type PageBackLinkProps = {
-  /** When provided, renders a Link. */
   href?: string
-  /** When provided (and no href), renders a button. Use for router.back(). */
   onClick?: () => void
   children: React.ReactNode
   className?: string
 }
 
-/**
- * Consistent page-level Back link. Use for all "Back", "Back to team", "Back to schedules", etc.
- * Pill styling with subtle hover background.
- */
 export function PageBackLink({
   href,
   onClick,
@@ -26,18 +21,18 @@ export function PageBackLink({
   className,
 }: PageBackLinkProps) {
   const baseClass = cn(pageBackLinkClass, className)
+  const content = (
+    <>
+      <ArrowLeft size={14} />
+      {children}
+    </>
+  )
   if (href != null) {
-    return (
-      <Link href={href} className={baseClass}>
-        <span aria-hidden>←</span>
-        {children}
-      </Link>
-    )
+    return <Link href={href} className={baseClass}>{content}</Link>
   }
   return (
     <button type="button" onClick={onClick} className={baseClass}>
-      <span aria-hidden>←</span>
-      {children}
+      {content}
     </button>
   )
 }

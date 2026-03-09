@@ -116,7 +116,7 @@ export function SettingsContent({
               setAvatarRemoved(false)
               setEditOpen(true)
             }}
-            className="text-sm font-medium text-primary hover:text-primary/80 transition-colors shrink-0"
+            className="text-sm font-medium text-primary hover:text-primary/80 transition-colors shrink-0 cursor-pointer"
           >
             Edit profile
           </button>
@@ -239,7 +239,7 @@ export function SettingsContent({
                         setAvatarPreview(null)
                         setAvatarRemoved(true)
                       }}
-                      className="text-xs text-muted-foreground hover:text-destructive transition-colors mt-2"
+                      className="text-xs text-muted-foreground hover:text-destructive transition-colors mt-2 cursor-pointer disabled:cursor-not-allowed"
                     >
                       Remove avatar
                     </button>
@@ -248,7 +248,7 @@ export function SettingsContent({
                       type="button"
                       disabled={saving}
                       onClick={() => setAvatarRemoved(false)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-2 cursor-pointer disabled:cursor-not-allowed"
                     >
                       Undo
                     </button>
@@ -288,7 +288,7 @@ export function SettingsContent({
         </div>
         <Link
           href="/settings/billing"
-          className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+          className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer"
         >
           Manage billing
         </Link>
@@ -302,7 +302,7 @@ export function SettingsContent({
             <button
               type="button"
               onClick={() => setChangeEmailOpen(true)}
-              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer"
             >
               Change email
             </button>
@@ -311,7 +311,7 @@ export function SettingsContent({
             <button
               type="button"
               onClick={() => setChangePasswordOpen(true)}
-              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer"
             >
               Change password
             </button>

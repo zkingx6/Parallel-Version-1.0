@@ -3,8 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { DateTime } from "luxon"
+import { ChevronRight, X } from "lucide-react"
 import { deleteSchedule } from "@/lib/actions"
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 type ScheduleItem = {
@@ -62,12 +62,12 @@ export function ScheduleListContent({
   if (items.length === 0) {
     const showGoToTeams = !emptyStateMessage && (demoMode ? !!onEmptyStateClick : true)
     return (
-      <div className="rounded-xl border border-border/50 bg-card p-8 shadow-sm text-center space-y-3">
-        <p className="text-sm text-muted-foreground">
+      <div className="rounded-xl border border-[#edeef0] bg-white p-8 shadow-[0_1px_4px_rgba(0,0,0,0.03)] text-center space-y-3">
+        <p className="text-[0.88rem] text-[#9ca3af]">
           {emptyStateMessage ?? "No schedules published yet."}
         </p>
         {!emptyStateMessage && (
-          <p className="text-sm text-muted-foreground/80">
+          <p className="text-[0.88rem] text-[#9ca3af]/80">
             Generate a rotation and publish a schedule first.
           </p>
         )}
@@ -75,14 +75,14 @@ export function ScheduleListContent({
           <button
             type="button"
             onClick={onEmptyStateClick}
-            className="inline-block text-sm text-primary hover:text-primary/80 transition-colors mt-2"
+            className="inline-block text-sm text-primary hover:text-primary/80 transition-colors mt-2 cursor-pointer"
           >
             Go to Teams →
           </button>
         ) : !emptyStateMessage ? (
           <Link
             href={emptyStateHref ?? "/teams"}
-            className="inline-block text-sm text-primary hover:text-primary/80 transition-colors mt-2"
+            className="inline-block text-sm text-primary hover:text-primary/80 transition-colors mt-2 cursor-pointer"
           >
             Go to Teams →
           </Link>
@@ -93,109 +93,97 @@ export function ScheduleListContent({
 
   return (
     <section>
-      <h2 className="text-lg font-semibold tracking-tight mb-4">
+      <h3 className="text-[#1a1a2e] text-[0.92rem] mb-3 font-semibold">
         Published schedules
-      </h2>
-      <div className="space-y-3">
+      </h3>
+      <div className="space-y-2">
         {items.map((s) => {
           const teamName = teamTitles[s.team_id] ?? "Team"
           const dateLabel = DateTime.fromISO(s.created_at).toFormat("MMM d, yyyy")
           const isConfirming = confirmRemoveId === s.id
 
-          return (
-            <div
-              key={s.id}
-              role={demoMode && onScheduleClick ? "button" : undefined}
-              tabIndex={demoMode && onScheduleClick ? 0 : undefined}
-              onClick={
-                demoMode && onScheduleClick
-                  ? (e) => {
-                      if (!(e.target as HTMLElement).closest("[data-schedule-delete]")) {
-                        onScheduleClick(s.id)
-                      }
-                    }
-                  : undefined
-              }
-              onKeyDown={
-                demoMode && onScheduleClick
-                  ? (e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault()
-                        onScheduleClick(s.id)
-                      }
-                    }
-                  : undefined
-              }
-              className={cn(
-                "rounded-xl border border-border/50 bg-card p-4 sm:p-5 shadow-sm flex items-start justify-between gap-3 transition-all",
-                demoMode && onScheduleClick
-                  ? "cursor-pointer hover:border-primary/20 hover:shadow-md"
-                  : "hover:border-primary/20 hover:shadow-md"
-              )}
-            >
-              {demoMode && onScheduleClick ? (
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {s.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {teamName}
-                  </p>
-                </div>
-              ) : (
-                <Link
-                  href={`${scheduleBasePath}/${s.id}${scheduleLinkParams ? `?${scheduleLinkParams}` : ""}`}
-                  className="flex-1 min-w-0"
-                >
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {s.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {teamName}
-                  </p>
-                </Link>
-              )}
+          const scheduleHref = `${scheduleBasePath}/${s.id}${scheduleLinkParams ? `?${scheduleLinkParams}` : ""}`
+          const rowClassName = "group bg-white rounded-xl border border-[#edeef0] px-5 py-4 flex items-center gap-4 cursor-pointer hover:border-[#d1d5db] hover:shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all duration-200"
+
+          const rowContent = (
+            <>
+              <div className="w-1 h-10 rounded-full bg-[#0d9488]/20 group-hover:bg-[#0d9488]/50 transition-colors shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-[#1a1a2e] text-[0.88rem] truncate block font-medium">
+                  {s.name}
+                </span>
+                <span className="text-[#b0b4bc] text-[0.78rem]">
+                  {teamName}
+                </span>
+              </div>
               <div
                 data-schedule-delete
-                className="flex items-center gap-1.5 shrink-0"
+                className="flex items-center gap-3 shrink-0"
                 onClick={(e) => e.stopPropagation()}
               >
                 {!isConfirming && (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[#b0b4bc] text-[0.78rem]">
                     {dateLabel}
                   </span>
                 )}
                 {showDeleteButton && (isConfirming ? (
                   <>
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-[11px] text-[#9ca3af]">
                       Remove schedule?
                     </span>
                     <button
                       onClick={() => setConfirmRemoveId(null)}
-                      className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      className="text-[11px] text-[#9ca3af] hover:text-[#1a1a2e] transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      className="h-6 px-2 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
+                    <button
                       onClick={() => handleDeleteSchedule(s.id)}
+                      className="px-2 py-1 rounded text-[11px] text-white bg-[#ef4444] hover:bg-[#dc2626] cursor-pointer"
                     >
                       Remove
-                    </Button>
+                    </button>
                   </>
                 ) : (
                   <button
                     onClick={() => setConfirmRemoveId(s.id)}
-                    className="text-muted-foreground/30 hover:text-destructive transition-colors text-lg px-0.5 cursor-pointer"
+                    className="p-1 rounded-lg bg-transparent border-0 cursor-pointer text-[#d1d5db] hover:text-[#ef4444] hover:bg-[#fef2f2] transition-all opacity-0 group-hover:opacity-100"
                     aria-label="Delete schedule"
                   >
-                    ×
+                    <X size={14} />
                   </button>
                 ))}
+                {!isConfirming && (
+                  <ChevronRight size={16} className="text-[#d1d5db] group-hover:text-[#9ca3af] transition-colors" />
+                )}
               </div>
+            </>
+          )
+
+          return demoMode && onScheduleClick ? (
+            <div
+              key={s.id}
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                if (!(e.target as HTMLElement).closest("[data-schedule-delete]")) {
+                  onScheduleClick(s.id)
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  onScheduleClick(s.id)
+                }
+              }}
+              className={rowClassName}
+            >
+              {rowContent}
             </div>
+          ) : (
+            <Link key={s.id} href={scheduleHref} className={rowClassName}>
+              {rowContent}
+            </Link>
           )
         })}
       </div>

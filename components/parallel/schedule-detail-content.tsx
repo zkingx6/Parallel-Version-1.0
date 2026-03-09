@@ -10,7 +10,6 @@ import { ensureDisplayTimezoneIana } from "@/lib/timezone"
 import { getBurdenCounts, hasConsecutiveStretch } from "@/lib/rotation"
 import { RotationOutput } from "./rotation-output"
 import { MemberAvatar } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
 import { PageBackLink } from "@/components/ui/page-back-link"
 import { cn } from "@/lib/utils"
 import { getInitials, type RotationWeekData } from "@/lib/types"
@@ -114,22 +113,24 @@ export function ScheduleDetailContent({
 
   if (!weeks.length) {
     return (
-      <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <PageBackLink href={demoMode ? undefined : backLink} onClick={demoMode ? onBack : undefined}>
-          Back to schedules
-        </PageBackLink>
-        <div className="mb-10">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-            {scheduleName}
-          </h1>
-        </div>
-        <div className="rounded-xl border border-border/50 bg-card p-8 shadow-sm text-center space-y-3">
-          <p className="text-sm text-muted-foreground">
-            No schedule data available.
-          </p>
-          <PageBackLink href={demoMode ? undefined : backLink} onClick={demoMode ? onBack : undefined} className="mt-2 mb-0">
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        <div className="max-w-2xl mx-auto">
+          <PageBackLink href={demoMode ? undefined : backLink} onClick={demoMode ? onBack : undefined} className="mb-6">
             Back to schedules
           </PageBackLink>
+          <div className="mb-10">
+            <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
+              {scheduleName}
+            </h1>
+          </div>
+          <div className="bg-white rounded-xl border border-[#edeef0] p-8 shadow-[0_1px_4px_rgba(0,0,0,0.03)] text-center space-y-3">
+            <p className="text-[0.88rem] text-[#9ca3af]">
+              No schedule data available.
+            </p>
+            <PageBackLink href={demoMode ? undefined : backLink} onClick={demoMode ? onBack : undefined} className="mt-2 mb-0">
+              Back to schedules
+            </PageBackLink>
+          </div>
         </div>
       </main>
     )
@@ -149,43 +150,36 @@ export function ScheduleDetailContent({
   const consecutive = hasConsecutiveStretch(weeks, team)
 
   return (
-    <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-      <PageBackLink href={demoMode ? undefined : backLink} onClick={demoMode ? onBack : undefined}>
-        Back to schedules
-      </PageBackLink>
-      <div className="mb-10">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-          {scheduleName}
-        </h1>
-        <div className="mt-2 flex items-baseline justify-between gap-4">
-          <p className="min-w-0 text-sm text-muted-foreground">
-            {meeting.title} — time rotates, burden distributed transparently.
-          </p>
-          {demoMode && onAnalysisClick ? (
-            <Button
-              variant="default"
-              size="sm"
-              className="shrink-0"
-              onClick={onAnalysisClick}
-            >
-              View rotation analysis
-            </Button>
-          ) : (
-            <Button
-              asChild
-              variant="default"
-              size="sm"
-              className="shrink-0"
-            >
+    <main className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-2xl mx-auto">
+        <PageBackLink href={demoMode ? undefined : backLink} onClick={demoMode ? onBack : undefined} className="mb-6">
+          Back to schedules
+        </PageBackLink>
+        <div className="mb-10">
+          <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] mb-2 font-semibold">
+            {scheduleName}
+          </h1>
+          <div className="flex items-center gap-4 flex-wrap">
+            <p className="text-[#9ca3af] text-[0.88rem]">
+              {meeting.title} — time rotates, burden distributed transparently.
+            </p>
+            {demoMode && onAnalysisClick ? (
+              <button
+                onClick={onAnalysisClick}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0d9488] text-white text-[0.82rem] border-0 cursor-pointer shrink-0 font-medium hover:bg-[#0f766e] hover:shadow-[0_4px_16px_rgba(13,148,136,0.2)] transition-all"
+              >
+                Rotation analysis
+              </button>
+            ) : (
               <Link
                 href={`${scheduleBasePath}/${scheduleId}/analysis${scheduleLinkParams ? `?${scheduleLinkParams}` : ""}`}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0d9488] text-white text-[0.82rem] border-0 shrink-0 font-medium hover:bg-[#0f766e] hover:shadow-[0_4px_16px_rgba(13,148,136,0.2)] transition-all cursor-pointer"
               >
                 Rotation analysis
               </Link>
-            </Button>
-          )}
+            )}
+          </div>
         </div>
-      </div>
 
       <div className="space-y-10 sm:space-y-12">
         <RotationOutput
@@ -195,7 +189,7 @@ export function ScheduleDetailContent({
           useBaseTime={useBaseTime}
         />
 
-        <section className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 sm:p-6 space-y-5">
+        <section className="rounded-2xl border border-[#edeef0] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-5 sm:p-6 space-y-5">
           <div>
             <h3 className="text-sm font-semibold mb-3">
               Over {rotationWeeks} weeks
@@ -249,6 +243,7 @@ export function ScheduleDetailContent({
             Back to schedules
           </PageBackLink>
         </div>
+      </div>
       </div>
     </main>
   )

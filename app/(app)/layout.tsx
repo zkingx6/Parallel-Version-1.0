@@ -52,7 +52,7 @@ export default async function AppLayout({
       if (isOwner || isMember) {
         return (
           <SetupProvider>
-            <div className="min-h-screen">
+            <div className="min-h-screen bg-[#f7f8fa]">
               <TopNav
                 userEmail={user.email || ""}
                 userName={userName}
@@ -72,7 +72,7 @@ export default async function AppLayout({
 
   return (
     <SetupProvider>
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-[#f7f8fa]">
         <TopNav
           userEmail={user.email || ""}
           userName={userName}
