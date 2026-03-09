@@ -136,3 +136,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Landing page section labels and nav */
+.section-label {
+  @apply text-xs font-semibold uppercase tracking-wider text-primary mb-3 block;
+}
+
+.nav-link {
+  @apply text-muted-foreground hover:text-foreground transition-colors duration-200;
+}
+
+.nav-link-active {
+  @apply text-foreground font-medium;
+}

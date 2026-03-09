@@ -832,7 +832,7 @@ export function RotationSection({
   const consecutive = rotation ? hasConsecutiveStretch(rotation, team) : false
 
   return (
-    <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
+    <main className="mx-auto max-w-3xl px-6 pt-8 sm:pt-12 pb-8">
       <div className="mb-10">
         <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
           {meeting.title}
@@ -852,41 +852,16 @@ export function RotationSection({
               Define cadence and cycle length.
             </p>
           </div>
-          <div className="rounded-xl border border-border/50 bg-card p-4 sm:p-5 shadow-sm space-y-3">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-3 text-sm text-muted-foreground leading-relaxed">
+          <div className="rounded-xl border border-border/50 bg-card p-4 sm:p-5 shadow-sm space-y-4">
+            {/* Row 1: Weekly on [Day] at [Time] for [Duration] over [Weeks] — matches demo */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-muted-foreground leading-relaxed">
               <span>Weekly on</span>
               <InlineSelect
                 value={meeting.day_of_week}
                 onChange={(v) => handleConfigChange({ day_of_week: v })}
                 options={DAYS}
               />
-              <span className="sr-only sm:not-sr-only">, starting</span>
-              <label className="flex items-center gap-1.5" title="Week 1 date. Leave empty for next occurrence.">
-                <input
-                  type="date"
-                  value={meeting.start_date ?? ""}
-                  onChange={(e) =>
-                    handleConfigChange({
-                      start_date: e.target.value ? e.target.value : null,
-                    })
-                  }
-                  className="bg-card border border-border/60 rounded-lg px-2.5 py-1.5 text-sm font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-                <span className="text-xs text-muted-foreground/70">
-                  {meeting.start_date ? "(Week 1)" : "(optional)"}
-                </span>
-              </label>
-              {!meeting.start_date && (
-                <span className="text-xs text-muted-foreground/60">
-                  Start week: Next{" "}
-                  {DateTime.fromISO(
-                    getNextOccurrenceOfWeekday(meeting.day_of_week),
-                    { zone: "utc" }
-                  ).toFormat("ccc, MMM d")}{" "}
-                  (auto)
-                </span>
-              )}
-              {meeting.base_time_minutes != null && (
+              {meeting.base_time_minutes != null ? (
                 <>
                   <span>at</span>
                   <BaseTimePicker
@@ -895,6 +870,8 @@ export function RotationSection({
                     onChange={(v) => handleConfigChange({ base_time_minutes: v })}
                   />
                 </>
+              ) : (
+                <span className="inline-block w-30 shrink-0" aria-hidden />
               )}
               <span>for</span>
               <InlineSelect
@@ -909,7 +886,40 @@ export function RotationSection({
                 options={ROTATION_WEEKS}
               />
             </div>
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-3 text-sm text-muted-foreground leading-relaxed">
+
+            {/* Start week metadata — muted supporting text below main cadence row */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-xs text-muted-foreground/70">
+              <span>Start week:</span>
+              <label className="flex items-center gap-1.5" title="Week 1 date. Leave empty for next occurrence.">
+                <input
+                  type="date"
+                  value={meeting.start_date ?? ""}
+                  onChange={(e) =>
+                    handleConfigChange({
+                      start_date: e.target.value ? e.target.value : null,
+                    })
+                  }
+                  className="bg-card border border-border/60 rounded-lg px-2 py-1 text-sm font-medium text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <span>{meeting.start_date ? "(Week 1)" : "(optional)"}</span>
+              </label>
+              {!meeting.start_date && (
+                <>
+                  <span className="text-muted-foreground/50">—</span>
+                  <span>
+                    Next{" "}
+                    {DateTime.fromISO(
+                      getNextOccurrenceOfWeekday(meeting.day_of_week),
+                      { zone: "utc" }
+                    ).toFormat("ccc, MMM d")}{" "}
+                    (auto)
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Row 2: displayed in [Timezone] — matches demo */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-muted-foreground leading-relaxed">
               <span>displayed in</span>
               <InlineSelect
                 value={displayTimezoneIana}
@@ -927,67 +937,75 @@ export function RotationSection({
                 options={getTimezoneOptions()}
               />
             </div>
-            {!useFixedBaseTime && (
-              <p className="text-xs text-muted-foreground/70">
-                Times displayed in {getTimezoneDisplayLabelNow(displayTimezoneIana)}. Algorithm runs in UTC.
-              </p>
-            )}
-            {useFixedBaseTime && (
-              <>
+
+            {/* Row 3: helper / warning / boundary messages */}
+            <div className="space-y-1">
+              {!useFixedBaseTime && (
                 <p className="text-xs text-muted-foreground/70">
-                  Anchor time in {getTimezoneDisplayLabelNow(displayTimezoneIana)}.
+                  Times displayed in {getTimezoneDisplayLabelNow(displayTimezoneIana)}. Algorithm runs in UTC.
                 </p>
-                {fixedBaseTimeStatus && (
-                  <>
-                    {fixedBaseTimeStatus.blockedByHardNo && (
-                      <p className="text-xs text-destructive mt-1">
-                        Blocked by hard boundaries — choose a different time.
-                      </p>
-                    )}
-                    {fixedBaseTimeStatus.outsideWorkHoursCount > 0 && (
-                      <p className="text-xs text-muted-foreground/70 mt-1">
-                        Outside working hours for {fixedBaseTimeStatus.outsideWorkHoursCount} member
-                        {fixedBaseTimeStatus.outsideWorkHoursCount !== 1 ? "s" : ""} — burden will
-                        increase.
-                      </p>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-            <label className="flex items-center gap-2.5 cursor-pointer pt-2">
-              <input
-                type="checkbox"
-                checked={meeting.base_time_minutes != null}
-                onChange={(e) => {
-                  const checked = e.target.checked
-                  if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
-                    console.log("[rotation-section] before toggle fixed base time:", {
-                      displayTimezoneIana,
-                      willBeChecked: checked,
+              )}
+              {useFixedBaseTime && (
+                <>
+                  <p className="text-xs text-muted-foreground/70">
+                    Anchor time in {getTimezoneDisplayLabelNow(displayTimezoneIana)}.
+                  </p>
+                  {fixedBaseTimeStatus && (
+                    <>
+                      {fixedBaseTimeStatus.blockedByHardNo && (
+                        <p className="text-xs text-destructive mt-1">
+                          Blocked by hard boundaries — choose a different time.
+                        </p>
+                      )}
+                      {fixedBaseTimeStatus.outsideWorkHoursCount > 0 && (
+                        <p className="text-xs text-muted-foreground/70 mt-1">
+                          Outside working hours for {fixedBaseTimeStatus.outsideWorkHoursCount} member
+                          {fixedBaseTimeStatus.outsideWorkHoursCount !== 1 ? "s" : ""} — burden will
+                          increase.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Row 4: Use a fixed base time checkbox — matches demo */}
+            <div className="pt-1 border-t border-border/30">
+              <label className="flex items-center gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={meeting.base_time_minutes != null}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+                      console.log("[rotation-section] before toggle fixed base time:", {
+                        displayTimezoneIana,
+                        willBeChecked: checked,
+                      })
+                    }
+                    handleConfigChange({
+                      base_time_minutes: checked ? 540 : null,
+                      anchor_offset: checked
+                        ? DateTime.now().setZone(displayTimezoneIana).offset / 60
+                        : 0,
                     })
-                  }
-                  handleConfigChange({
-                    base_time_minutes: checked ? 540 : null,
-                    anchor_offset: checked
-                      ? DateTime.now().setZone(displayTimezoneIana).offset / 60
-                      : 0,
-                  })
-                  if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
-                    console.log("[rotation-section] after toggle (displayTimezoneIana unchanged):", displayTimezoneIana)
-                  }
-                }}
-                className="rounded border-border/60 text-primary focus:ring-primary/20"
-              />
-              <span className="text-sm text-foreground/90">
-                Use a fixed base time
-              </span>
-            </label>
-            <p className="text-xs text-muted-foreground/50 leading-relaxed pt-0.5">
-              {meeting.base_time_minutes != null
-                ? "Time rotates week to week. Some members may see a different local day."
-                : "If disabled, Parallel will choose the fairest time for the team."}
-            </p>
+                    if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+                      console.log("[rotation-section] after toggle (displayTimezoneIana unchanged):", displayTimezoneIana)
+                    }
+                  }}
+                  className="rounded border-border/60 text-primary focus:ring-primary/20"
+                />
+                <span className="text-sm text-foreground/90">
+                  Use a fixed base time
+                </span>
+              </label>
+              <p className="text-xs text-muted-foreground/50 leading-relaxed mt-1 ml-6">
+                {meeting.base_time_minutes != null
+                  ? "Meeting time is fixed. Some members may see a different local day."
+                  : "If disabled, Parallel will choose the fairest time for the team."}
+              </p>
+            </div>
           </div>
         </section>
 

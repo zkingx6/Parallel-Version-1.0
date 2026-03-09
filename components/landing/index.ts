@@ -1,0 +1,11 @@
+export { Navbar } from "./Navbar";
+export { Hero } from "./Hero";
+export { Problem } from "./Problem";
+export { WhyCurrentToolsFail } from "./WhyCurrentToolsFail";
+export { ParallelSolution } from "./ParallelSolution";
+export { HowItWorks } from "./HowItWorks";
+export { ProductPreview } from "./ProductPreview";
+export { PricingPreview } from "./PricingPreview";
+export { FAQ } from "./FAQ";
+export { FinalCTA } from "./FinalCTA";
+export { Footer } from "./Footer";

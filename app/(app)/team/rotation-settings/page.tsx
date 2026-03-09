@@ -143,7 +143,7 @@ export default function RotationSettingsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-5 py-10 sm:px-8">
+    <main className="mx-auto max-w-4xl px-6 py-10">
       <PageBackLink href="/teams" className="mb-8">Back to Teams</PageBackLink>
 
       <header className="mb-10">
