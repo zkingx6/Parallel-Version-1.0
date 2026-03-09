@@ -35,13 +35,13 @@ export function MemberTopNav({
   const isAccount = pathname?.includes("/member-dashboard/account")
 
   const tabBase =
-    "inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-transparent transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    "inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-transparent transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
   const tabInactive =
-    "text-neutral-600 hover:bg-neutral-100 hover:border-neutral-200 hover:text-neutral-900"
-  const tabActive = "bg-neutral-100 border-neutral-200 text-neutral-900"
+    "text-muted-foreground hover:bg-accent/50 hover:border-border hover:text-foreground"
+  const tabActive = "bg-accent/60 border-border text-foreground"
 
   return (
-    <header className="relative z-10 w-full shrink-0 border-b border-border/40 bg-background">
+    <header className="relative z-10 w-full shrink-0 border-b border-border/40 bg-navbar backdrop-blur-sm">
       <div className="relative flex items-center justify-between h-16 pl-8 pr-8">
         {/* Left: Logo */}
         <div className="shrink-0">
@@ -77,8 +77,8 @@ export function MemberTopNav({
             <Link
               href={accountUrl}
               className={cn(
-                "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                isAccount && "ring-2 ring-neutral-300 ring-offset-2 ring-offset-background"
+                "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                isAccount && "ring-2 ring-ring ring-offset-2 ring-offset-background"
               )}
               aria-label="Account"
             >

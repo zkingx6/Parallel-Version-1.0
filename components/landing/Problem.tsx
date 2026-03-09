@@ -11,42 +11,57 @@ import {
 import { Container } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
-const problems = [
+const problemGroups = [
   {
     icon: Moon,
-    title: "Someone always takes the late meeting",
-    description:
-      "When teams span continents, one person often joins at 10pm so everyone else can meet during the day.",
-  },
-  {
-    icon: Repeat,
-    title: "The same teammate keeps adjusting",
-    description:
-      "Teams choose the time that works for most people — but over months, the same person often sacrifices every week.",
+    items: [
+      {
+        icon: Moon,
+        title: "Someone always takes the late meeting",
+        description:
+          "When teams span continents, one person often joins at 10pm so everyone else can meet during the day.",
+      },
+      {
+        icon: Repeat,
+        title: "The same teammate keeps adjusting",
+        description:
+          "Teams choose the time that works for most people — but over months, the same person often sacrifices every week.",
+      },
+    ],
   },
   {
     icon: Calendar,
-    title: "Scheduling tools don't track fairness",
-    description:
-      "Tools like Calendly help find a time, but they don't track who has already taken the burden.",
-  },
-  {
-    icon: BarChart3,
-    title: "Managers want fairness but lack visibility",
-    description:
-      "Leaders care about sharing inconvenience, but there is rarely a clear way to see who has already adjusted.",
+    items: [
+      {
+        icon: Calendar,
+        title: "Scheduling tools don't track fairness",
+        description:
+          "Tools like Calendly help find a time, but they don't track who has already taken the burden.",
+      },
+      {
+        icon: BarChart3,
+        title: "Managers want fairness but lack visibility",
+        description:
+          "Leaders care about sharing inconvenience, but there is rarely a clear way to see who has already adjusted.",
+      },
+    ],
   },
   {
     icon: Clock,
-    title: "Teams default to \"whatever works\"",
-    description:
-      "The easiest time gets picked again and again, even if it quietly disadvantages the same region.",
-  },
-  {
-    icon: RotateCcw,
-    title: "Manual rotation doesn't scale",
-    description:
-      "Trying to rotate meeting times across multiple time zones quickly becomes confusing and inconsistent.",
+    items: [
+      {
+        icon: Clock,
+        title: "Teams default to \"whatever works\"",
+        description:
+          "The easiest time gets picked again and again, even if it quietly disadvantages the same region.",
+      },
+      {
+        icon: RotateCcw,
+        title: "Manual rotation doesn't scale",
+        description:
+          "Trying to rotate meeting times across multiple time zones quickly becomes confusing and inconsistent.",
+      },
+    ],
   },
 ];
 
@@ -70,33 +85,39 @@ export function Problem() {
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
-          {problems.map((item) => (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-10">
+          {problemGroups.map((group) => (
             <div
-              key={item.title}
+              key={group.items[0].title}
               className={cn(
-                "group relative rounded-xl border-2 bg-card p-6 md:p-7",
-                "border-[#e0dfde] shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
+                "group relative rounded-2xl border bg-card p-8 md:p-10",
+                "border-border/50 shadow-sm",
                 "transition-all duration-200 ease-out",
-                "hover:border-primary/55 hover:shadow-[0_10px_32px_-8px_rgba(13,148,136,0.2)]",
+                "hover:border-primary/25 hover:shadow-md",
                 "hover:-translate-y-1"
               )}
             >
               <div
                 className={cn(
-                  "rounded-lg bg-primary/5 border border-primary/10 p-2.5 w-fit mb-4",
-                "transition-all duration-200 ease-out",
-                "group-hover:bg-primary/12 group-hover:border-primary/25"
+                  "rounded-xl bg-primary/5 border border-primary/10 p-3 w-fit mb-6",
+                  "transition-all duration-200 ease-out",
+                  "group-hover:bg-primary/10 group-hover:border-primary/20"
                 )}
               >
-                <item.icon className="size-4 text-primary transition-transform duration-200 group-hover:scale-[1.05]" strokeWidth={1.75} />
+                <group.icon className="size-5 text-primary transition-transform duration-200 group-hover:scale-[1.05]" strokeWidth={1.75} />
               </div>
-              <h3 className="font-semibold text-[#1c1b1a] text-[15px] leading-snug">
-                {item.title}
-              </h3>
-              <p className="mt-2.5 text-sm text-muted-foreground leading-relaxed">
-                {item.description}
-              </p>
+              <div className="space-y-6">
+                {group.items.map((item) => (
+                  <div key={item.title}>
+                    <h3 className="font-semibold text-foreground text-base leading-snug">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>

@@ -23,10 +23,9 @@ export function WhyCurrentToolsFail() {
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
           <div
             className={cn(
-              "rounded-xl border-2 border-[#e0dfde] bg-card p-8",
-              "shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
+              "rounded-xl border-2 border-border/60 bg-card p-8 shadow-sm",
               "transition-all duration-200 ease-out",
-              "hover:border-[#d4d3d2] hover:shadow-[0_10px_32px_-8px_rgba(0,0,0,0.08)]",
+              "hover:border-border hover:shadow-md",
               "hover:-translate-y-1"
             )}
           >
@@ -47,10 +46,9 @@ export function WhyCurrentToolsFail() {
 
           <div
             className={cn(
-              "rounded-xl border-2 border-primary/35 bg-primary/8 p-8",
-              "shadow-[0_4px_16px_-4px_rgba(13,148,136,0.15)]",
+              "rounded-xl border-2 border-primary/35 bg-primary/8 p-8 shadow-sm",
               "transition-all duration-200 ease-out",
-              "hover:border-primary/55 hover:shadow-[0_10px_32px_-8px_rgba(13,148,136,0.2)]",
+              "hover:border-primary/50 hover:shadow-md",
               "hover:-translate-y-1"
             )}
           >

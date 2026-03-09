@@ -3,8 +3,8 @@ import { headers } from "next/headers"
 import { createServerSupabase, createServiceSupabase } from "@/lib/supabase-server"
 import { SetupProvider } from "@/lib/setup-context"
 import { TopNav } from "@/components/parallel/top-nav"
-import { resolveOwnerAvatar } from "@/lib/avatar-resolver"
 import { resolvePostLoginRedirect } from "@/lib/actions"
+import { ensureProfileForUser, fetchProfilesForUserIds, resolveCurrentUserDisplay } from "@/lib/profile-resolver"
 
 export default async function AppLayout({
   children,
@@ -17,6 +17,11 @@ export default async function AppLayout({
   } = await supabase.auth.getUser()
 
   if (!user) redirect("/")
+
+  await ensureProfileForUser(supabase, user)
+  const profileMap = await fetchProfilesForUserIds([user.id])
+  const profile = profileMap.get(user.id)
+  const { userName, userAvatar } = resolveCurrentUserDisplay(user, profile)
 
   const pathname = (await headers()).get("x-pathname") ?? ""
   const scheduleMatch = pathname.match(/^\/schedule\/([^/]+)(?:\/|$)/)
@@ -50,13 +55,8 @@ export default async function AppLayout({
             <div className="min-h-screen">
               <TopNav
                 userEmail={user.email || ""}
-                userName={
-                  (user.user_metadata?.full_name as string) ||
-                  (user.user_metadata?.name as string) ||
-                  user.email?.split("@")[0] ||
-                  ""
-                }
-                userAvatar={resolveOwnerAvatar(user)}
+                userName={userName}
+                userAvatar={userAvatar}
               />
               {children}
             </div>
@@ -70,19 +70,11 @@ export default async function AppLayout({
   const target = await resolvePostLoginRedirect()
   if (target.startsWith("/member-dashboard")) redirect(target)
 
-  const userEmail = user.email || ""
-  const userName =
-    (user.user_metadata?.full_name as string) ||
-    (user.user_metadata?.name as string) ||
-    user.email?.split("@")[0] ||
-    ""
-  const userAvatar = resolveOwnerAvatar(user)
-
   return (
     <SetupProvider>
       <div className="min-h-screen">
         <TopNav
-          userEmail={userEmail}
+          userEmail={user.email || ""}
           userName={userName}
           userAvatar={userAvatar}
         />

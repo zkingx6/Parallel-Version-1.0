@@ -74,6 +74,9 @@ export function ScheduleDetailContent({
   scheduleBasePath = "/schedule",
   backHref,
   scheduleLinkParams,
+  demoMode,
+  onBack,
+  onAnalysisClick,
 }: {
   scheduleId: string
   scheduleName: string
@@ -87,6 +90,10 @@ export function ScheduleDetailContent({
   backHref?: string
   /** Query params for schedule links (e.g. token=...&memberId=...) */
   scheduleLinkParams?: string
+  /** When true, use demo handlers for navigation. */
+  demoMode?: boolean
+  onBack?: () => void
+  onAnalysisClick?: () => void
 }) {
   const backLink = backHref ?? scheduleBasePath
   const team = members.map(dbMemberToTeamMember).map((tm) => {
@@ -108,7 +115,9 @@ export function ScheduleDetailContent({
   if (!weeks.length) {
     return (
       <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-        <PageBackLink href={backLink}>Back to schedules</PageBackLink>
+        <PageBackLink href={demoMode ? undefined : backLink} onClick={demoMode ? onBack : undefined}>
+          Back to schedules
+        </PageBackLink>
         <div className="mb-10">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
             {scheduleName}
@@ -118,7 +127,7 @@ export function ScheduleDetailContent({
           <p className="text-sm text-muted-foreground">
             No schedule data available.
           </p>
-          <PageBackLink href={backLink} className="mt-2 mb-0">
+          <PageBackLink href={demoMode ? undefined : backLink} onClick={demoMode ? onBack : undefined} className="mt-2 mb-0">
             Back to schedules
           </PageBackLink>
         </div>
@@ -141,7 +150,9 @@ export function ScheduleDetailContent({
 
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-      <PageBackLink href={backLink}>Back to schedules</PageBackLink>
+      <PageBackLink href={demoMode ? undefined : backLink} onClick={demoMode ? onBack : undefined}>
+        Back to schedules
+      </PageBackLink>
       <div className="mb-10">
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
           {scheduleName}
@@ -150,18 +161,29 @@ export function ScheduleDetailContent({
           <p className="min-w-0 text-sm text-muted-foreground">
             {meeting.title} — time rotates, burden distributed transparently.
           </p>
-          <Button
-            asChild
-            variant="default"
-            size="sm"
-            className="shrink-0"
-          >
-            <Link
-              href={`${scheduleBasePath}/${scheduleId}/analysis${scheduleLinkParams ? `?${scheduleLinkParams}` : ""}`}
+          {demoMode && onAnalysisClick ? (
+            <Button
+              variant="default"
+              size="sm"
+              className="shrink-0"
+              onClick={onAnalysisClick}
             >
-              Rotation analysis
-            </Link>
-          </Button>
+              View rotation analysis
+            </Button>
+          ) : (
+            <Button
+              asChild
+              variant="default"
+              size="sm"
+              className="shrink-0"
+            >
+              <Link
+                href={`${scheduleBasePath}/${scheduleId}/analysis${scheduleLinkParams ? `?${scheduleLinkParams}` : ""}`}
+              >
+                Rotation analysis
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -223,7 +245,9 @@ export function ScheduleDetailContent({
         </section>
 
         <div className="pt-4">
-          <PageBackLink href={backLink} className="mb-0">Back to schedules</PageBackLink>
+          <PageBackLink href={demoMode ? undefined : backLink} onClick={demoMode ? onBack : undefined} className="mb-0">
+            Back to schedules
+          </PageBackLink>
         </div>
       </div>
     </main>

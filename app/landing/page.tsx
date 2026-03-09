@@ -4,8 +4,8 @@ import {
   Problem,
   WhyCurrentToolsFail,
   ParallelSolution,
+  NoPerfectTime,
   HowItWorks,
-  ProductPreview,
   PricingPreview,
   FAQ,
   FinalCTA,
@@ -20,8 +20,8 @@ export default function LandingPage() {
       <Problem />
       <WhyCurrentToolsFail />
       <ParallelSolution />
+      <NoPerfectTime />
       <HowItWorks />
-      <ProductPreview />
       <PricingPreview />
       <FAQ />
       <FinalCTA />

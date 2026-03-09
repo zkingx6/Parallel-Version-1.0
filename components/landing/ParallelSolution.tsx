@@ -43,7 +43,7 @@ export function ParallelSolution() {
             <div
               key={item.title}
               className={cn(
-                "group relative rounded-xl border-2 border-[#e0dfde] bg-background p-6 lg:p-8",
+                "group relative rounded-xl border-2 border-border/60 bg-card p-6 lg:p-8 shadow-sm",
                 "shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
                 "transition-all duration-200 ease-out",
                 "hover:border-primary/55 hover:shadow-[0_10px_32px_-8px_rgba(13,148,136,0.2)]",

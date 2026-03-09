@@ -503,8 +503,8 @@ export function DemoSchedulerPreview() {
   const fullConfig = buildDemoMeetingConfig(demoConfig);
 
   return (
-    <div className="flex flex-col rounded-2xl border border-border/50 bg-card shadow-[0_8px_30px_-8px_rgba(44,43,42,0.12)] overflow-hidden w-full max-w-5xl mx-auto h-[680px]">
-      <div className="flex-shrink-0 border-b border-border bg-background/80 flex items-center gap-3 px-4 py-3">
+    <div className="flex flex-col rounded-2xl border border-border/50 bg-background shadow-md overflow-hidden w-full max-w-5xl mx-auto h-[600px]">
+      <div className="shrink-0 border-b border-border/40 bg-navbar flex items-center gap-3 px-4 py-3">
         <div className="flex gap-2" aria-hidden="true">
           <span className="size-3 rounded-full bg-[#FF5F57]" />
           <span className="size-3 rounded-full bg-[#FFBD2E]" />
@@ -514,7 +514,7 @@ export function DemoSchedulerPreview() {
           Parallel — Demo
         </span>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-8 lg:p-10">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-background p-5 sm:p-8 lg:p-10">
         {view === "teams" && (
           <DemoTeamsView onSelectTeam={handleSelectTeam} />
         )}

@@ -9,28 +9,28 @@ const steps = [
     icon: Users,
     title: "Add your team",
     description:
-      "Add members and their time zones. The system uses IANA timezones for accuracy.",
+      "Add members, time zones, and non-negotiable limits.",
   },
   {
     step: 2,
     icon: Calendar,
     title: "Define availability",
     description:
-      "Set meeting preferences, frequency, and acceptable windows. The system captures your constraints.",
+      "Set cadence, meeting length, acceptable windows, and hard boundaries.",
   },
   {
     step: 3,
     icon: Shuffle,
-    title: "Generate rotation",
+    title: "Generate the fairest rotation",
     description:
-      "The algorithm computes a fair rotation—balancing who takes the late meeting or early call across the team over time.",
+      "When no perfect time exists, Parallel computes a rotation that distributes inconvenience more fairly across the team.",
   },
   {
     step: 4,
     icon: Share2,
     title: "Share the schedule",
     description:
-      "Export or sync the rotation. Everyone sees who adjusts when.",
+      "Share the plan with transparent reasoning so everyone sees who adjusts and when.",
   },
 ];
 
@@ -55,7 +55,7 @@ export function HowItWorks() {
           {steps.map((item, i) => (
             <div key={item.step} className="flex items-stretch lg:min-w-0">
               <div
-                className="relative flex-1 flex flex-col sm:flex-row sm:items-start gap-3 rounded-xl p-4 lg:p-5 border border-[#e0dfde] bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 ease-out hover:border-primary/35 hover:shadow-[0_6px_20px_-6px_rgba(13,148,136,0.12)] hover:-translate-y-0.5"
+                className="relative flex-1 flex flex-col sm:flex-row sm:items-start gap-3 rounded-xl p-4 lg:p-5 border border-border/60 bg-card shadow-sm transition-all duration-200 ease-out hover:border-primary/35 hover:shadow-md hover:-translate-y-0.5"
               >
                 <span className="flex shrink-0 size-8 rounded-full items-center justify-center text-xs font-semibold bg-primary text-primary-foreground ring-2 ring-primary/15 ring-offset-2">
                   {item.step}

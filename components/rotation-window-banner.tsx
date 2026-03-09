@@ -18,31 +18,31 @@ export function RotationWindowBanner() {
   const isOpen = mockState.phase === "open"
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-neutral-200 bg-neutral-50 px-6 py-4 md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-4 rounded-xl border border-border/50 bg-muted/30 px-6 py-4 md:flex-row md:items-center md:justify-between">
       {/* Left section */}
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium uppercase tracking-wider text-neutral-500">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Rotation Window
         </p>
-        <p className="mt-0.5 text-base font-medium text-neutral-800">
+        <p className="mt-0.5 text-base font-medium text-foreground">
           {isOpen
             ? "Availability updates are OPEN"
             : "Rotation inputs are LOCKED"}
         </p>
-        <p className="mt-0.5 text-sm text-neutral-500">
+        <p className="mt-0.5 text-sm text-muted-foreground">
           Deadline: {mockState.deadlineText}
         </p>
       </div>
 
       {/* Center section */}
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-neutral-400 transition-all"
+            className="h-full rounded-full bg-primary/60 transition-all"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted-foreground">
           {mockState.updatesSubmitted} of {mockState.totalMembers} members
           updated availability
         </p>
@@ -51,11 +51,11 @@ export function RotationWindowBanner() {
       {/* Right section */}
       <div className="shrink-0">
         {isOpen ? (
-          <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800">
+          <span className="inline-flex items-center rounded-full bg-primary/15 px-3 py-1 text-sm font-medium text-primary">
             Locking in {mockState.hoursRemaining} hours
           </span>
         ) : (
-          <span className="inline-flex items-center rounded-full bg-neutral-200 px-3 py-1 text-sm font-medium text-neutral-600">
+          <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-sm font-medium text-muted-foreground">
             Locked for next rotation
           </span>
         )}

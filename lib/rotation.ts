@@ -1408,6 +1408,11 @@ export function alternatingPatternJitter(weeks: Array<{ utcHour: number }>): num
   return varianceOf(evens) + varianceOf(odds)
 }
 
+/** Count distinct UTC hours in a plan. Used as tie-breaker to prefer more varied slots. */
+function uniqueSlotCount(weeks: Array<{ utcHour: number }>): number {
+  return new Set(weeks.map((w) => w.utcHour)).size
+}
+
 function debugLogPlanMetrics(
   team: TeamMember[],
   burden: Record<string, number>,
@@ -1656,6 +1661,9 @@ function fairnessGuaranteeBeamSearch(
       if (a.totalPenalty !== b.totalPenalty) return a.totalPenalty - b.totalPenalty
       if (a.totalSlotDeviation !== b.totalSlotDeviation)
         return a.totalSlotDeviation - b.totalSlotDeviation
+      const varietyA = uniqueSlotCount(a.weeks)
+      const varietyB = uniqueSlotCount(b.weeks)
+      if (varietyA !== varietyB) return varietyB - varietyA
       const jitterA = alternatingPatternJitter(a.weeks)
       const jitterB = alternatingPatternJitter(b.weeks)
       if (jitterA !== jitterB) return jitterA - jitterB
@@ -1819,6 +1827,9 @@ function runFallbackBeamNoPruning(
       if (a.totalPenalty !== b.totalPenalty) return a.totalPenalty - b.totalPenalty
       if (a.totalSlotDeviation !== b.totalSlotDeviation)
         return a.totalSlotDeviation - b.totalSlotDeviation
+      const varietyA = uniqueSlotCount(a.weeks)
+      const varietyB = uniqueSlotCount(b.weeks)
+      if (varietyA !== varietyB) return varietyB - varietyA
       const jitterA = alternatingPatternJitter(a.weeks)
       const jitterB = alternatingPatternJitter(b.weeks)
       if (jitterA !== jitterB) return jitterA - jitterB

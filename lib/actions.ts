@@ -266,12 +266,6 @@ export async function updateProfile(formData: FormData) {
   const displayName = (formData.get("displayName") as string)?.trim() ?? ""
   if (!displayName) return { error: "Display name is required." }
 
-  const newEmail = (formData.get("email") as string)?.trim()
-  if (newEmail && newEmail !== user.email) {
-    const { error: emailError } = await supabase.auth.updateUser({ email: newEmail })
-    if (emailError) return { error: emailError.message }
-  }
-
   const removeAvatar = formData.get("removeAvatar") === "1" || formData.get("removeAvatar") === "true"
   const avatarFile = formData.get("avatar") as File | null
   let avatarUrl: string | null =
@@ -318,15 +312,15 @@ export async function updateProfile(formData: FormData) {
 
   // Upsert profiles table (canonical source for display)
   try {
-    const serviceSupabase = createServiceSupabase()
-    await serviceSupabase.from("profiles").upsert(
+    await supabase.from("profiles").upsert(
       {
-        id: user.id,
+        user_id: user.id,
+        email: user.email ?? null,
         full_name: displayName,
         avatar_url: removeAvatar ? null : (avatarUrl ?? null),
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "id" }
+      { onConflict: "user_id" }
     )
   } catch {
     /* profiles table may not exist yet; auth still has the data */

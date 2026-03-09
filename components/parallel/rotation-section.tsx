@@ -17,6 +17,7 @@ import {
   parseTimeToMinutes,
   type NoViableTimeResult,
   type RotationResult,
+  type RotationWeekData,
 } from "@/lib/types"
 import { DateTime } from "luxon"
 import {
@@ -490,8 +491,8 @@ function NoViableTimePanel({
                   key={s.id}
                   className={`rounded-lg border p-4 space-y-2 transition-colors cursor-pointer ${
                     isRecommended
-                      ? "border-teal-700/40 bg-teal-50/30 hover:border-teal-700/60 hover:bg-teal-50/40 dark:border-teal-400/30 dark:bg-teal-950/20 dark:hover:border-teal-400/50 dark:hover:bg-teal-950/30"
-                      : "border-gray-200 bg-white dark:border-border/50 dark:bg-muted/20 hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20"
+                      ? "border-primary/40 bg-primary/10 hover:border-primary/60 hover:bg-primary/15"
+                      : "border-border/50 bg-card hover:border-primary/30 hover:bg-primary/5"
                   }`}
                 >
                   <h5 className="text-sm font-medium text-foreground">
@@ -508,7 +509,7 @@ function NoViableTimePanel({
                     size="sm"
                     className={
                       isRecommended
-                        ? "mt-2 rounded-full px-6 py-3 bg-teal-700 text-white hover:bg-teal-800 border-teal-700 hover:border-teal-800"
+                        ? "mt-2 rounded-full px-6 py-3 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
                         : "mt-2 rounded-full px-6 py-3"
                     }
                     onClick={() => handleApplyClick(s)}
@@ -553,13 +554,32 @@ export function RotationSection({
   meeting: initialMeeting,
   members: initialMembers,
   membersDisplay,
+  demoMode,
+  onBack,
+  onUpdateMeeting,
+  onPublishSchedule,
 }: {
   meeting: DbMeeting
   members: DbMemberSubmission[]
   /** Resolved display data from profiles/auth (canonical). memberId -> { name, avatarUrl } */
   membersDisplay: Map<string, { name: string; avatarUrl: string }>
+  /** When true, use demo handlers instead of server actions. */
+  demoMode?: boolean
+  /** When provided (e.g. in demo mode), used for Back to team instead of href. */
+  onBack?: () => void
+  onUpdateMeeting?: (id: string, patch: Record<string, unknown>) => void
+  onPublishSchedule?: (params: {
+    meetingId: string
+    meetingTitle: string
+    weeks: unknown[]
+    modeUsed: string
+    explain: unknown
+  }) => void
 }) {
   const [meeting, setMeeting] = useState(initialMeeting)
+  useEffect(() => {
+    setMeeting(initialMeeting)
+  }, [initialMeeting])
   const ownerTimezoneIana = getOwnerTimezoneIana(initialMembers)
   const displayTimezoneInitial = ensureDisplayTimezoneIana(
     initialMeeting.display_timezone ?? ownerTimezoneIana ?? "America/New_York"
@@ -576,6 +596,7 @@ export function RotationSection({
 
   const lastPersistedMeetingId = useRef<string | null>(null)
   useEffect(() => {
+    if (demoMode) return
     if (
       lastPersistedMeetingId.current === initialMeeting.id ||
       initialMeeting.display_timezone != null ||
@@ -586,8 +607,9 @@ export function RotationSection({
     updateMeetingConfig(initialMeeting.id, { display_timezone: ownerTimezoneIana }).then(() => {
       setMeeting((prev) => ({ ...prev, display_timezone: ownerTimezoneIana }))
     })
-  }, [initialMeeting.id, initialMeeting.display_timezone, ownerTimezoneIana])
+  }, [demoMode, initialMeeting.id, initialMeeting.display_timezone, ownerTimezoneIana])
   const [rotationResult, setRotationResult] = useState<RotationResult | null>(null)
+  const [orderedWeeks, setOrderedWeeks] = useState<RotationWeekData[] | null>(null)
   const [noViableResult, setNoViableResult] = useState<NoViableTimeResult | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [rotationError, setRotationError] = useState<string | null>(null)
@@ -597,7 +619,7 @@ export function RotationSection({
   const [previewRelaxedMemberName, setPreviewRelaxedMemberName] = useState<string | null>(null)
   const router = useRouter()
 
-  const rotation = rotationResult?.weeks ?? null
+  const rotation = orderedWeeks ?? rotationResult?.weeks ?? null
 
   const team = initialMembers.map((m) => {
     const tm = dbMemberToTeamMember(m)
@@ -636,12 +658,17 @@ export function RotationSection({
     async (updates: Record<string, number | string | null>) => {
       setMeeting((prev) => ({ ...prev, ...updates }))
       setRotationResult(null)
-      await updateMeetingConfig(meeting.id, updates)
+      if (demoMode && onUpdateMeeting) {
+        onUpdateMeeting(meeting.id, updates)
+      } else {
+        await updateMeetingConfig(meeting.id, updates)
+      }
     },
-    [meeting.id]
+    [demoMode, meeting.id, onUpdateMeeting]
   )
 
   useEffect(() => {
+    if (demoMode) return
     if (
       meeting.base_time_minutes == null &&
       meeting.anchor_offset !== 0
@@ -650,7 +677,7 @@ export function RotationSection({
         setMeeting((prev) => ({ ...prev, anchor_offset: 0 }))
       })
     }
-  }, [meeting.id, meeting.base_time_minutes, meeting.anchor_offset])
+  }, [demoMode, meeting.id, meeting.base_time_minutes, meeting.anchor_offset])
 
   const handleGenerate = () => {
     console.log("[DEBUG] Plan button clicked")
@@ -696,6 +723,7 @@ export function RotationSection({
     console.log("[DEBUG] Team length:", team?.length)
     setIsGenerating(true)
     setRotationResult(null)
+    setOrderedWeeks(null)
     setNoViableResult(null)
     setRotationError(null)
     setIsPreviewFromRelaxedConstraint(false)
@@ -720,6 +748,7 @@ export function RotationSection({
           setRotationError("No viable rotation with current boundaries.")
         } else if (isRotationResult(result)) {
           setRotationResult(result)
+          setOrderedWeeks(null)
           if (
             typeof process !== "undefined" &&
             process.env.NEXT_PUBLIC_DEBUG_ROTATION === "1"
@@ -777,6 +806,7 @@ export function RotationSection({
             setNoViableResult(null)
           } else if (isRotationResult(result)) {
             setRotationResult(result)
+            setOrderedWeeks(null)
             setNoViableResult(null)
             setRotationError(null)
             setIsPreviewFromRelaxedConstraint(true)
@@ -798,20 +828,31 @@ export function RotationSection({
   )
 
   const handlePublishSchedule = async () => {
-    if (!rotationResult?.weeks?.length) return
+    const weeksToPublish = orderedWeeks ?? rotationResult?.weeks
+    if (!weeksToPublish?.length || !rotationResult) return
     setIsPublishing(true)
     try {
-      const result = await createScheduleRecord(meeting.id, meeting.title, {
-        weeks: rotationResult.weeks,
-        modeUsed: rotationResult.modeUsed,
-        explain: rotationResult.explain,
-      })
-      if (result?.error) {
-        setRotationError(result.error)
-        return
-      }
-      if (result?.data?.id) {
-        router.push(`/schedule/${result.data.id}`)
+      if (demoMode && onPublishSchedule) {
+        onPublishSchedule({
+          meetingId: meeting.id,
+          meetingTitle: meeting.title,
+          weeks: weeksToPublish,
+          modeUsed: rotationResult.modeUsed,
+          explain: rotationResult.explain,
+        })
+      } else {
+        const result = await createScheduleRecord(meeting.id, meeting.title, {
+          weeks: weeksToPublish,
+          modeUsed: rotationResult.modeUsed,
+          explain: rotationResult.explain,
+        })
+        if (result?.error) {
+          setRotationError(result.error)
+          return
+        }
+        if (result?.data?.id) {
+          router.push(`/schedule/${result.data.id}`)
+        }
       }
     } finally {
       setIsPublishing(false)
@@ -861,7 +902,7 @@ export function RotationSection({
                 onChange={(v) => handleConfigChange({ day_of_week: v })}
                 options={DAYS}
               />
-              {meeting.base_time_minutes != null ? (
+              {meeting.base_time_minutes != null && (
                 <>
                   <span>at</span>
                   <BaseTimePicker
@@ -870,8 +911,6 @@ export function RotationSection({
                     onChange={(v) => handleConfigChange({ base_time_minutes: v })}
                   />
                 </>
-              ) : (
-                <span className="inline-block w-30 shrink-0" aria-hidden />
               )}
               <span>for</span>
               <InlineSelect
@@ -1047,7 +1086,7 @@ export function RotationSection({
         {noViableResult && !isGenerating && (
           <>
             {rotationError === "PREVIEW_NO_OVERLAP" && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-950/30 px-4 py-3 text-sm text-muted-foreground animate-in fade-in-0 duration-300 mb-4">
+              <div className="rounded-lg border border-stretch/40 bg-stretch/15 px-4 py-3 text-sm text-muted-foreground animate-in fade-in-0 duration-300 mb-4">
                 <p>Even with this option, the team still has no overlapping meeting window.</p>
                 <p className="mt-1.5 text-xs text-muted-foreground/90">You may need to adjust member availability or remove some constraints.</p>
               </div>
@@ -1068,7 +1107,7 @@ export function RotationSection({
         {rotation && !isGenerating && (
           <>
             {isPreviewFromRelaxedConstraint && (
-              <div className="rounded-lg border border-teal-200 bg-teal-50/50 dark:border-teal-800/50 dark:bg-teal-950/30 px-4 py-3 text-sm text-muted-foreground animate-in fade-in-0 duration-300 space-y-1.5">
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-muted-foreground animate-in fade-in-0 duration-300 space-y-1.5">
                 <p>Preview generated using relaxed constraints. Member settings have not been changed.</p>
                 {previewRelaxedMemberName && (
                   <p>To generate this preview, one hard boundary was temporarily relaxed for {previewRelaxedMemberName}.</p>
@@ -1080,17 +1119,17 @@ export function RotationSection({
               team={team}
               displayTimezone={displayTimezoneIana}
               useBaseTime={useFixedBaseTime}
+              reorderable
+              onReorder={setOrderedWeeks}
+              weekStartConfig={{
+                dayOfWeek: meeting.day_of_week,
+                startDateIso: meeting.start_date ?? undefined,
+              }}
             />
             {rotationResult?.explain?.weeks?.some((w) => w.unavoidableMaxMemberId) && (
               <p className="text-sm text-muted-foreground">
                 Given the current hard limits, at least one member had to take a
                 late/early meeting in some weeks.
-              </p>
-            )}
-            {rotationResult?.explain?.weeks?.some((w) => w.rotationForced) && (
-              <p className="text-sm text-muted-foreground">
-                In some weeks, rotation was not possible without exceeding limits —
-                the same member had to take the late/early slot.
               </p>
             )}
             <section className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both">
@@ -1148,7 +1187,7 @@ export function RotationSection({
               <Button
                 variant="outline"
                 size="lg"
-                className="w-full sm:w-auto h-12 text-sm font-medium rounded-xl border-emerald-500/60 text-emerald-600 hover:bg-emerald-500/10 hover:border-emerald-500/80 hover:text-emerald-700 dark:text-emerald-400 dark:border-emerald-400/50 dark:hover:bg-emerald-500/15 dark:hover:border-emerald-400/70"
+                className="w-full sm:w-auto h-12 text-sm font-medium rounded-xl border-primary/40 text-primary hover:bg-primary/10 hover:border-primary/60"
                 onClick={() => setAnalysisOpen(true)}
               >
                 View rotation analysis
@@ -1166,7 +1205,11 @@ export function RotationSection({
         )}
 
         <div className="pt-4">
-          <PageBackLink href={`/team/${meeting.id}`} className="mb-0">Back to team</PageBackLink>
+          {demoMode && onBack ? (
+            <PageBackLink onClick={onBack} className="mb-0">Back to team</PageBackLink>
+          ) : (
+            <PageBackLink href={`/team/${meeting.id}`} className="mb-0">Back to team</PageBackLink>
+          )}
         </div>
       </div>
 

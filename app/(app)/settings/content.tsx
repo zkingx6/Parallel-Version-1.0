@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { PageBackLink } from "@/components/ui/page-back-link"
 import { SignOutButton } from "@/components/ui/sign-out-button"
 import { ChangePasswordModal } from "@/components/account/change-password-modal"
+import { ChangeEmailModal } from "@/components/account/change-email-modal"
 import { SignOutConfirmModal } from "@/components/account/sign-out-confirm-modal"
 import { updateProfile } from "@/lib/actions"
 
@@ -40,6 +41,7 @@ export function SettingsContent({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarRemoved, setAvatarRemoved] = useState(false)
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const [changeEmailOpen, setChangeEmailOpen] = useState(false)
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
 
   const handleBack = () => {
@@ -177,22 +179,20 @@ export function SettingsContent({
             </div>
             <div>
               <label
-                htmlFor="edit-email"
+                htmlFor="edit-email-display"
                 className="block text-sm font-medium mb-1.5"
               >
                 Email
               </label>
               <Input
-                id="edit-email"
-                name="email"
-                type="email"
-                defaultValue={userEmail}
-                placeholder="you@example.com"
-                disabled={saving}
-                className="w-full"
+                id="edit-email-display"
+                type="text"
+                value={userEmail || "—"}
+                readOnly
+                className="bg-muted/50 cursor-default"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Changing email requires confirmation. A link will be sent to the new address.
+                Email is part of your account identity. To change it, use the Security section below.
               </p>
             </div>
             <div>
@@ -301,6 +301,15 @@ export function SettingsContent({
           <div>
             <button
               type="button"
+              onClick={() => setChangeEmailOpen(true)}
+              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              Change email
+            </button>
+          </div>
+          <div>
+            <button
+              type="button"
               onClick={() => setChangePasswordOpen(true)}
               className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
             >
@@ -313,6 +322,12 @@ export function SettingsContent({
         </div>
       </section>
 
+      <ChangeEmailModal
+        open={changeEmailOpen}
+        onOpenChange={setChangeEmailOpen}
+        currentEmail={userEmail}
+        onSuccess={() => router.refresh()}
+      />
       <ChangePasswordModal
         open={changePasswordOpen}
         onOpenChange={setChangePasswordOpen}

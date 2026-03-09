@@ -36,6 +36,13 @@ export function TeamSection({
   members: initialMembers,
   userEmail,
   membersDisplay,
+  demoMode,
+  hideOwnerActions,
+  onBack,
+  onConfigureRotation,
+  onUpdateMeeting,
+  onDeleteMember,
+  onAddOwner,
 }: {
   meeting: DbMeeting
   members: DbMemberSubmission[]
@@ -43,6 +50,15 @@ export function TeamSection({
   userEmail: string
   /** Resolved display data from profiles/auth (canonical). memberId -> { name, avatarUrl } */
   membersDisplay: Map<string, { name: string; avatarUrl: string }>
+  /** When true, use demo handlers instead of server actions. */
+  demoMode?: boolean
+  /** When true, hide configure rotation and other owner-only actions. */
+  hideOwnerActions?: boolean
+  onBack?: () => void
+  onConfigureRotation?: () => void
+  onUpdateMeeting?: (id: string, patch: Partial<DbMeeting>) => void
+  onDeleteMember?: (memberId: string) => void
+  onAddOwner?: (payload: Parameters<typeof upsertOwnerParticipant>[1]) => Promise<void>
 }) {
   const [meeting, setMeeting] = useState(initialMeeting)
   const [members, setMembers] = useState(initialMembers)
@@ -78,9 +94,15 @@ export function TeamSection({
     if (!trimmed) return
     setRenameSaving(true)
     try {
-      await updateMeetingConfig(meeting.id, { title: trimmed })
-      setMeeting((prev) => ({ ...prev, title: trimmed }))
-      setRenameModalOpen(false)
+      if (demoMode && onUpdateMeeting) {
+        onUpdateMeeting(meeting.id, { title: trimmed })
+        setMeeting((prev) => ({ ...prev, title: trimmed }))
+        setRenameModalOpen(false)
+      } else {
+        await updateMeetingConfig(meeting.id, { title: trimmed })
+        setMeeting((prev) => ({ ...prev, title: trimmed }))
+        setRenameModalOpen(false)
+      }
     } finally {
       setRenameSaving(false)
     }
@@ -99,6 +121,11 @@ export function TeamSection({
   const handleOwnerSubmit = async (
     payload: Parameters<typeof upsertOwnerParticipant>[1]
   ) => {
+    if (demoMode) {
+      if (onAddOwner) await onAddOwner(payload)
+      setOwnerModalOpen(false)
+      return
+    }
     setOwnerSaving(true)
     try {
       const result = await upsertOwnerParticipant(meeting.id, payload)
@@ -116,6 +143,7 @@ export function TeamSection({
   }
 
   const handleRefresh = async () => {
+    if (demoMode) return
     setRefreshing(true)
     const { data } = await supabase
       .from("member_submissions")
@@ -128,6 +156,12 @@ export function TeamSection({
   }
 
   const handleDeleteMember = async (memberId: string) => {
+    if (demoMode && onDeleteMember) {
+      onDeleteMember(memberId)
+      setMembers((prev) => prev.filter((m) => m.id !== memberId))
+      setConfirmRemoveId(null)
+      return
+    }
     await deleteMemberAction(memberId, meeting.id)
     setMembers((prev) => prev.filter((m) => m.id !== memberId))
     setConfirmRemoveId(null)
@@ -135,20 +169,28 @@ export function TeamSection({
 
   return (
     <main className="mx-auto max-w-2xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
-      <PageBackLink href="/teams" className="mb-6">Back to Teams</PageBackLink>
+      <PageBackLink
+        href={demoMode ? undefined : "/teams"}
+        onClick={demoMode ? onBack : undefined}
+        className="mb-6"
+      >
+        Back to Teams
+      </PageBackLink>
       <div className="mb-10">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
             {meeting.title}
           </h1>
-          <button
-            type="button"
-            onClick={handleRenameOpen}
-            className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-            aria-label="Rename team"
-          >
-            <PencilIcon className="size-4" />
-          </button>
+          {!hideOwnerActions && (
+            <button
+              type="button"
+              onClick={handleRenameOpen}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+              aria-label="Rename team"
+            >
+              <PencilIcon className="size-4" />
+            </button>
+          )}
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
           Invite your team, then plan a fair rotation.
@@ -263,33 +305,35 @@ export function TeamSection({
           </DialogContent>
         </Dialog>
 
-        <section>
-          <div className="mb-5">
-            <h2 className="text-lg font-semibold tracking-tight">
-              Invite link
-            </h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Share this link with your team. They set their own timezone and
-              boundaries.
-            </p>
-          </div>
-          <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm flex items-center gap-3">
-            <code className="flex-1 text-xs text-muted-foreground truncate bg-muted/30 rounded-lg px-3 py-2">
-              {inviteUrl || "Loading…"}
-            </code>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyLink}
-              className={cn(
-                "text-xs h-8 shrink-0",
-                copied && "bg-primary/10 text-primary border-primary/30"
-              )}
-            >
-              {copied ? "Copied" : "Copy"}
-            </Button>
-          </div>
-        </section>
+        {!hideOwnerActions && (
+          <section>
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold tracking-tight">
+                Invite link
+              </h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Share this link with your team. They set their own timezone and
+                boundaries.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm flex items-center gap-3">
+              <code className="flex-1 text-xs text-muted-foreground truncate bg-muted/30 rounded-lg px-3 py-2">
+                {inviteUrl || "Loading…"}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyLink}
+                className={cn(
+                  "text-xs h-8 shrink-0",
+                  copied && "bg-primary/10 text-primary border-primary/30"
+                )}
+              >
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
+          </section>
+        )}
 
         <section>
           <div className="mb-5 flex items-center justify-between">
@@ -393,52 +437,54 @@ export function TeamSection({
                             )}
                           </div>
                         </div>
-                        <div
-                          className="flex items-center gap-1.5 shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {confirmRemoveId === m.id ? (
-                            <>
-                              <span className="text-[11px] text-muted-foreground">
-                                Remove member?
-                              </span>
-                              <button
-                                onClick={() => setConfirmRemoveId(null)}
-                                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                className="h-6 px-2 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
-                                onClick={() => handleDeleteMember(m.id)}
-                              >
-                                Remove
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              {m.is_owner_participant && (
+                        {!hideOwnerActions && (
+                          <div
+                            className="flex items-center gap-1.5 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {confirmRemoveId === m.id ? (
+                              <>
+                                <span className="text-[11px] text-muted-foreground">
+                                  Remove member?
+                                </span>
                                 <button
-                                  onClick={() => setOwnerModalOpen(true)}
-                                  className="text-xs text-primary hover:text-primary/80 transition-colors cursor-pointer"
+                                  onClick={() => setConfirmRemoveId(null)}
+                                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                                 >
-                                  Edit
+                                  Cancel
                                 </button>
-                              )}
-                              {!m.is_owner_participant && (
-                                <button
-                                  onClick={() => setConfirmRemoveId(m.id)}
-                                  className="text-muted-foreground/30 hover:text-destructive transition-colors text-lg px-0.5 cursor-pointer"
-                                  aria-label="Remove member"
+                                <Button
+                                  size="xs"
+                                  variant="outline"
+                                  className="h-6 px-2 text-[11px] text-destructive border-destructive/30 hover:bg-destructive/10"
+                                  onClick={() => handleDeleteMember(m.id)}
                                 >
-                                  ×
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
+                                  Remove
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                {m.is_owner_participant && (
+                                  <button
+                                    onClick={() => setOwnerModalOpen(true)}
+                                    className="text-xs text-primary hover:text-primary/80 transition-colors cursor-pointer"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+                                {!m.is_owner_participant && (
+                                  <button
+                                    onClick={() => setConfirmRemoveId(m.id)}
+                                    className="text-muted-foreground/30 hover:text-destructive transition-colors text-lg px-0.5 cursor-pointer"
+                                    aria-label="Remove member"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {isExpanded && (
@@ -476,21 +522,35 @@ export function TeamSection({
           )}
         </section>
 
-        <div className="pt-4">
-          <Button
-            asChild
-            variant="default"
-            size="sm"
-          >
-            <Link
-              href={`/rotation/${meeting.id}`}
-              className="inline-flex items-center gap-1.5"
-            >
-              <span aria-hidden>→</span>
-              Configure rotation & plan schedule
-            </Link>
-          </Button>
-        </div>
+        {!hideOwnerActions && (
+          <div className="pt-4">
+            {demoMode && onConfigureRotation ? (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onConfigureRotation}
+                className="inline-flex items-center gap-1.5"
+              >
+                <span aria-hidden>→</span>
+                Configure rotation & plan schedule
+              </Button>
+            ) : (
+              <Button
+                asChild
+                variant="default"
+                size="sm"
+              >
+                <Link
+                  href={`/rotation/${meeting.id}`}
+                  className="inline-flex items-center gap-1.5"
+                >
+                  <span aria-hidden>→</span>
+                  Configure rotation & plan schedule
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </main>
   )

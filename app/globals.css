@@ -38,6 +38,7 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-navbar: var(--navbar);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -55,6 +56,7 @@
   --radius: 0.75rem;
   --background: oklch(0.977 0.004 75);
   --foreground: oklch(0.17 0.008 75);
+  --navbar: #ECF7F3;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.17 0.008 75);
   --popover: oklch(1 0 0);
@@ -148,4 +150,32 @@
 
 .nav-link-active {
   @apply text-foreground font-medium;
+}
+
+/* DaisyUI-style text-rotate: one phrase visible at a time, vertical slide animation */
+.text-rotate {
+  display: inline-block;
+  overflow: hidden;
+  height: 1.5em;
+  line-height: 1.5em;
+  vertical-align: middle;
+}
+.text-rotate > span {
+  display: block;
+  animation: text-rotate-anim 10s infinite;
+}
+.text-rotate:hover > span {
+  animation-play-state: paused;
+}
+.text-rotate > span > span {
+  display: block;
+  height: 1.5em;
+  line-height: 1.5em;
+}
+@keyframes text-rotate-anim {
+  0%, 24.99% { transform: translateY(0); }
+  25%, 49.99% { transform: translateY(-25%); }
+  50%, 74.99% { transform: translateY(-50%); }
+  75%, 99.99% { transform: translateY(-75%); }
+  100% { transform: translateY(0); }
 }

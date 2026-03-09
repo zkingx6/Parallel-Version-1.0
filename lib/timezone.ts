@@ -244,3 +244,43 @@ export function getTimezoneDisplayLabel(iana: string): string {
   return getTimezoneDisplayLabelNow(iana)
 }
 
+/**
+ * Week 1 start date for schedule display. Used when reordering weeks.
+ * Matches rotation engine logic: startDateIso if set, else next occurrence of dayOfWeek.
+ */
+function getNextMeetingDayUtc(dayOfWeek: number): DateTime {
+  const now = DateTime.utc()
+  const current = now.weekday
+  let daysUntil = dayOfWeek - current
+  if (daysUntil <= 0) daysUntil += 7
+  return now.plus({ days: daysUntil }).startOf("day")
+}
+
+export function getWeekStartForSchedule(
+  dayOfWeek: number,
+  startDateIso?: string | null
+): DateTime {
+  if (
+    startDateIso &&
+    typeof startDateIso === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(startDateIso.trim())
+  ) {
+    const dt = DateTime.utc(
+      parseInt(startDateIso.slice(0, 4), 10),
+      parseInt(startDateIso.slice(5, 7), 10),
+      parseInt(startDateIso.slice(8, 10), 10)
+    )
+    if (dt.isValid) return dt.startOf("day")
+  }
+  return getNextMeetingDayUtc(dayOfWeek)
+}
+
+/** Format date for schedule week label (e.g. "Thu, Mar 6"). */
+export function formatScheduleDate(dt: DateTime): string {
+  return dt.toLocaleString({
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })
+}
+

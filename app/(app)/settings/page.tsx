@@ -1,6 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase-server"
 import { SettingsContent } from "./content"
-import { resolveOwnerAvatar } from "@/lib/avatar-resolver"
+import { ensureProfileForUser, fetchProfilesForUserIds, resolveCurrentUserDisplay } from "@/lib/profile-resolver"
 
 export default async function SettingsPage() {
   const supabase = await createServerSupabase()
@@ -8,16 +8,22 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
+  if (!user) {
+    return (
+      <SettingsContent userEmail="" userName="" userAvatar="" />
+    )
+  }
+
+  await ensureProfileForUser(supabase, user)
+  const profileMap = await fetchProfilesForUserIds([user.id])
+  const profile = profileMap.get(user.id)
+  const { userName, userAvatar } = resolveCurrentUserDisplay(user, profile)
+
   return (
     <SettingsContent
-      userEmail={user?.email || ""}
-      userName={
-        (user?.user_metadata?.full_name as string) ||
-        (user?.user_metadata?.name as string) ||
-        user?.email?.split("@")[0] ||
-        ""
-      }
-      userAvatar={user ? resolveOwnerAvatar(user) : ""}
+      userEmail={user.email || ""}
+      userName={userName}
+      userAvatar={userAvatar}
     />
   )
 }

@@ -21,7 +21,7 @@ export type DemoMemberDisplay = {
   workHours: string;
 };
 
-/** Design Sync — 4 members. Some have hard no ranges for realism. */
+/** Design Sync — 4 members (Americas, Europe, Dubai). */
 const DESIGN_SYNC_MEMBERS: TeamMember[] = [
   {
     id: "ds-1",
@@ -29,7 +29,7 @@ const DESIGN_SYNC_MEMBERS: TeamMember[] = [
     timezone: "America/New_York",
     workStartHour: 9,
     workEndHour: 18,
-    hardNoRanges: [],
+    hardNoRanges: [{ start: 0, end: 6 }], // 12am–6am local
     initials: "AC",
   },
   {
@@ -37,67 +37,49 @@ const DESIGN_SYNC_MEMBERS: TeamMember[] = [
     name: "Olivia Brown",
     timezone: "Europe/London",
     workStartHour: 9,
-    workEndHour: 17.5,
-    hardNoRanges: [{ start: 19, end: 22 }], // 7:00 PM – 10:00 PM local
+    workEndHour: 18,
+    hardNoRanges: [{ start: 23, end: 7 }], // 11pm–7am local (overnight)
     initials: "OB",
   },
   {
     id: "ds-3",
-    name: "Wei Zhang",
-    timezone: "Asia/Singapore",
-    workStartHour: 9,
-    workEndHour: 18,
-    hardNoRanges: [{ start: 22, end: 7 }], // 10:00 PM – 7:00 AM local (overnight)
-    initials: "WZ",
-  },
-  {
-    id: "ds-4",
-    name: "Liam O'Connor",
-    timezone: "Australia/Sydney",
-    workStartHour: 8.5,
-    workEndHour: 17,
-    hardNoRanges: [{ start: 6, end: 8 }], // 6:00 AM – 8:00 AM local
-    initials: "LO",
-  },
-];
-
-/** Global Product — 8 members */
-const GLOBAL_PRODUCT_MEMBERS: TeamMember[] = [
-  ...DESIGN_SYNC_MEMBERS,
-  {
-    id: "gp-5",
-    name: "Emma Wilson",
-    timezone: "America/Los_Angeles",
-    workStartHour: 9,
-    workEndHour: 17,
-    hardNoRanges: [],
-    initials: "EW",
-  },
-  {
-    id: "gp-6",
     name: "Hans Mueller",
     timezone: "Europe/Berlin",
     workStartHour: 9,
     workEndHour: 18,
-    hardNoRanges: [],
+    hardNoRanges: [{ start: 23, end: 7 }], // 11pm–7am local (overnight)
     initials: "HM",
   },
   {
-    id: "gp-7",
+    id: "ds-4",
     name: "Sara Al-Hassan",
     timezone: "Asia/Dubai",
     workStartHour: 9,
-    workEndHour: 18,
-    hardNoRanges: [],
+    workEndHour: 19,
+    hardNoRanges: [{ start: 0, end: 7 }], // 12am–7am local
     initials: "SA",
   },
+];
+
+/** Global Product — 6 members (Design Sync + Singapore, Tokyo). */
+const GLOBAL_PRODUCT_MEMBERS: TeamMember[] = [
+  ...DESIGN_SYNC_MEMBERS,
   {
-    id: "gp-8",
+    id: "gp-5",
+    name: "Wei Zhang",
+    timezone: "Asia/Singapore",
+    workStartHour: 9,
+    workEndHour: 19,
+    hardNoRanges: [{ start: 0, end: 7 }], // 12am–7am local
+    initials: "WZ",
+  },
+  {
+    id: "gp-6",
     name: "Yuki Tanaka",
     timezone: "Asia/Tokyo",
     workStartHour: 10,
-    workEndHour: 19,
-    hardNoRanges: [],
+    workEndHour: 20,
+    hardNoRanges: [{ start: 0, end: 7 }], // 12am–7am local
     initials: "YT",
   },
 ];
@@ -105,18 +87,16 @@ const GLOBAL_PRODUCT_MEMBERS: TeamMember[] = [
 /** Display data for Design Sync members (UI labels) */
 const DESIGN_SYNC_DISPLAY: DemoMemberDisplay[] = [
   { id: "ds-1", name: "Alex Chen", timezone: "America/New_York", timezoneLabel: "New York", initials: "AC", isOwner: true, workHours: "9:00 AM – 6:00 PM" },
-  { id: "ds-2", name: "Olivia Brown", timezone: "Europe/London", timezoneLabel: "London", initials: "OB", workHours: "9:00 AM – 5:30 PM" },
-  { id: "ds-3", name: "Wei Zhang", timezone: "Asia/Singapore", timezoneLabel: "Singapore", initials: "WZ", workHours: "9:00 AM – 6:00 PM" },
-  { id: "ds-4", name: "Liam O'Connor", timezone: "Australia/Sydney", timezoneLabel: "Sydney", initials: "LO", workHours: "8:30 AM – 5:00 PM" },
+  { id: "ds-2", name: "Olivia Brown", timezone: "Europe/London", timezoneLabel: "London", initials: "OB", workHours: "9:00 AM – 6:00 PM" },
+  { id: "ds-3", name: "Hans Mueller", timezone: "Europe/Berlin", timezoneLabel: "Berlin", initials: "HM", workHours: "9:00 AM – 6:00 PM" },
+  { id: "ds-4", name: "Sara Al-Hassan", timezone: "Asia/Dubai", timezoneLabel: "Dubai", initials: "SA", workHours: "9:00 AM – 7:00 PM" },
 ];
 
 /** Display data for Global Product members (UI labels) */
 const GLOBAL_PRODUCT_DISPLAY: DemoMemberDisplay[] = [
   ...DESIGN_SYNC_DISPLAY,
-  { id: "gp-5", name: "Emma Wilson", timezone: "America/Los_Angeles", timezoneLabel: "Los Angeles", initials: "EW", workHours: "9:00 AM – 5:00 PM" },
-  { id: "gp-6", name: "Hans Mueller", timezone: "Europe/Berlin", timezoneLabel: "Berlin", initials: "HM", workHours: "9:00 AM – 6:00 PM" },
-  { id: "gp-7", name: "Sara Al-Hassan", timezone: "Asia/Dubai", timezoneLabel: "Dubai", initials: "SA", workHours: "9:00 AM – 6:00 PM" },
-  { id: "gp-8", name: "Yuki Tanaka", timezone: "Asia/Tokyo", timezoneLabel: "Tokyo", initials: "YT", workHours: "10:00 AM – 7:00 PM" },
+  { id: "gp-5", name: "Wei Zhang", timezone: "Asia/Singapore", timezoneLabel: "Singapore", initials: "WZ", workHours: "9:00 AM – 7:00 PM" },
+  { id: "gp-6", name: "Yuki Tanaka", timezone: "Asia/Tokyo", timezoneLabel: "Tokyo", initials: "YT", workHours: "10:00 AM – 8:00 PM" },
 ];
 
 export const DEMO_TEAMS: DemoTeam[] = [
@@ -129,7 +109,7 @@ export const DEMO_TEAMS: DemoTeam[] = [
   {
     id: "team2",
     name: "Global Product",
-    memberCount: 8,
+    memberCount: 6,
     teamMembers: GLOBAL_PRODUCT_MEMBERS,
   },
 ];

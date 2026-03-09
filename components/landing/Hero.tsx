@@ -1,22 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { ArrowRight } from "lucide-react";
-import { Container, RotatingPhrase } from "@/components/ui";
-import { DemoSchedulerPreview } from "@/components/demo";
-
-const GlobeBackground = dynamic(
-  () => import("@/components/ui/GlobeBackground").then((m) => ({ default: m.GlobeBackground })),
-  { ssr: false }
-);
+import { Container } from "@/components/ui";
+import { DemoSandbox } from "@/components/demo";
 
 export function Hero() {
   return (
-    <section className="relative pt-0 pb-24 md:pb-32 bg-gradient-to-b from-background via-background to-primary/[0.02]">
-      <div className="absolute inset-0 overflow-hidden z-0 pointer-events-none">
-        <GlobeBackground />
-      </div>
+    <section className="relative pt-0 pb-24 md:pb-32 bg-background">
+      {/* Glow layer: behind content, centered in gap between CTA and demo, partially obscured by preview */}
+      <div
+        className="absolute inset-0 z-0 pointer-events-none overflow-hidden"
+        aria-hidden
+        style={{
+          background:
+            "radial-gradient(900px circle at 50% 78%, oklch(0.52 0.11 182 / 0.22), transparent 55%), radial-gradient(1300px circle at 50% 82%, oklch(0.52 0.11 182 / 0.12), transparent 65%)",
+        }}
+      />
       <div className="relative z-10 pt-20 md:pt-24">
         <Container size="narrow">
           <div className="text-center">
@@ -29,7 +29,17 @@ export function Hero() {
             </h1>
 
             <p className="mt-4 max-w-2xl mx-auto text-lg text-muted-foreground leading-relaxed">
-              Parallel helps teams rotate <RotatingPhrase />
+              <span className="inline-flex items-center gap-2">
+                <span>Parallel helps teams rotate</span>
+                <span className="text-rotate inline-block align-middle">
+                  <span>
+                    <span className="bg-primary/15 text-primary px-2 rounded-md font-medium">late meetings</span>
+                    <span className="bg-primary/15 text-primary px-2 rounded-md font-medium">early calls</span>
+                    <span className="bg-primary/15 text-primary px-2 rounded-md font-medium">weekly syncs</span>
+                    <span className="bg-primary/15 text-primary px-2 rounded-md font-medium">late meetings</span>
+                  </span>
+                </span>
+              </span>
             </p>
 
             <p className="mt-4 max-w-2xl mx-auto text-lg text-muted-foreground leading-relaxed">
@@ -56,8 +66,11 @@ export function Hero() {
           </div>
         </Container>
 
-        <div className="mx-auto w-full max-w-5xl px-5 sm:px-6 lg:px-8 mt-16 md:mt-24">
-          <DemoSchedulerPreview />
+        <div className="relative z-20 mx-auto w-full max-w-5xl px-5 sm:px-6 lg:px-8 mt-16 md:mt-24">
+          <p className="text-center text-sm text-muted-foreground mb-4">
+            No perfect meeting time exists for this team. Parallel distributes the inconvenience more fairly across the cycle.
+          </p>
+          <DemoSandbox />
         </div>
       </div>
     </section>

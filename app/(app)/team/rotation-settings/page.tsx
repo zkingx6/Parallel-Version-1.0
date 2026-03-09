@@ -157,24 +157,24 @@ export default function RotationSettingsPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="flex flex-col gap-6">
-          <div className="rounded-xl border border-neutral-200 bg-white p-6">
-            <h2 className="text-base font-semibold text-neutral-800">
+          <div className="rounded-xl border border-border/50 bg-card shadow-sm p-6 hover:shadow-md transition-shadow">
+            <h2 className="text-base font-semibold text-foreground">
               Availability Update Window
             </h2>
-            <p className="mt-1 text-sm text-neutral-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Weekly window when members can submit updates
             </p>
-            <div className="mt-4 space-y-1 text-sm text-neutral-700">
+            <div className="mt-4 space-y-1 text-sm text-foreground">
               <p>Opens: {windowDisplay.opens}</p>
               <p>Closes: {windowDisplay.closes}</p>
             </div>
-            <p className="mt-3 text-xs text-gray-500">
+            <p className="mt-3 text-xs text-muted-foreground">
               Times are automatically shown in your local timezone.
             </p>
             <button
               type="button"
               onClick={openEditDrawer}
-              className="mt-4 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-all duration-200"
+              className="mt-4 rounded-md border border-border bg-muted/50 px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent/50 transition-all duration-200"
             >
               Edit Window
             </button>
@@ -182,53 +182,53 @@ export default function RotationSettingsPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <div className="rounded-xl border border-neutral-200 bg-white p-6">
-            <h2 className="text-base font-semibold text-neutral-800">
+          <div className="rounded-xl border border-border/50 bg-card shadow-sm p-6 hover:shadow-md transition-shadow">
+            <h2 className="text-base font-semibold text-foreground">
               Recent Updates
             </h2>
-            <ul className="mt-4 divide-y divide-neutral-100">
+            <ul className="mt-4 divide-y divide-border/30">
               {mockRotation.updates.map((u, i) => (
                 <li
                   key={i}
                   className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
                 >
-                  <span className="text-sm text-neutral-700">
+                  <span className="text-sm text-foreground">
                     {u.name} {u.action}
                   </span>
-                  <span className="text-xs text-neutral-500">{u.time}</span>
+                  <span className="text-xs text-muted-foreground">{u.time}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="rounded-xl border border-neutral-200 bg-white p-6">
-            <h2 className="text-base font-semibold text-neutral-800">
+          <div className="rounded-xl border border-border/50 bg-card shadow-sm p-6 hover:shadow-md transition-shadow">
+            <h2 className="text-base font-semibold text-foreground">
               Rotation Health
             </h2>
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-neutral-600">
+                <span className="text-sm text-muted-foreground">
                   This month burden spread
                 </span>
-                <span className="text-sm font-medium text-neutral-800">
+                <span className="text-sm font-medium text-foreground">
                   {mockRotation.health.burdenRange}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-neutral-600">Overlap health</span>
+                <span className="text-sm text-muted-foreground">Overlap health</span>
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    isStable ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                    isStable ? "bg-primary/15 text-primary" : "bg-stretch/20 text-stretch-foreground"
                   }`}
                 >
                   {mockRotation.health.overlapHealth}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-neutral-600">Next rotation</span>
+                <span className="text-sm text-muted-foreground">Next rotation</span>
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    isSafe ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                    isSafe ? "bg-primary/15 text-primary" : "bg-stretch/20 text-stretch-foreground"
                   }`}
                 >
                   {mockRotation.health.nextRotation}
@@ -249,24 +249,24 @@ export default function RotationSettingsPage() {
             aria-hidden
           />
           <div
-            className="fixed right-0 top-0 z-50 h-full w-full max-w-md border-l border-neutral-200 bg-white shadow-xl transition-all duration-200"
+            className="fixed right-0 top-0 z-50 h-full w-full max-w-md border-l border-border bg-card shadow-xl transition-all duration-200"
             style={{ top: "4rem", height: "calc(100vh - 4rem)" }}
           >
             <div className="flex h-full flex-col p-6">
-              <h2 className="text-lg font-semibold text-neutral-800">
+              <h2 className="text-lg font-semibold text-foreground">
                 Edit Availability Update Window
               </h2>
 
               <div className="mt-6 space-y-6">
                 <div>
-                  <h3 className="text-sm font-medium text-neutral-700">Opens</h3>
+                  <h3 className="text-sm font-medium text-foreground">Opens</h3>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <select
                       value={draftOpens.day}
                       onChange={(e) =>
                         setDraftOpens((p) => ({ ...p, day: parseInt(e.target.value, 10) }))
                       }
-                      className="rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
+                      className="rounded-md border border-border bg-card px-2 py-1.5 text-sm"
                     >
                       {DAYS.map((d) => (
                         <option key={d.value} value={d.value}>
@@ -279,7 +279,7 @@ export default function RotationSettingsPage() {
                       onChange={(e) =>
                         setDraftOpens((p) => ({ ...p, hour: parseInt(e.target.value, 10) }))
                       }
-                      className="rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
+                      className="rounded-md border border-border px-2 py-1.5 text-sm"
                     >
                       {HOURS.map((h) => (
                         <option key={h.value} value={h.value}>
@@ -292,7 +292,7 @@ export default function RotationSettingsPage() {
                       onChange={(e) =>
                         setDraftOpens((p) => ({ ...p, minute: parseInt(e.target.value, 10) }))
                       }
-                      className="rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
+                      className="rounded-md border border-border px-2 py-1.5 text-sm"
                     >
                       {MINUTES.map((m) => (
                         <option key={m.value} value={m.value}>
@@ -304,14 +304,14 @@ export default function RotationSettingsPage() {
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-medium text-neutral-700">Closes</h3>
+                  <h3 className="text-sm font-medium text-foreground">Closes</h3>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <select
                       value={draftCloses.day}
                       onChange={(e) =>
                         setDraftCloses((p) => ({ ...p, day: parseInt(e.target.value, 10) }))
                       }
-                      className="rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
+                      className="rounded-md border border-border bg-card px-2 py-1.5 text-sm"
                     >
                       {DAYS.map((d) => (
                         <option key={d.value} value={d.value}>
@@ -324,7 +324,7 @@ export default function RotationSettingsPage() {
                       onChange={(e) =>
                         setDraftCloses((p) => ({ ...p, hour: parseInt(e.target.value, 10) }))
                       }
-                      className="rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
+                      className="rounded-md border border-border px-2 py-1.5 text-sm"
                     >
                       {HOURS.map((h) => (
                         <option key={h.value} value={h.value}>
@@ -337,7 +337,7 @@ export default function RotationSettingsPage() {
                       onChange={(e) =>
                         setDraftCloses((p) => ({ ...p, minute: parseInt(e.target.value, 10) }))
                       }
-                      className="rounded-md border border-neutral-200 px-2 py-1.5 text-sm"
+                      className="rounded-md border border-border px-2 py-1.5 text-sm"
                     >
                       {MINUTES.map((m) => (
                         <option key={m.value} value={m.value}>
@@ -353,14 +353,14 @@ export default function RotationSettingsPage() {
                 <button
                   type="button"
                   onClick={cancelEdit}
-                  className="rounded-md border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-all duration-200"
+                  className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent/50 transition-all duration-200"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={saveEdit}
-                  className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-all duration-200"
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all duration-200"
                 >
                   Save
                 </button>

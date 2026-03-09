@@ -47,20 +47,20 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
   const isAccount = pathname?.startsWith("/settings")
 
   const tabBase =
-    "inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-transparent transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    "inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-transparent transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
   const tabInactive =
-    "text-neutral-600 hover:bg-neutral-100 hover:border-neutral-200 hover:text-neutral-900"
+    "text-muted-foreground hover:bg-accent/50 hover:border-border hover:text-foreground"
   const tabActive =
-    "bg-neutral-100 border-neutral-200 text-neutral-900"
+    "bg-accent/60 border-border text-foreground"
   const tabDisabled =
-    "cursor-not-allowed pointer-events-none text-neutral-400 border-transparent"
+    "cursor-not-allowed pointer-events-none text-muted-foreground/60 border-transparent"
 
   const getTabClass = (isActive: boolean) =>
     cn(tabBase, isActive ? tabActive : tabInactive)
 
   return (
-    <header className="relative z-10 w-full shrink-0 border-b border-border/40 bg-background">
-      {/* z-10 + bg-background: ensures nav stays above page content and receives clicks.
+    <header className="relative z-10 w-full shrink-0 border-b border-border/40 bg-navbar backdrop-blur-sm">
+      {/* z-10 + bg-navbar: navbar has subtle secondary tint for visual separation from content.
           Without this, page content (e.g. on /team/rotation-settings) can create stacking
           contexts that overlay the center nav (Team/Rotation) and block pointer events. */}
       <div className="relative flex items-center justify-between h-16 pl-8 pr-8">
@@ -102,8 +102,8 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
           <Link
             href="/settings"
             className={cn(
-              "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-              isAccount && "ring-2 ring-neutral-300 ring-offset-2 ring-offset-background"
+              "flex items-center justify-center rounded-full transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              isAccount && "ring-2 ring-ring ring-offset-2 ring-offset-background"
             )}
             aria-label="Account"
           >
