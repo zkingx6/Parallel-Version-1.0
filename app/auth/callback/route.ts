@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServerSupabase } from "@/lib/supabase-server"
 import { resolvePostLoginRedirect } from "@/lib/actions"
+import { syncProfileFromAuth } from "@/lib/profile-sync"
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -36,6 +37,11 @@ export async function GET(request: Request) {
     console.log("[auth/callback] Session established successfully")
   } else if (tokenHash && type) {
     await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    await syncProfileFromAuth(supabase, user)
   }
 
   const safeNext =

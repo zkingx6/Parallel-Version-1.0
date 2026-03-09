@@ -764,17 +764,20 @@ export async function updateMemberProfile(
       })
     }
     try {
-      await supabase.from("profiles").upsert(
+      const { error: profileError } = await supabase.from("profiles").upsert(
         {
-          id: userId,
+          user_id: userId,
           full_name: name,
           avatar_url: removeAvatar ? null : (avatarUrl ?? null),
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "id" }
+        { onConflict: "user_id" }
       )
-    } catch {
-      /* profiles table may not exist */
+      if (profileError) {
+        console.error("[updateMemberProfile] profiles upsert failed:", profileError.message)
+      }
+    } catch (e) {
+      console.error("[updateMemberProfile] profiles upsert error:", e)
     }
   }
 

@@ -6,12 +6,14 @@
  * Profile data (name, avatar) must be resolved via user_id → profiles/auth.
  */
 
-import { createServerSupabase, createServiceSupabase } from "./supabase-server"
+import { createServiceSupabase } from "./supabase-server"
 import { resolveOwnerAvatar } from "./avatar-resolver"
+import { syncProfileFromAuth } from "./profile-sync"
 
 export type ResolvedProfile = {
   fullName: string
   avatarUrl: string
+  email?: string | null
   updatedAt?: string
 }
 
@@ -30,25 +32,56 @@ export function authUserToProfile(user: {
 }
 
 /**
- * Resolve display name and avatar for current user (layout, settings).
- * Profiles table is canonical; falls back to auth metadata only when profile fields are empty.
+ * Single resolver for identity display. Used by all owner/member/account/top-nav UI.
+ * Precedence: profile (app-level) > auth metadata > email prefix / initials.
  */
-export function resolveCurrentUserDisplay(
+export function resolveIdentity(
   user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null },
   profile: ResolvedProfile | undefined
-): { userName: string; userAvatar: string } {
+): {
+  resolvedDisplayName: string
+  resolvedEmail: string
+  resolvedAvatarUrl: string
+  initials: string
+} {
   const authName =
     (user.user_metadata?.full_name as string) ||
     (user.user_metadata?.name as string) ||
     user.email?.split("@")[0] ||
     ""
   const authAvatar = resolveOwnerAvatar(user)
-  const userName = (profile?.fullName?.trim() || authName).trim() || authName
-  const userAvatar =
-    profile?.avatarUrl?.trim()
-      ? `${profile.avatarUrl}?v=${profile.updatedAt ?? ""}`
-      : authAvatar
-  return { userName, userAvatar }
+  const resolvedDisplayName =
+    (profile?.fullName?.trim() || authName).trim() || authName
+  const resolvedEmail = user.email?.trim() || profile?.email?.trim() || ""
+  const resolvedAvatarUrl = profile?.avatarUrl?.trim()
+    ? `${profile.avatarUrl}?v=${profile.updatedAt ?? ""}`
+    : authAvatar
+  const initials =
+    resolvedDisplayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || ""
+  return {
+    resolvedDisplayName,
+    resolvedEmail,
+    resolvedAvatarUrl,
+    initials,
+  }
+}
+
+/**
+ * Resolve display name and avatar for current user (layout, settings).
+ * Delegates to resolveIdentity for consistent precedence.
+ */
+export function resolveCurrentUserDisplay(
+  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null },
+  profile: ResolvedProfile | undefined
+): { userName: string; userAvatar: string } {
+  const { resolvedDisplayName, resolvedAvatarUrl } = resolveIdentity(user, profile)
+  return { userName: resolvedDisplayName, userAvatar: resolvedAvatarUrl }
 }
 
 /**
@@ -66,13 +99,14 @@ export async function fetchProfilesForUserIds(
   try {
     const { data: rows } = await supabase
       .from("profiles")
-      .select("user_id, full_name, avatar_url, updated_at")
+      .select("user_id, full_name, avatar_url, email, updated_at")
       .in("user_id", unique)
 
     for (const r of rows ?? []) {
       map.set(r.user_id, {
         fullName: r.full_name ?? "",
         avatarUrl: r.avatar_url ?? "",
+        email: r.email ?? null,
         updatedAt: r.updated_at,
       })
     }
@@ -91,36 +125,14 @@ export async function fetchProfilesForUserIds(
 }
 
 /**
- * Bootstrap: create profile row if it does not exist (first sign-in).
- * Initializes email from auth user, full_name/avatar_url from auth metadata as fallback.
- * Uses user's supabase client so RLS allows insert.
+ * Ensure profile exists and is synced from auth. Calls syncProfileFromAuth.
+ * Safe to call on every authenticated layout load (owner and member).
  */
 export async function ensureProfileForUser(
-  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  supabase: Awaited<ReturnType<typeof import("./supabase-server").createServerSupabase>>,
   user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null }
 ): Promise<void> {
-  try {
-    const { data: existing } = await supabase
-      .from("profiles")
-      .select("user_id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (existing) return
-
-    const meta = user.user_metadata as { full_name?: string; name?: string; avatar_url?: string; picture?: string } | undefined
-    const fullName = (meta?.full_name || meta?.name || user.email?.split("@")[0] || "").trim()
-    const avatarUrl = meta?.avatar_url || meta?.picture || ""
-
-    await supabase.from("profiles").insert({
-      user_id: user.id,
-      email: user.email ?? null,
-      full_name: fullName || null,
-      avatar_url: avatarUrl || null,
-    })
-  } catch {
-    /* profiles table may not exist yet */
-  }
+  await syncProfileFromAuth(supabase, user)
 }
 
 /**
@@ -146,6 +158,7 @@ export async function fetchAuthProfilesForUserIds(
       map.set(uid, {
         fullName,
         avatarUrl,
+        email: u.email ?? null,
         updatedAt: u.updated_at,
       })
     }
