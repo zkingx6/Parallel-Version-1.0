@@ -117,7 +117,7 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
         >
           <MemberAvatar
               avatarUrl={userAvatar || undefined}
-              name={userName || userEmail?.split("@")[0] || "?"}
+              name={userName || "?"}
               size="default"
             />
         </Link>

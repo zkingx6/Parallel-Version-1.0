@@ -516,7 +516,7 @@ export async function getMemberDashboardData(token: string, memberId: string) {
   if (memberError) return { error: memberError.message }
   if (!member) return { error: "Member not found." }
 
-  const { resolveMembersDisplay, fetchProfilesForUserIds } = await import("@/lib/profile-resolver")
+  const { resolveMembersDisplay, resolveDisplayProfile, fetchProfilesForUserIds } = await import("@/lib/profile-resolver")
   const ownerProfiles = meeting.manager_id
     ? await fetchProfilesForUserIds([meeting.manager_id])
     : new Map()
@@ -524,10 +524,8 @@ export async function getMemberDashboardData(token: string, memberId: string) {
     ? ownerProfiles.get(meeting.manager_id) ?? null
     : null
   const membersDisplay = await resolveMembersDisplay([member], ownerAuthProfile ?? undefined)
-  const memberDisplay = membersDisplay.get(member.id) ?? {
-    name: member.name ?? "?",
-    avatarUrl: member.avatar_url ?? "",
-  }
+  const resolved = membersDisplay.get(member.id)
+  const memberDisplay = resolved ?? resolveDisplayProfile(null, member)
 
   let memberEmail: string | null = null
   const memberWithUserId = member as { user_id?: string | null }
@@ -584,7 +582,7 @@ export async function getExistingMemberForJoin(token: string, memberId: string) 
   if (error) return { error: error.message }
   if (!member) return { error: "Member not found." }
 
-  const { resolveMembersDisplay, fetchProfilesForUserIds } = await import("@/lib/profile-resolver")
+  const { resolveMembersDisplay, resolveDisplayProfile, fetchProfilesForUserIds } = await import("@/lib/profile-resolver")
   const ownerProfiles = meeting.manager_id
     ? await fetchProfilesForUserIds([meeting.manager_id])
     : new Map()
@@ -592,10 +590,8 @@ export async function getExistingMemberForJoin(token: string, memberId: string) 
     ? ownerProfiles.get(meeting.manager_id) ?? null
     : null
   const membersDisplay = await resolveMembersDisplay([member], ownerAuthProfile ?? undefined)
-  const memberDisplay = membersDisplay.get(member.id) ?? {
-    name: member.name ?? "?",
-    avatarUrl: member.avatar_url ?? "",
-  }
+  const resolved = membersDisplay.get(member.id)
+  const memberDisplay = resolved ?? resolveDisplayProfile(null, member)
 
   return {
     data: {

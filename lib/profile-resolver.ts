@@ -166,26 +166,51 @@ export async function fetchAuthProfilesForUserIds(
   return map
 }
 
+/** Shared identity display contract. All UI surfaces must use this shape. */
+export type ResolvedIdentityDisplay = {
+  name: string
+  avatarUrl: string
+  initials: string
+}
+
+function computeInitials(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "?"
+  )
+}
+
 /**
- * Resolve profile for display. Avatar priority (matches avatar-resolver):
- * 1. member_submissions.avatar_url (canonical — when null, user explicitly removed)
- * 2. profiles.avatar_url
- * 3. auth.user_metadata.avatar_url
- * 4. initials fallback (empty string)
+ * Resolve profile for display. Single source for all member/owner identity rendering.
+ * Precedence: profile (synced from auth) > member_submissions.
+ * When member_submissions.avatar_url is explicitly null, user removed avatar in member context.
  */
 export function resolveDisplayProfile(
   profile: ResolvedProfile | null,
   memberFallback: { name?: string | null; avatar_url?: string | null; updated_at?: string }
-): { name: string; avatarUrl: string } {
+): ResolvedIdentityDisplay {
   const name = (profile?.fullName || memberFallback.name || "").trim() || "?"
   const rawUrl =
-    (memberFallback.avatar_url && String(memberFallback.avatar_url).trim()) ||
-    profile?.avatarUrl ||
-    ""
+    memberFallback.avatar_url === null
+      ? ""
+      : (profile?.avatarUrl && String(profile.avatarUrl).trim()) ||
+        (memberFallback.avatar_url && String(memberFallback.avatar_url).trim()) ||
+        ""
   const updatedAt =
-    memberFallback.avatar_url != null ? memberFallback.updated_at : profile?.updatedAt || memberFallback.updated_at
+    (profile?.avatarUrl ? profile.updatedAt : null) ??
+    (memberFallback.avatar_url != null ? memberFallback.updated_at : null) ??
+    memberFallback.updated_at
   const avatarUrl = rawUrl ? `${rawUrl}?v=${updatedAt ?? ""}` : ""
-  return { name, avatarUrl }
+  return {
+    name,
+    avatarUrl,
+    initials: computeInitials(name),
+  }
 }
 
 export type MemberWithUserId = {
@@ -200,19 +225,20 @@ export type MemberWithUserId = {
 
 /**
  * Resolve display data for a list of members. Fetches profiles for user_ids,
- * merges with member fallback. Returns map of memberId -> { name, avatarUrl }.
+ * merges with member fallback. Returns map of memberId -> ResolvedIdentityDisplay.
+ * All team/member/schedule UI must use this; no direct raw field rendering.
  */
 export async function resolveMembersDisplay(
   members: MemberWithUserId[],
   ownerAuthProfile?: ResolvedProfile | null
-): Promise<Map<string, { name: string; avatarUrl: string }>> {
+): Promise<Map<string, ResolvedIdentityDisplay>> {
   const userIds = members
     .map((m) => m.user_id)
     .filter((id): id is string => !!id)
   const profiles = await fetchProfilesForUserIds(userIds)
   const userIdToProfile = profiles
 
-  const result = new Map<string, { name: string; avatarUrl: string }>()
+  const result = new Map<string, ResolvedIdentityDisplay>()
   for (const m of members) {
     const profile =
       m.is_owner_participant && ownerAuthProfile

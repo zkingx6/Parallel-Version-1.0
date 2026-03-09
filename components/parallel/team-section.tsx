@@ -48,8 +48,8 @@ export function TeamSection({
   members: DbMemberSubmission[]
   hasOwnerParticipant: boolean
   userEmail: string
-  /** Resolved display data from profiles/auth (canonical). memberId -> { name, avatarUrl } */
-  membersDisplay: Map<string, { name: string; avatarUrl: string }>
+  /** Resolved display data from profiles/auth (canonical). memberId -> ResolvedIdentityDisplay */
+  membersDisplay: Map<string, { name: string; avatarUrl: string; initials?: string }>
   /** When true, use demo handlers instead of server actions. */
   demoMode?: boolean
   /** When true, hide configure rotation and other owner-only actions. */
@@ -385,10 +385,7 @@ export function TeamSection({
                   const hasRanges = ranges.length > 0
                   const isOwner = m.is_owner_participant === true
                   const resolved = membersDisplay.get(m.id)
-                  const displayName =
-                    resolved?.name ||
-                    (isOwner ? userEmail : m.name) ||
-                    "?"
+                  const displayName = resolved?.name ?? (isOwner ? userEmail : "?")
                   const displayAvatarUrl = resolved?.avatarUrl ?? ""
 
                   return (
@@ -408,12 +405,12 @@ export function TeamSection({
                           <div className="flex items-center gap-2 flex-wrap">
                             <MemberAvatar
                               avatarUrl={displayAvatarUrl || undefined}
-                              name={(displayName || m.name || "").trim() || "?"}
+                              name={displayName}
                               size="sm"
                               className="size-7 shrink-0"
                             />
                             <span className="text-sm font-medium truncate">
-                              {displayName || m.name || "—"}
+                              {displayName || "—"}
                             </span>
                             {m.is_owner_participant && (
                               <span className="text-[0.68rem] text-[#0d9488] bg-[#f0fdfa] px-2 py-0.5 rounded-full border border-[#0d9488]/15 font-medium">

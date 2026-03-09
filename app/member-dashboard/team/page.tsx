@@ -11,6 +11,7 @@ import { isComplementOfOverlapPattern } from "@/lib/hard-no-ranges"
 import type { HardNoRange } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { PageBackLink } from "@/components/ui/page-back-link"
+import { MemberAvatar } from "@/components/ui/avatar"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
 
 const DAY_NAMES = [
@@ -241,7 +242,13 @@ export default function MemberTeamDetailPage() {
           <ul className="space-y-2 text-[0.88rem]">
             {members.map((m) => (
               <li key={m.id} className="flex items-center gap-2">
-                <span className="font-medium text-[#1a1a2e]">{membersDisplay[m.id]?.name ?? m.name}</span>
+                <MemberAvatar
+                  avatarUrl={membersDisplay[m.id]?.avatarUrl || undefined}
+                  name={membersDisplay[m.id]?.name ?? "?"}
+                  size="sm"
+                  className="size-6 shrink-0"
+                />
+                <span className="font-medium text-[#1a1a2e]">{membersDisplay[m.id]?.name ?? "?"}</span>
                 {m.is_owner_participant && (
                   <span className="text-[0.7rem] text-[#9ca3af] bg-[#f0f0f2] px-2 py-0.5 rounded">
                     Owner
