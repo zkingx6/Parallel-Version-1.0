@@ -23,7 +23,7 @@ type Plan = {
 const plans: Plan[] = [
   {
     name: "Starter",
-    subtitle: "For small distributed teams",
+    subtitle: "Perfect for small distributed teams",
     priceMonthly: "$13",
     priceYearly: "$9",
     badge: null,
@@ -32,13 +32,13 @@ const plans: Plan[] = [
     features: [
       "Up to 5 team members",
       "Generate rotations up to 4 weeks",
-      "Up to 3 active teams",
-      "Timezone-aware scheduling",
+      "Up to 2 active teams",
+      "Rotation analysis",
       "Export rotations to your calendar (.ics)",
     ],
     cta: "Start free",
     ctaHref: "/signup",
-    ctaNote: null,
+    ctaNote: "No credit card required",
     ctaStyle: "outline",
   },
   {
@@ -53,7 +53,7 @@ const plans: Plan[] = [
       "Up to 20 team members",
       "Generate rotations up to 12 weeks",
       "Unlimited teams",
-      "Rotation analysis",
+      "Advanced rotation analysis",
       "Priority support",
       "Everything in Starter",
     ],
@@ -332,10 +332,10 @@ export function PricingPreview() {
             Pricing
           </span>
           <h2 className="text-[2.25rem] tracking-[-0.03em] text-[#1a1a2e] mb-5 max-w-2xl mx-auto leading-[1.15] mt-4">
-            Simple, transparent pricing
+          Simple pricing for distributed teams
           </h2>
           <p className="text-[#6b7280] max-w-lg mx-auto text-[1.02rem] leading-relaxed">
-            Start with a free trial. Scale as your team grows.
+          Start free. Upgrade when your team grows.
           </p>
         </motion.div>
 
