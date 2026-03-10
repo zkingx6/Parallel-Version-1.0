@@ -3,7 +3,7 @@ import { createServerSupabase } from "@/lib/supabase-server"
 import { TeamSection } from "@/components/parallel/team-section"
 import {
   resolveMembersDisplay,
-  authUserToProfile,
+  getOwnerProfileForMeeting,
 } from "@/lib/profile-resolver"
 
 export default async function TeamPage({
@@ -38,7 +38,10 @@ export default async function TeamPage({
   } = await supabase.auth.getUser()
 
   const userEmail = user?.email || ""
-  const ownerAuthProfile = user ? authUserToProfile(user) : null
+  const ownerAuthProfile = await getOwnerProfileForMeeting(
+    meeting.manager_id,
+    user ?? undefined
+  )
   const membersDisplay = await resolveMembersDisplay(
     members ?? [],
     ownerAuthProfile ?? undefined

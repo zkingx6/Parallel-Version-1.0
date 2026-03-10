@@ -4,7 +4,7 @@ import { ScheduleDetailContent } from "@/components/parallel/schedule-detail-con
 import type { RotationWeekData } from "@/lib/types"
 import {
   resolveMembersDisplay,
-  authUserToProfile,
+  getOwnerProfileForMeeting,
 } from "@/lib/profile-resolver"
 
 export default async function ScheduleDetailPage({
@@ -50,8 +50,10 @@ export default async function ScheduleDetailPage({
       ? rotationResult.weeks
       : []
 
-  const isOwner = meeting.manager_id === user.id
-  const ownerAuthProfile = isOwner ? authUserToProfile(user) : null
+  const ownerAuthProfile = await getOwnerProfileForMeeting(
+    meeting.manager_id,
+    user
+  )
   const membersDisplay = await resolveMembersDisplay(
     members ?? [],
     ownerAuthProfile ?? undefined

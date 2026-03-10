@@ -85,6 +85,26 @@ export function resolveCurrentUserDisplay(
 }
 
 /**
+ * Get owner profile for display. Uses profiles table first (canonical source).
+ * Fallback to auth metadata only when manager_id is missing or profile lookup fails.
+ * Ensures avatar cache-bust uses profiles.updated_at, not auth.user.updated_at.
+ */
+export async function getOwnerProfileForMeeting(
+  managerId: string | null | undefined,
+  authFallback?: { user_metadata?: { full_name?: string; name?: string; avatar_url?: string; picture?: string } | null; email?: string | null; updated_at?: string }
+): Promise<ResolvedProfile | null> {
+  if (!managerId) return authFallback ? authUserToProfile(authFallback) : null
+  try {
+    const map = await fetchProfilesForUserIds([managerId])
+    const profile = map.get(managerId)
+    if (profile) return profile
+  } catch {
+    /* fallback below */
+  }
+  return authFallback ? authUserToProfile(authFallback) : null
+}
+
+/**
  * Fetch profiles for user IDs. Tries profiles table first (by user_id); falls back to auth for missing.
  */
 export async function fetchProfilesForUserIds(

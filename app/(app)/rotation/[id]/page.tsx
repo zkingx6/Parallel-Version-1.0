@@ -3,7 +3,7 @@ import { createServerSupabase } from "@/lib/supabase-server"
 import { RotationSection } from "@/components/parallel/rotation-section"
 import {
   resolveMembersDisplay,
-  authUserToProfile,
+  getOwnerProfileForMeeting,
 } from "@/lib/profile-resolver"
 
 export default async function RotationPage({
@@ -32,9 +32,10 @@ export default async function RotationPage({
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  const isOwner = meeting.manager_id === user?.id
-  const ownerAuthProfile =
-    isOwner && user ? authUserToProfile(user) : null
+  const ownerAuthProfile = await getOwnerProfileForMeeting(
+    meeting.manager_id,
+    user ?? undefined
+  )
   const membersDisplay = await resolveMembersDisplay(
     members ?? [],
     ownerAuthProfile ?? undefined
