@@ -86,6 +86,8 @@ export async function resolvePostLoginRedirect(): Promise<string> {
 }
 import type { HardNoRange } from "./types"
 import { isComplementOfOverlapPattern } from "./hard-no-ranges"
+import { getPlanLimits } from "./plans"
+import { getEffectivePlanFromDb } from "./plan-resolver"
 
 export async function createMeeting(title: string) {
   const supabase = await createServerSupabase()
@@ -93,6 +95,19 @@ export async function createMeeting(title: string) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
+
+  const plan = await getEffectivePlanFromDb(user.id)
+  const limits = getPlanLimits(plan)
+  const { count } = await supabase
+    .from("meetings")
+    .select("id", { count: "exact", head: true })
+    .eq("manager_id", user.id)
+  if (count != null && count >= limits.maxTeams) {
+    return {
+      error:
+        "You have reached the Starter plan limit of 2 active teams. Upgrade to Pro to create more teams.",
+    }
+  }
 
   const { data: meeting, error } = await supabase
     .from("meetings")
@@ -145,6 +160,17 @@ export async function updateMeetingConfig(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
+
+  if (config.rotation_weeks != null) {
+    const plan = await getEffectivePlanFromDb(user.id)
+    const limits = getPlanLimits(plan)
+    if (config.rotation_weeks > limits.maxRotationWeeks) {
+      return {
+        error:
+          "Starter supports rotations up to 4 weeks. Upgrade to Pro to generate longer schedules.",
+      }
+    }
+  }
 
   const { error } = await supabase
     .from("meetings")
@@ -386,6 +412,21 @@ export async function upsertOwnerParticipant(
     .eq("is_owner_participant", true)
     .maybeSingle()
 
+  if (!existing) {
+    const plan = await getEffectivePlanFromDb(user.id)
+    const limits = getPlanLimits(plan)
+    const { count } = await supabase
+      .from("member_submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("meeting_id", meetingId)
+    if (count != null && count >= limits.maxMembers) {
+      return {
+        error:
+          "This team has reached the Starter plan limit of 5 members. Upgrade to Pro to add more teammates.",
+      }
+    }
+  }
+
   if (existing) {
     const { data, error } = await supabase
       .from("member_submissions")
@@ -622,11 +663,26 @@ export async function submitMember(
 
   const { data: meeting } = await supabase
     .from("meetings")
-    .select("id")
+    .select("id, manager_id")
     .eq("invite_token", token)
     .single()
 
   if (!meeting) return { error: "Invalid invite link." }
+
+  if (!existingId) {
+    const plan = await getEffectivePlanFromDb(meeting.manager_id)
+    const limits = getPlanLimits(plan)
+    const { count } = await supabase
+      .from("member_submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("meeting_id", meeting.id)
+    if (count != null && count >= limits.maxMembers) {
+      return {
+        error:
+          "This team has reached the Starter plan limit of 5 members. Upgrade to Pro to add more teammates.",
+      }
+    }
+  }
 
   const userDefined = Array.isArray(input.hard_no_ranges)
     ? input.hard_no_ranges

@@ -17,9 +17,9 @@ import {
   isNoViableTimeResult,
   isRotationResult,
 } from "@/lib/rotation"
-import { Header } from "./header"
+import { Header } from "./demo-header"
 import { TeamSetup } from "./team-setup"
-import { MeetingConfiguration } from "./meeting-config"
+import { MeetingConfiguration } from "./rotation-config-panel"
 import { RotationOutput } from "./rotation-output"
 import { ensureDisplayTimezoneIana } from "@/lib/timezone"
 import { FairnessSummary } from "./fairness-summary"

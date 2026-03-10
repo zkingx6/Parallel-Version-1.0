@@ -37,6 +37,12 @@ import {
   isRotationResult,
   verifyInputIntegrity,
 } from "@/lib/rotation"
+import type { Plan } from "@/lib/plans"
+import {
+  getPlanLimits,
+  PRO_ROTATION_WEEKS,
+  STARTER_ROTATION_WEEKS,
+} from "@/lib/plans"
 import { RotationOutput } from "./rotation-output"
 import { ScheduleAnalysisContent } from "./schedule-analysis-content"
 import { Button } from "@/components/ui/button"
@@ -67,13 +73,6 @@ const DURATIONS = [
   { label: "1 hour", value: 60 },
   { label: "90 min", value: 90 },
   { label: "2 hours", value: 120 },
-]
-const ROTATION_WEEKS = [
-  { label: "4 weeks", value: 4 },
-  { label: "6 weeks", value: 6 },
-  { label: "8 weeks", value: 8 },
-  { label: "10 weeks", value: 10 },
-  { label: "12 weeks", value: 12 },
 ]
 
 function getModeLabel(modeUsed: string | undefined): string {
@@ -554,6 +553,7 @@ export function RotationSection({
   meeting: initialMeeting,
   members: initialMembers,
   membersDisplay,
+  plan = "starter",
   demoMode,
   onBack,
   onUpdateMeeting,
@@ -563,6 +563,8 @@ export function RotationSection({
   members: DbMemberSubmission[]
   /** Resolved display data from profiles/auth (canonical). memberId -> { name, avatarUrl } */
   membersDisplay: Map<string, { name: string; avatarUrl: string }>
+  /** User plan for feature gating. Default starter. */
+  plan?: Plan
   /** When true, use demo handlers instead of server actions. */
   demoMode?: boolean
   /** When provided (e.g. in demo mode), used for Back to team instead of href. */
@@ -576,7 +578,13 @@ export function RotationSection({
     explain: unknown
   }) => void
 }) {
+  const rotationWeeksOptions =
+    plan === "pro" ? [...PRO_ROTATION_WEEKS] : [...STARTER_ROTATION_WEEKS]
   const [meeting, setMeeting] = useState(initialMeeting)
+  const displayRotationWeeks =
+    plan === "starter" && meeting.rotation_weeks > 4
+      ? 4
+      : (meeting.rotation_weeks ?? 4)
   useEffect(() => {
     setMeeting(initialMeeting)
   }, [initialMeeting])
@@ -649,6 +657,10 @@ export function RotationSection({
         baseTimeMinutes: null,
         anchorOffset: meeting.anchor_offset,
       }
+  const effectiveConfig =
+    plan === "starter" && config.rotationWeeks > 4
+      ? { ...config, rotationWeeks: 4 }
+      : config
   const fixedBaseTimeStatus = useFixedBaseTime
     ? getBaseTimeStatus(team, { ...config, displayTimezone: displayTimezoneIana })
     : null
@@ -656,15 +668,27 @@ export function RotationSection({
 
   const handleConfigChange = useCallback(
     async (updates: Record<string, number | string | null>) => {
-      setMeeting((prev) => ({ ...prev, ...updates }))
+      const prevMeeting = meeting
+      const normalized =
+        plan === "starter" &&
+        updates.rotation_weeks != null &&
+        Number(updates.rotation_weeks) > 4
+          ? { ...updates, rotation_weeks: 4 }
+          : updates
+      setMeeting((prev) => ({ ...prev, ...normalized }))
       setRotationResult(null)
+      setRotationError(null)
       if (demoMode && onUpdateMeeting) {
-        onUpdateMeeting(meeting.id, updates)
+        onUpdateMeeting(meeting.id, normalized)
       } else {
-        await updateMeetingConfig(meeting.id, updates)
+        const result = await updateMeetingConfig(meeting.id, normalized)
+        if (result && "error" in result && result.error) {
+          setMeeting(prevMeeting)
+          setRotationError(result.error)
+        }
       }
     },
-    [demoMode, meeting.id, onUpdateMeeting]
+    [demoMode, meeting, onUpdateMeeting, plan]
   )
 
   useEffect(() => {
@@ -679,16 +703,35 @@ export function RotationSection({
     }
   }, [demoMode, meeting.id, meeting.base_time_minutes, meeting.anchor_offset])
 
+  useEffect(() => {
+    if (demoMode) return
+    if (plan === "starter" && meeting.rotation_weeks > 4) {
+      updateMeetingConfig(meeting.id, { rotation_weeks: 4 }).then(() => {
+        setMeeting((prev) => ({ ...prev, rotation_weeks: 4 }))
+      })
+    }
+  }, [demoMode, plan, meeting.id, meeting.rotation_weeks])
+
   const handleGenerate = () => {
     if (process.env.NODE_ENV === "development") {
       console.log("[DEBUG] Plan button clicked")
+    }
+
+    const limits = getPlanLimits(plan)
+    if (effectiveConfig.rotationWeeks > limits.maxRotationWeeks) {
+      setRotationError(
+        "Starter supports rotations up to 4 weeks. Upgrade to Pro to generate longer schedules."
+      )
+      setRotationResult(null)
+      setNoViableResult(null)
+      return
     }
 
     if (
       typeof process !== "undefined" &&
       process.env.NEXT_PUBLIC_DEBUG_ROTATION === "1"
     ) {
-      verifyInputIntegrity(team, config)
+      verifyInputIntegrity(team, effectiveConfig)
     }
 
     if (team.length < 2) {
@@ -705,7 +748,7 @@ export function RotationSection({
       setNoViableResult(null)
       return
     }
-    const validation = canGenerateRotation(team, config)
+    const validation = canGenerateRotation(team, effectiveConfig)
     if (!validation.valid) {
       const reason = validation.reason ?? ""
       const isInfeasible =
@@ -730,7 +773,7 @@ export function RotationSection({
     }
     if (process.env.NODE_ENV === "development") {
       console.log("[DEBUG] Team length:", team?.length)
-      console.log("Rotation config:", config)
+      console.log("Rotation config:", effectiveConfig)
       console.log("[DEBUG] Calling generateRotationGuarded")
     }
     setIsGenerating(true)
@@ -742,7 +785,7 @@ export function RotationSection({
     setPreviewRelaxedMemberName(null)
     setTimeout(() => {
       try {
-        const result = generateRotationGuarded(team, config)
+        const result = generateRotationGuarded(team, effectiveConfig)
         if (process.env.NODE_ENV === "development") {
           console.log("[DEBUG] generateRotationGuarded result:", result)
         }
@@ -802,7 +845,7 @@ export function RotationSection({
       setPreviewRelaxedMemberName(null)
       setTimeout(() => {
         try {
-          const result = generateRotationGuarded(modifiedTeam, config)
+          const result = generateRotationGuarded(modifiedTeam, effectiveConfig)
           if (isInputContractViolation(result)) {
             const msg =
               result.error.details?.map((d) => d.reason || `${d.field}: invalid`).join("; ") ??
@@ -840,7 +883,7 @@ export function RotationSection({
         setIsGenerating(false)
       }, 800)
     },
-    [team, config]
+    [team, effectiveConfig]
   )
 
   const handlePublishSchedule = async () => {
@@ -948,9 +991,9 @@ export function RotationSection({
               />
               <span>over</span>
               <InlineSelect
-                value={meeting.rotation_weeks}
+                value={displayRotationWeeks}
                 onChange={(v) => handleConfigChange({ rotation_weeks: v })}
-                options={ROTATION_WEEKS}
+                options={rotationWeeksOptions}
               />
             </div>
 
@@ -1085,7 +1128,7 @@ export function RotationSection({
           >
             {isGenerating
               ? "Planning…"
-              : `Plan the next ${meeting.rotation_weeks} weeks fairly`}
+              : `Plan the next ${displayRotationWeeks} weeks fairly`}
           </Button>
           {(team.length < 2 || isFixedBaseTimeBlocked) && (
             <p className="text-xs text-muted-foreground/60 text-center mt-2">
@@ -1124,8 +1167,16 @@ export function RotationSection({
         )}
 
         {rotationError && !noViableResult && !isGenerating && (
-          <div className="rounded-xl border border-stretch/40 bg-stretch/15 p-4 text-center animate-in fade-in-0 duration-300">
+          <div className="rounded-xl border border-stretch/40 bg-stretch/15 p-4 text-center animate-in fade-in-0 duration-300 space-y-3">
             <p className="text-sm text-stretch-foreground">{rotationError}</p>
+            {rotationError.includes("Starter supports rotations") && (
+              <Link
+                href="/upgrade"
+                className="inline-flex items-center justify-center rounded-lg bg-[#0d9488] px-4 py-2 text-[0.84rem] font-medium text-white hover:bg-[#0f766e] transition-colors cursor-pointer"
+              >
+                Upgrade to Pro
+              </Link>
+            )}
           </div>
         )}
 

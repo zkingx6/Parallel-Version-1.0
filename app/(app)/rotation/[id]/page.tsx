@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation"
 import { createServerSupabase } from "@/lib/supabase-server"
-import { RotationSection } from "@/components/parallel/rotation-section"
+import { RotationSection } from "@/components/parallel/rotation-planner-panel"
 import {
   resolveMembersDisplay,
   getOwnerProfileForMeeting,
 } from "@/lib/profile-resolver"
+import { getEffectivePlanFromDb } from "@/lib/plan-resolver"
 
 export default async function RotationPage({
   params,
@@ -32,6 +33,7 @@ export default async function RotationPage({
   const {
     data: { user },
   } = await supabase.auth.getUser()
+  const plan = user ? await getEffectivePlanFromDb(user.id) : "starter"
   const ownerAuthProfile = await getOwnerProfileForMeeting(
     meeting.manager_id,
     user ?? undefined
@@ -46,6 +48,7 @@ export default async function RotationPage({
       meeting={meeting}
       members={members || []}
       membersDisplay={membersDisplay}
+      plan={plan}
     />
   )
 }

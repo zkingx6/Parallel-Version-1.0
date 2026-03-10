@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation"
 import { createServerSupabase } from "@/lib/supabase-server"
-import { TeamSection } from "@/components/parallel/team-section"
+import { TeamSection } from "@/components/parallel/team-management-panel"
 import {
   resolveMembersDisplay,
   getOwnerProfileForMeeting,
 } from "@/lib/profile-resolver"
+import { getEffectivePlanFromDb } from "@/lib/plan-resolver"
 
 export default async function TeamPage({
   params,
@@ -38,6 +39,7 @@ export default async function TeamPage({
   } = await supabase.auth.getUser()
 
   const userEmail = user?.email || ""
+  const plan = user ? await getEffectivePlanFromDb(user.id) : "starter"
   const ownerAuthProfile = await getOwnerProfileForMeeting(
     meeting.manager_id,
     user ?? undefined
@@ -54,6 +56,7 @@ export default async function TeamPage({
       hasOwnerParticipant={hasOwnerParticipant}
       userEmail={userEmail}
       membersDisplay={membersDisplay}
+      plan={plan}
     />
   )
 }

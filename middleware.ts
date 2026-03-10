@@ -10,6 +10,7 @@ const PROTECTED_PREFIXES = [
   "/rotation",
   "/schedule",
   "/settings",
+  "/upgrade",
   "/meeting",
   "/member-dashboard",
   "/member",

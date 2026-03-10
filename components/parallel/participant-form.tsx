@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import Link from "next/link"
 import {
   WORK_HOURS,
   FULL_DAY_HOURS,
@@ -344,9 +345,19 @@ export function ParticipantForm({
       </section>
 
       {error && (
-        <p className="text-[0.88rem] text-[#dc2626] bg-[#fef2f2] rounded-lg px-4 py-3 border border-[#fecaca]">
-          {error}
-        </p>
+        <div className="space-y-2">
+          <p className="text-[0.88rem] text-[#dc2626] bg-[#fef2f2] rounded-lg px-4 py-3 border border-[#fecaca]">
+            {error}
+          </p>
+          {error.includes("Starter plan limit") && (
+            <Link
+              href="/upgrade"
+              className="inline-flex items-center justify-center rounded-lg bg-[#0d9488] px-4 py-2 text-[0.84rem] font-medium text-white hover:bg-[#0f766e] transition-colors cursor-pointer"
+            >
+              Upgrade to Pro
+            </Link>
+          )}
+        </div>
       )}
 
       <Button

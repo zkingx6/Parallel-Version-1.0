@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "motion/react"
 import { createMeeting, deleteMeeting } from "@/lib/actions"
@@ -29,6 +30,7 @@ export function DashboardContent({
 }: DashboardContentProps) {
   const [title, setTitle] = useState("")
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
   const [items, setItems] = useState(meetings)
@@ -46,20 +48,25 @@ export function DashboardContent({
   const handleCreate = async () => {
     if (!title.trim()) return
     setCreating(true)
+    setCreateError(null)
     if (demoMode && onCreateMeeting) {
       const result = await onCreateMeeting(title.trim())
       if (result && "data" in result && result.data) {
         onNavigate?.(`/team/${result.data.id}`)
+        setTitle("")
+        setShowCreate(false)
       }
     } else {
       const result = await createMeeting(title.trim())
       if (result.data) {
         router.push(`/team/${result.data.id}`)
+        setTitle("")
+        setShowCreate(false)
+      } else if (result.error) {
+        setCreateError(result.error)
       }
     }
     setCreating(false)
-    setTitle("")
-    setShowCreate(false)
   }
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
@@ -130,6 +137,19 @@ export function DashboardContent({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
                 >
+                  {createError && (
+                    <div className="mb-3 space-y-2">
+                      <p className="text-[0.88rem] text-[#dc2626] bg-[#fef2f2] rounded-lg px-4 py-3 border border-[#fecaca]">
+                        {createError}
+                      </p>
+                      <Link
+                        href="/upgrade"
+                        className="inline-flex items-center justify-center rounded-lg bg-[#0d9488] px-4 py-2 text-[0.84rem] font-medium text-white hover:bg-[#0f766e] transition-colors cursor-pointer"
+                      >
+                        Upgrade to Pro
+                      </Link>
+                    </div>
+                  )}
                   <div className="flex items-center gap-3">
                     <input
                       type="text"

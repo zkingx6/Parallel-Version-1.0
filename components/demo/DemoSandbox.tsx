@@ -4,8 +4,8 @@ import { useState, useCallback, useEffect } from "react"
 import { SetupProvider } from "@/lib/setup-context"
 import { DemoProvider, useDemo, type DemoView } from "@/lib/demo-context"
 import { DashboardContent } from "@/app/(app)/dashboard/content"
-import { TeamSection } from "@/components/parallel/team-section"
-import { RotationSection } from "@/components/parallel/rotation-section"
+import { TeamSection } from "@/components/parallel/team-management-panel"
+import { RotationSection } from "@/components/parallel/rotation-planner-panel"
 import { ScheduleListContent } from "@/components/parallel/schedule-list-content"
 import { ScheduleDetailContent } from "@/components/parallel/schedule-detail-content"
 import { ScheduleAnalysisContent } from "@/components/parallel/schedule-analysis-content"
@@ -301,6 +301,7 @@ function DemoSandboxInner() {
             hasOwnerParticipant={selectedMembers.some((m) => m.is_owner_participant)}
             userEmail="demo@parallel.app"
             membersDisplay={getMembersDisplay(selectedMeeting.id)}
+            plan="pro"
             demoMode
             hideOwnerActions={!isOwner}
             onBack={() => onNavigate("teams")}
@@ -328,6 +329,7 @@ function DemoSandboxInner() {
             meeting={selectedMeeting}
             members={selectedMembers}
             membersDisplay={getMembersDisplay(selectedMeeting.id)}
+            plan="pro"
             demoMode
             onBack={() => onNavigate("teams")}
             onUpdateMeeting={(id, patch) => updateMeeting(id, patch)}
