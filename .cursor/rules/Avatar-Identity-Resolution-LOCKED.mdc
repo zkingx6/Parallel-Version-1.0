@@ -1,0 +1,185 @@
+---
+alwaysApply: true
+---
+
+Purpose
+
+Prevent avatar/name inconsistencies across the application by enforcing a single identity source of truth and a strict avatar resolution order.
+
+This rule exists because previous implementations caused:
+
+Team page showing fallback initials instead of avatar
+
+Different pages showing different avatars for the same user
+
+member.avatar_url === null incorrectly overriding profile avatars
+
+Duplicate identity rendering
+
+This rule is locked and must not be changed without explicit approval.
+
+1. Canonical Identity Key
+
+The only valid identity key across the system is:
+
+user_id
+
+Mapping:
+
+auth.users.id
+= profiles.user_id
+= member_submissions.user_id
+
+Never use:
+
+profiles.id
+member_submissions.id
+team_members.id
+
+These are row identifiers, not identity identifiers.
+
+2. Avatar Source of Truth
+
+The single source of truth for avatars is:
+
+profiles.avatar_url
+
+Avatar resolution order must always be:
+
+1️⃣ profiles.avatar_url
+2️⃣ member_submissions.avatar_url (legacy fallback only)
+3️⃣ fallback initials
+
+Important rule:
+
+member.avatar_url === null MUST NOT override profile.avatar_url
+
+This bug previously caused owner avatars to disappear.
+
+3. Avatar Cache Busting (MANDATORY)
+
+All avatar URLs must include a cache-busting version parameter.
+
+?v=<profiles.updated_at>
+
+Example:
+
+https://supabase.../avatars/<user_id>/avatar.png?v=2026-03-10T00:17:00
+
+This prevents browser caching after avatar updates.
+
+Cache busting must be applied inside the profile resolver, not in UI components.
+
+4. Avatar Rendering Rule
+
+All UI components must receive avatars from the resolver layer.
+
+UI components must never fetch profile data directly.
+
+Allowed:
+
+resolveDisplayProfile()
+resolveMembersDisplay()
+resolveCurrentUserDisplay()
+
+Forbidden:
+
+auth.user.avatar_url
+member.avatar_url
+email-based fallback
+
+All avatar data must come from the profile resolver pipeline.
+
+5. Resolver Responsibilities
+
+profile-resolver.ts is the single authority for identity display data.
+
+It must output:
+
+{
+  id
+  user_id
+  name
+  avatarUrl
+}
+
+UI components must treat this object as fully resolved display data.
+
+No additional avatar logic should exist in UI.
+
+6. Owner Row Special Case
+
+Owner rows created in:
+
+member_submissions
+
+may contain:
+
+avatar_url = null
+
+This is expected and must not suppress profile avatars.
+
+Resolver must always check:
+
+profile.avatarUrl first
+7. UI Component Rule
+
+Components such as:
+
+TeamSection
+RotationSection
+ScheduleView
+MemberDashboard
+TopNav
+
+must render avatars only via:
+
+<MemberAvatar avatarUrl={resolved.avatarUrl} />
+
+UI components must never construct avatar URLs themselves.
+
+8. Debug Logging (Development Only)
+
+In development mode, resolvers should log identity resolution:
+
+NODE_ENV === development
+
+Log:
+
+member.id
+member.user_id
+resolved.name
+resolved.avatarUrl
+
+This prevents silent identity mismatches.
+
+9. Identity Consistency Requirement
+
+For the same user_id, the following must always match:
+
+Page	Avatar	Name
+Top Nav	same	same
+Account	same	same
+Team	same	same
+Rotation	same	same
+Schedule	same	same
+
+If any page differs, the resolver pipeline is broken.
+
+10. Change Control
+
+Do NOT modify avatar logic without reviewing:
+
+profile-resolver.ts
+resolveMembersDisplay()
+resolveDisplayProfile()
+resolveCurrentUserDisplay()
+
+Any change must guarantee:
+
+profiles.avatar_url remains the primary source
+Final Rule
+All avatars in Parallel MUST originate from profiles.avatar_url
+and pass through profile-resolver.ts before reaching the UI.
+
+No exceptions.

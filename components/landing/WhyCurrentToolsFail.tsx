@@ -138,8 +138,8 @@ export function WhyCurrentToolsFail() {
             size="lg"
             className="rounded-full px-8 py-6 text-base font-medium shadow-md hover:shadow-lg transition-shadow"
           >
-            <Link href="/login" className="gap-2.5">
-              Start your first fair rotation
+            <Link href="/signup" className="gap-2.5">
+              Start free
               <ArrowRight size={16} className="shrink-0" />
             </Link>
           </Button>

@@ -59,9 +59,15 @@ export function Navbar() {
           <div className="flex items-center gap-3 sm:gap-4">
             <Link
               href="/login"
+              className="hidden sm:inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/signup"
               className="hidden sm:inline-flex items-center justify-center rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:shadow-md"
             >
-              Get started
+              Start free
             </Link>
             <button
               className="md:hidden p-2 -mr-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200"
@@ -101,13 +107,22 @@ export function Navbar() {
                   </a>
                 );
               })}
-              <Link
-                href="/login"
-                className="mt-3 flex items-center justify-center rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:shadow-md"
-                onClick={() => setMobileOpen(false)}
-              >
-                Get started
-              </Link>
+              <div className="mt-3 flex flex-col gap-2">
+                <Link
+                  href="/login"
+                  className="flex items-center justify-center rounded-full px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Log in
+                </Link>
+                <Link
+                  href="/signup"
+                  className="flex items-center justify-center rounded-full bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:shadow-md"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Start free
+                </Link>
+              </div>
             </div>
           </div>
         )}

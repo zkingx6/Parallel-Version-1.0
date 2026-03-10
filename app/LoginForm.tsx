@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, usePathname } from "next/navigation"
 import { useActionState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -35,8 +35,10 @@ export function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [isSignUp, setIsSignUp] = useState(false)
+  const pathname = usePathname()
   const searchParams = useSearchParams()
+  const defaultSignUp = pathname === "/signup" || searchParams.get("signup") === "1"
+  const [isSignUp, setIsSignUp] = useState(defaultSignUp)
   const redirectTo = searchParams.get("redirect")
   const urlError = searchParams.get("error")
 

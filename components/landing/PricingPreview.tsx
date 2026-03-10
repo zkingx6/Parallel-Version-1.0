@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
 import { Check } from "lucide-react";
 
@@ -14,6 +15,7 @@ type Plan = {
   trialNote: string | null;
   features: string[];
   cta: string;
+  ctaHref: string | null;
   ctaNote: string | null;
   ctaStyle: "outline" | "filled";
 };
@@ -22,8 +24,8 @@ const plans: Plan[] = [
   {
     name: "Starter",
     subtitle: "For small distributed teams",
-    priceMonthly: "$19",
-    priceYearly: "$15",
+    priceMonthly: "$13",
+    priceYearly: "$9",
     badge: null,
     highlight: false,
     trialNote: "14-day free trial",
@@ -34,7 +36,8 @@ const plans: Plan[] = [
       "Timezone-aware scheduling",
       "Export rotations to your calendar (.ics)",
     ],
-    cta: "Start free trial",
+    cta: "Start free",
+    ctaHref: "/signup",
     ctaNote: null,
     ctaStyle: "outline",
   },
@@ -54,7 +57,8 @@ const plans: Plan[] = [
       "Priority support",
       "Everything in Starter",
     ],
-    cta: "Upgrade to Pro",
+    cta: "Choose Pro",
+    ctaHref: "/signup",
     ctaNote: null,
     ctaStyle: "filled",
   },
@@ -74,6 +78,7 @@ const plans: Plan[] = [
       "Dedicated support",
     ],
     cta: "Contact sales",
+    ctaHref: null,
     ctaNote: null,
     ctaStyle: "outline",
   },
@@ -222,36 +227,74 @@ function PricingCard({
 
         {/* CTA Button */}
         <div className="mt-auto">
-          {plan.ctaStyle === "filled" ? (
-            <motion.button
-              className="w-full py-3 rounded-xl text-white text-[0.92rem] cursor-pointer border-0"
-              style={{
-                fontWeight: 500,
-                backgroundColor: "#0d9488",
-              }}
-              whileHover={{
-                backgroundColor: "#0f766e",
-                boxShadow: "0 4px 16px rgba(13, 148, 136, 0.25)",
-              }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ duration: 0.2 }}
-            >
-              {plan.cta}
-            </motion.button>
+          {plan.ctaHref ? (
+            plan.ctaStyle === "filled" ? (
+              <Link href={plan.ctaHref}>
+                <motion.span
+                  className="block w-full py-3 rounded-xl text-white text-[0.92rem] cursor-pointer border-0 text-center"
+                  style={{
+                    fontWeight: 500,
+                    backgroundColor: "#0d9488",
+                  }}
+                  whileHover={{
+                    backgroundColor: "#0f766e",
+                    boxShadow: "0 4px 16px rgba(13, 148, 136, 0.25)",
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {plan.cta}
+                </motion.span>
+              </Link>
+            ) : (
+              <Link href={plan.ctaHref}>
+                <motion.span
+                  className="block w-full py-3 rounded-xl bg-white text-[#1a1a2e] text-[0.92rem] border border-[#d1d5db] cursor-pointer text-center"
+                  style={{ fontWeight: 500 }}
+                  whileHover={{
+                    borderColor: "#0d9488",
+                    color: "#0d9488",
+                    boxShadow: "0 2px 12px rgba(13, 148, 136, 0.08)",
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {plan.cta}
+                </motion.span>
+              </Link>
+            )
           ) : (
-            <motion.button
-              className="w-full py-3 rounded-xl bg-white text-[#1a1a2e] text-[0.92rem] border border-[#d1d5db] cursor-pointer"
-              style={{ fontWeight: 500 }}
-              whileHover={{
-                borderColor: "#0d9488",
-                color: "#0d9488",
-                boxShadow: "0 2px 12px rgba(13, 148, 136, 0.08)",
-              }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ duration: 0.2 }}
-            >
-              {plan.cta}
-            </motion.button>
+            plan.ctaStyle === "filled" ? (
+              <motion.button
+                className="w-full py-3 rounded-xl text-white text-[0.92rem] cursor-pointer border-0"
+                style={{
+                  fontWeight: 500,
+                  backgroundColor: "#0d9488",
+                }}
+                whileHover={{
+                  backgroundColor: "#0f766e",
+                  boxShadow: "0 4px 16px rgba(13, 148, 136, 0.25)",
+                }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+              >
+                {plan.cta}
+              </motion.button>
+            ) : (
+              <motion.button
+                className="w-full py-3 rounded-xl bg-white text-[#1a1a2e] text-[0.92rem] border border-[#d1d5db] cursor-pointer"
+                style={{ fontWeight: 500 }}
+                whileHover={{
+                  borderColor: "#0d9488",
+                  color: "#0d9488",
+                  boxShadow: "0 2px 12px rgba(13, 148, 136, 0.08)",
+                }}
+                whileTap={{ scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+              >
+                {plan.cta}
+              </motion.button>
+            )
           )}
 
           {/* CTA sub-note */}

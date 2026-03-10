@@ -17,10 +17,10 @@ export function FinalCTA() {
             required.
           </p>
           <Link
-            href="/login"
+            href="/signup"
             className="mt-8 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:shadow-lg hover:shadow-primary/20"
           >
-            Get started free
+            Start free
             <ArrowRight className="size-4" />
           </Link>
         </div>

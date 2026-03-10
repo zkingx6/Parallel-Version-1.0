@@ -226,7 +226,7 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.65 }}
           >
-            <Link href="/login">
+            <Link href="/signup">
               <motion.span
                 className="inline-flex items-center gap-2 bg-[#0d9488] text-white px-7 py-3 rounded-full text-[0.92rem] cursor-pointer border-0"
                 style={{ fontWeight: 500 }}
@@ -238,12 +238,12 @@ export function Hero() {
                 whileTap={{ scale: 0.97 }}
                 transition={{ duration: 0.25 }}
               >
-                Start rotating meeting times
+                Start free
                 <ArrowRight size={16} />
               </motion.span>
             </Link>
 
-            <Link href="#how-it-works">
+            <Link href="#pricing">
               <motion.span
                 className="inline-flex items-center justify-center bg-white text-[#1a1a2e] px-6 py-3 rounded-full text-[0.92rem] border border-[#d1d5db] cursor-pointer"
                 style={{ fontWeight: 500 }}
@@ -255,7 +255,7 @@ export function Hero() {
                 whileTap={{ scale: 0.97 }}
                 transition={{ duration: 0.25 }}
               >
-                See how it works
+                See pricing
               </motion.span>
             </Link>
           </motion.div>
