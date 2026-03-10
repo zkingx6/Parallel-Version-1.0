@@ -208,7 +208,7 @@ function computeInitials(name: string): string {
 /**
  * Resolve profile for display. Single source for all member/owner identity rendering.
  * Precedence: profile (synced from auth) > member_submissions.
- * When member_submissions.avatar_url is explicitly null, user removed avatar in member context.
+ * Profile.avatarUrl takes precedence; member.avatar_url === null only applies when profile has no avatar.
  */
 export function resolveDisplayProfile(
   profile: ResolvedProfile | null,
@@ -216,11 +216,9 @@ export function resolveDisplayProfile(
 ): ResolvedIdentityDisplay {
   const name = (profile?.fullName || memberFallback.name || "").trim() || "?"
   const rawUrl =
-    memberFallback.avatar_url === null
-      ? ""
-      : (profile?.avatarUrl && String(profile.avatarUrl).trim()) ||
-        (memberFallback.avatar_url && String(memberFallback.avatar_url).trim()) ||
-        ""
+    (profile?.avatarUrl && String(profile.avatarUrl).trim()) ||
+    (memberFallback.avatar_url && String(memberFallback.avatar_url).trim()) ||
+    ""
   const updatedAt =
     (profile?.avatarUrl ? profile.updatedAt : null) ??
     (memberFallback.avatar_url != null ? memberFallback.updated_at : null) ??
@@ -268,6 +266,15 @@ export async function resolveMembersDisplay(
           : null
     const resolved = resolveDisplayProfile(profile, m)
     result.set(m.id, resolved)
+
+    if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+      console.log("[resolveMembersDisplay]", {
+        id: m.id,
+        user_id: m.user_id ?? null,
+        is_owner_participant: m.is_owner_participant ?? false,
+        resolved: { name: resolved.name, avatarUrl: resolved.avatarUrl ? `${resolved.avatarUrl.slice(0, 60)}...` : "(empty)" },
+      })
+    }
   }
   return result
 }
