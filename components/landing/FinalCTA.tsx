@@ -18,7 +18,7 @@ export function FinalCTA() {
           </p>
           <Link
             href="/signup"
-            className="mt-8 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:shadow-lg hover:shadow-primary/20"
+            className="mt-8 inline-flex items-center justify-center gap-2 rounded-lg bg-white text-emerald-600 border border-emerald-200 px-6 py-3 text-sm font-medium hover:border-emerald-400 hover:bg-emerald-50 transition-colors duration-200"
           >
             Start free
             <ArrowRight className="size-4" />

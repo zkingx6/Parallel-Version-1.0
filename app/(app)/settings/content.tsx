@@ -22,6 +22,7 @@ import { SignOutConfirmModal } from "@/components/account/sign-out-confirm-modal
 import { updateProfile } from "@/lib/actions"
 import type { Plan } from "@/lib/plans"
 import type { BillingInfo } from "@/lib/billing"
+import { PRICING_SECONDARY_CLASSES } from "@/lib/pricing-button-styles"
 
 type SettingsContentProps = {
   userEmail: string
@@ -385,7 +386,7 @@ export function SettingsContent({
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/upgrade"
-                className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+                className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium ${PRICING_SECONDARY_CLASSES}`}
               >
                 Choose a plan
               </Link>

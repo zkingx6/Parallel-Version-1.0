@@ -135,8 +135,9 @@ export function WhyCurrentToolsFail() {
         <div className="flex justify-center">
           <Button
             asChild
+            variant="pricing-secondary"
             size="lg"
-            className="rounded-full px-8 py-6 text-base font-medium shadow-md hover:shadow-lg transition-shadow"
+            className="rounded-full px-8 py-6 text-base font-medium"
           >
             <Link href="/signup" className="gap-2.5">
               Start free

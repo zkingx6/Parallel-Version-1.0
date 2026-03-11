@@ -228,11 +228,11 @@ export function Hero() {
           >
             <Link href="/signup">
               <motion.span
-                className="inline-flex items-center gap-2 bg-[#0d9488] text-white px-7 py-3 rounded-full text-[0.92rem] cursor-pointer border-0"
+                className="inline-flex items-center gap-2 bg-white text-emerald-600 border border-emerald-200 px-7 py-3 rounded-full text-[0.92rem] cursor-pointer transition-colors duration-200 hover:border-emerald-400 hover:bg-emerald-50"
                 style={{ fontWeight: 500 }}
                 whileHover={{
-                  backgroundColor: "#0f766e",
-                  boxShadow: "0 6px 24px rgba(13,148,136,0.25)",
+                  borderColor: "#34d399",
+                  backgroundColor: "#ecfdf5",
                   gap: "10px",
                 }}
                 whileTap={{ scale: 0.97 }}
@@ -245,12 +245,11 @@ export function Hero() {
 
             <Link href="#pricing">
               <motion.span
-                className="inline-flex items-center justify-center bg-white text-[#1a1a2e] px-6 py-3 rounded-full text-[0.92rem] border border-[#d1d5db] cursor-pointer"
+                className="inline-flex items-center justify-center bg-white text-emerald-600 border border-emerald-200 px-6 py-3 rounded-full text-[0.92rem] cursor-pointer transition-colors duration-200 hover:border-emerald-400 hover:bg-emerald-50"
                 style={{ fontWeight: 500 }}
                 whileHover={{
-                  borderColor: "#0d9488",
-                  color: "#0d9488",
-                  boxShadow: "0 2px 12px rgba(13,148,136,0.08)",
+                  borderColor: "#34d399",
+                  backgroundColor: "#ecfdf5",
                 }}
                 whileTap={{ scale: 0.97 }}
                 transition={{ duration: 0.25 }}

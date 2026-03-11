@@ -4,6 +4,10 @@ import { useState } from "react"
 import Link from "next/link"
 import { motion } from "motion/react"
 import { Check } from "lucide-react"
+import {
+  PRICING_SECONDARY_CLASSES,
+  PRICING_SECONDARY_HOVER,
+} from "@/lib/pricing-button-styles"
 import type { Plan as AppPlan } from "@/lib/plans"
 
 /** Resolved plan for pricing UI. trial = on free trial; starter = paid Starter; pro = paid Pro; enterprise = paid Enterprise. */
@@ -30,7 +34,7 @@ const basePlans: PricingPlan[] = [
     name: "Starter",
     subtitle: "Perfect for small distributed teams",
     priceMonthly: "$13",
-    priceYearly: "$9",
+    priceYearly: "$10",
     badge: null,
     highlight: false,
     trialNote: "14-day free trial",
@@ -49,8 +53,8 @@ const basePlans: PricingPlan[] = [
   {
     name: "Pro",
     subtitle: "For growing distributed teams",
-    priceMonthly: "$39",
-    priceYearly: "$31",
+    priceMonthly: "$49",
+    priceYearly: "$39",
     badge: "Most popular",
     highlight: true,
     trialNote: null,
@@ -154,14 +158,10 @@ function PricingCard({
 
   const renderCta = () => {
     const baseButtonClass =
-      "block w-full py-3 rounded-xl text-[0.92rem] border-0 text-center"
+      "block w-full py-3 rounded-xl text-[0.92rem] text-center"
     const filledClass =
-      "text-white cursor-pointer"
-    const isStarterPrimaryCta =
-      plan.name === "Starter" && plan.cta === "Start free"
-    const outlineClass = isStarterPrimaryCta
-      ? "bg-white text-emerald-600 border border-emerald-200 cursor-pointer transition-colors duration-200 hover:border-emerald-400 hover:bg-emerald-50"
-      : "bg-white text-[#1a1a2e] border border-[#d1d5db] cursor-pointer"
+      "border-0 text-white cursor-pointer"
+    const outlineClass = PRICING_SECONDARY_CLASSES
 
     if (plan.ctaDisabled) {
       return (
@@ -198,18 +198,7 @@ function PricingCard({
           <motion.span
             className={`${baseButtonClass} ${outlineClass}`}
             style={{ fontWeight: 500 }}
-            whileHover={
-              isStarterPrimaryCta
-                ? {
-                    borderColor: "#34d399",
-                    backgroundColor: "#ecfdf5",
-                  }
-                : {
-                    borderColor: "#0d9488",
-                    color: "#0d9488",
-                    boxShadow: "0 2px 12px rgba(13, 148, 136, 0.08)",
-                  }
-            }
+            whileHover={PRICING_SECONDARY_HOVER}
             whileTap={{ scale: 0.98 }}
             transition={{ duration: 0.2 }}
           >
@@ -247,11 +236,7 @@ function PricingCard({
         }
         className={`${baseButtonClass} ${outlineClass}`}
         style={{ fontWeight: 500 }}
-        whileHover={{
-          borderColor: "#0d9488",
-          color: "#0d9488",
-          boxShadow: "0 2px 12px rgba(13, 148, 136, 0.08)",
-        }}
+        whileHover={PRICING_SECONDARY_HOVER}
         whileTap={{ scale: 0.98 }}
         transition={{ duration: 0.2 }}
       >
