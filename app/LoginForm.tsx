@@ -44,7 +44,10 @@ export function LoginForm() {
 
   const [state, formAction, isPending] = useActionState(
     async (_prev: { error: string | null; signUpSuccess?: boolean } | null, formData: FormData) => {
-      if (redirectTo) formData.set("redirectTo", redirectTo)
+      if (redirectTo) {
+        formData.set("redirectTo", redirectTo)
+        if (typeof window !== "undefined") formData.set("redirectOrigin", window.location.origin)
+      }
       formData.set("isSignUp", isSignUp ? "1" : "0")
       return signInAction(formData)
     },
@@ -56,11 +59,13 @@ export function LoginForm() {
 
   const signInWithGoogle = async () => {
     const supabase = createClient()
+    const callbackUrl =
+      redirectTo && redirectTo.startsWith("/member-dashboard")
+        ? `${location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+        : `${location.origin}/auth/callback`
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${location.origin}/auth/callback?next=/teams`,
-      },
+      options: { redirectTo: callbackUrl },
     })
   }
 

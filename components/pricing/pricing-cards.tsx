@@ -6,6 +6,9 @@ import { motion } from "motion/react"
 import { Check } from "lucide-react"
 import type { Plan as AppPlan } from "@/lib/plans"
 
+/** Resolved plan for pricing UI. trial = on free trial; starter = paid Starter; pro = paid Pro; enterprise = paid Enterprise. */
+export type ResolvedPlan = "trial" | "starter" | "pro" | "enterprise"
+
 export type PricingPlan = {
   name: string
   subtitle: string
@@ -88,38 +91,48 @@ const basePlans: PricingPlan[] = [
 
 function getPlansForMode(
   mode: "marketing" | "upgrade",
-  currentPlan: AppPlan
+  resolvedPlan: ResolvedPlan
 ): PricingPlan[] {
   if (mode === "marketing") return basePlans
 
   return basePlans.map((p) => {
     if (p.name === "Starter") {
+      const isCurrent = resolvedPlan === "trial" || resolvedPlan === "starter"
+      const isProUser = resolvedPlan === "pro"
+      const isEnterprise = resolvedPlan === "enterprise"
       return {
         ...p,
-        badge: currentPlan === "starter" ? "Your current plan" : null,
-        cta: "Current plan",
+        badge: isCurrent ? "Your current plan" : null,
+        cta: isCurrent ? "Current plan" : isProUser ? "Downgrade to Starter" : "Starter",
         ctaHref: null,
         ctaNote: null,
         ctaStyle: "outline",
-        ctaDisabled: currentPlan === "starter",
+        ctaDisabled: isCurrent || isProUser || isEnterprise,
       }
     }
     if (p.name === "Pro") {
+      const isCurrent = resolvedPlan === "pro"
+      const isEnterprise = resolvedPlan === "enterprise"
       return {
         ...p,
-        cta: "Upgrade to Pro",
+        badge: isCurrent ? "Your current plan" : null,
+        cta: isCurrent ? "Current plan" : "Upgrade to Pro",
         ctaHref: null,
         ctaNote: null,
-        ctaStyle: "filled",
+        ctaStyle: isCurrent ? "outline" : "filled",
+        ctaDisabled: isCurrent || isEnterprise,
       }
     }
     if (p.name === "Enterprise") {
+      const isCurrent = resolvedPlan === "enterprise"
       return {
         ...p,
-        cta: "Contact sales",
+        badge: isCurrent ? "Your current plan" : null,
+        cta: isCurrent ? "Current plan" : "Contact sales",
         ctaHref: null,
         ctaNote: null,
         ctaStyle: "outline",
+        ctaDisabled: isCurrent,
       }
     }
     return p
@@ -375,6 +388,9 @@ function PricingCard({
 
 export type PricingCardsProps = {
   mode: "marketing" | "upgrade"
+  /** Resolved plan for pricing UI: trial | starter | pro | enterprise. All cards use this single value. */
+  resolvedPlan?: ResolvedPlan
+  /** @deprecated Use resolvedPlan. Kept for backward compatibility with marketing mode. */
   currentPlan?: AppPlan
   onUpgradeClick?: () => void
   showBillingToggle?: boolean
@@ -384,6 +400,7 @@ export type PricingCardsProps = {
 
 export function PricingCards({
   mode,
+  resolvedPlan: resolvedPlanProp,
   currentPlan = "starter",
   onUpgradeClick,
   showBillingToggle = true,
@@ -391,7 +408,14 @@ export function PricingCards({
   showOwnerNote = true,
 }: PricingCardsProps) {
   const [isYearly, setIsYearly] = useState(false)
-  const plans = getPlansForMode(mode, currentPlan)
+  const resolvedPlan: ResolvedPlan =
+    resolvedPlanProp ??
+    (currentPlan === "pro"
+      ? "pro"
+      : currentPlan === "enterprise"
+        ? "enterprise"
+        : "starter")
+  const plans = getPlansForMode(mode, resolvedPlan)
 
   return (
     <div className="max-w-4xl mx-auto">

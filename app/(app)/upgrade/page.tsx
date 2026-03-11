@@ -1,14 +1,26 @@
 import { createServerSupabase } from "@/lib/supabase-server"
 import { PageBackLink } from "@/components/ui/page-back-link"
-import { getEffectivePlanFromDb } from "@/lib/plan-resolver"
+import { getPlanAndTrialFromDb } from "@/lib/plan-resolver"
 import { UpgradePageContent } from "./content"
+import type { ResolvedPlan } from "@/components/pricing/pricing-cards"
+
+function resolvePlanForPricing(
+  plan: string,
+  trialActive: boolean
+): ResolvedPlan {
+  if (plan === "pro") return "pro"
+  if (plan === "enterprise") return "enterprise"
+  if (plan === "starter" && trialActive) return "trial"
+  return "starter"
+}
 
 export default async function UpgradePage() {
   const supabase = await createServerSupabase()
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  const plan = user ? await getEffectivePlanFromDb(user.id) : "starter"
+  const planInfo = user ? await getPlanAndTrialFromDb(user.id) : { plan: "starter" as const, trialActive: false, trialDaysLeft: 0 }
+  const resolvedPlan = resolvePlanForPricing(planInfo.plan, planInfo.trialActive)
 
   return (
     <main className="mx-auto max-w-4xl px-5 sm:px-8 pt-8 sm:pt-12 pb-8">
@@ -19,7 +31,7 @@ export default async function UpgradePage() {
       <p className="text-sm text-muted-foreground mb-10">
         Get more capacity for your teams and longer rotation schedules.
       </p>
-      <UpgradePageContent currentPlan={plan} />
+      <UpgradePageContent resolvedPlan={resolvedPlan} />
     </main>
   )
 }

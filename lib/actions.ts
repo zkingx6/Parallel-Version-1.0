@@ -20,7 +20,21 @@ export async function signInAction(formData: FormData) {
   const supabase = await createServerSupabase()
 
   if (isSignUp) {
-    const { error } = await supabase.auth.signUp({ email, password })
+    const safeRedirect =
+      redirectTo &&
+      typeof redirectTo === "string" &&
+      redirectTo.startsWith("/") &&
+      !redirectTo.startsWith("//")
+    const redirectOrigin = (formData.get("redirectOrigin") as string)?.trim()
+    const origin = redirectOrigin || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    const emailRedirectTo = safeRedirect
+      ? `${origin.replace(/\/$/, "")}/auth/callback?next=${encodeURIComponent(redirectTo)}`
+      : undefined
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo },
+    })
     if (error) return { error: error.message }
     return { error: null, signUpSuccess: true }
   }
@@ -28,12 +42,7 @@ export async function signInAction(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) return { error: error.message }
 
-  const safeRedirect =
-    redirectTo &&
-    typeof redirectTo === "string" &&
-    redirectTo.startsWith("/") &&
-    !redirectTo.startsWith("//")
-  const target = safeRedirect ? redirectTo : await resolvePostLoginRedirect()
+  const target = await resolveFinalRedirect(redirectTo)
   redirect(target)
 }
 
@@ -84,6 +93,77 @@ export async function resolvePostLoginRedirect(): Promise<string> {
 
   return "/teams"
 }
+
+/**
+ * Link member row to current user when redirect targets member-dashboard with token+memberId.
+ * Used for invite flow: user submitted while anonymous, then signed in; row had user_id=null.
+ * Also syncs member.name to profile.full_name when profile has no name (ensures correct display).
+ */
+async function linkMemberToUserIfNeeded(requestedRedirect: string | null): Promise<void> {
+  if (!requestedRedirect || !requestedRedirect.startsWith("/member-dashboard")) return
+  const parsed = new URL(requestedRedirect, "http://x")
+  const token = parsed.searchParams.get("token")
+  const memberId = parsed.searchParams.get("memberId")
+  if (!token || !memberId) return
+
+  const serverSupabase = await createServerSupabase()
+  const { data: { user } } = await serverSupabase.auth.getUser()
+  if (!user) return
+
+  const serviceSupabase = createServiceSupabase()
+  const { data: meeting } = await serviceSupabase
+    .from("meetings")
+    .select("id")
+    .eq("invite_token", token)
+    .single()
+  if (!meeting) return
+
+  const { data: member } = await serviceSupabase
+    .from("member_submissions")
+    .select("id, name")
+    .eq("id", memberId)
+    .eq("meeting_id", meeting.id)
+    .is("user_id", null)
+    .maybeSingle()
+  if (!member) return
+
+  const { error: updateErr } = await serviceSupabase
+    .from("member_submissions")
+    .update({ user_id: user.id, updated_at: new Date().toISOString() })
+    .eq("id", memberId)
+    .eq("meeting_id", meeting.id)
+    .is("user_id", null)
+  if (updateErr) return
+
+  const memberName = (member.name && String(member.name).trim()) || null
+  if (memberName) {
+    await serviceSupabase
+      .from("profiles")
+      .update({ full_name: memberName, updated_at: new Date().toISOString() })
+      .eq("user_id", user.id)
+  }
+}
+
+/**
+ * Resolve final redirect after login. Uses role-based target unless requestedRedirect
+ * is safe and role-compatible (members must not be sent to owner paths).
+ * For invite flow: links member row to user when redirect has token+memberId.
+ */
+export async function resolveFinalRedirect(requestedRedirect: string | null): Promise<string> {
+  await linkMemberToUserIfNeeded(requestedRedirect)
+  const roleTarget = await resolvePostLoginRedirect()
+  const safe =
+    requestedRedirect &&
+    typeof requestedRedirect === "string" &&
+    requestedRedirect.startsWith("/") &&
+    !requestedRedirect.startsWith("//")
+  if (!safe) return roleTarget
+  if (roleTarget.startsWith("/member-dashboard") && !requestedRedirect.startsWith("/member-dashboard")) {
+    return roleTarget
+  }
+  return requestedRedirect
+}
+
 import type { HardNoRange } from "./types"
 import { isComplementOfOverlapPattern } from "./hard-no-ranges"
 import { getPlanLimits } from "./plans"

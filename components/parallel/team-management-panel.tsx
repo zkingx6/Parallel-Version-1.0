@@ -323,17 +323,9 @@ export function TeamSection({
               Share this link with your team. They set their own timezone and boundaries.
             </p>
             {inviteLimitReached && (
-              <div className="mb-3 space-y-2">
-                <p className="text-[0.88rem] text-[#dc2626] bg-[#fef2f2] rounded-lg px-4 py-3 border border-[#fecaca]">
-                  This team has reached the Starter plan limit of 5 members. Upgrade to Pro to invite more teammates.
-                </p>
-                <Link
-                  href="/upgrade"
-                  className="inline-flex items-center justify-center rounded-lg bg-[#0d9488] px-4 py-2 text-[0.84rem] font-medium text-white hover:bg-[#0f766e] transition-colors cursor-pointer"
-                >
-                  Upgrade to Pro
-                </Link>
-              </div>
+              <p className="mb-3 text-[0.88rem] text-[#dc2626] bg-[#fef2f2] rounded-lg px-4 py-3 border border-[#fecaca]">
+                This team has reached the Starter plan limit of 5 members. Manage your plan in Account.
+              </p>
             )}
             <div className="bg-white rounded-xl border border-[#edeef0] px-4 py-3 flex items-center gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
               <code className="flex-1 text-[0.8rem] text-[#6b7280] truncate font-mono">

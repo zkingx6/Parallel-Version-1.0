@@ -47,7 +47,7 @@ export async function syncProfileFromAuth(
   try {
     const { data: existing } = await supabase
       .from("profiles")
-      .select("user_id, email, full_name, avatar_url")
+      .select("user_id, email, full_name, avatar_url, trial_ends_at")
       .eq("user_id", user.id)
       .maybeSingle()
 
@@ -56,11 +56,15 @@ export async function syncProfileFromAuth(
     const authAvatar = getAuthAvatar(user)
 
     if (!existing) {
+      const trialEndsAt = new Date()
+      trialEndsAt.setDate(trialEndsAt.getDate() + 14)
       await supabase.from("profiles").insert({
         user_id: user.id,
         email: authEmail,
         full_name: authName || null,
         avatar_url: authAvatar || null,
+        plan: "starter",
+        trial_ends_at: trialEndsAt.toISOString(),
       })
       return
     }
@@ -73,14 +77,21 @@ export async function syncProfileFromAuth(
       authAvatar ||
       null
 
+    const updatePayload: Record<string, unknown> = {
+      email,
+      full_name: fullName,
+      avatar_url: avatarUrl,
+      updated_at: new Date().toISOString(),
+    }
+    if (existing.trial_ends_at == null) {
+      const trialEndsAt = new Date()
+      trialEndsAt.setDate(trialEndsAt.getDate() + 14)
+      updatePayload.trial_ends_at = trialEndsAt.toISOString()
+    }
+
     await supabase
       .from("profiles")
-      .update({
-        email,
-        full_name: fullName,
-        avatar_url: avatarUrl,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("user_id", user.id)
   } catch {
     /* profiles table may not exist yet */

@@ -1,9 +1,11 @@
 /**
  * Central plan config for Parallel MVP feature gating.
- * Phase 1: No Stripe. Plan resolved via profiles.plan or default "starter".
+ * starter | pro | enterprise. Trial applies to Starter only.
  */
 
-export type Plan = "starter" | "pro"
+import type { Plan as PlanType } from "./plan"
+
+export type Plan = PlanType
 
 export const PLAN_LIMITS = {
   starter: {
@@ -12,6 +14,11 @@ export const PLAN_LIMITS = {
     maxRotationWeeks: 4,
   },
   pro: {
+    maxMembers: 20,
+    maxTeams: Number.POSITIVE_INFINITY,
+    maxRotationWeeks: 12,
+  },
+  enterprise: {
     maxMembers: 20,
     maxTeams: Number.POSITIVE_INFINITY,
     maxRotationWeeks: 12,
@@ -27,7 +34,7 @@ export function isStarter(plan: Plan): boolean {
 }
 
 export function isPro(plan: Plan): boolean {
-  return plan === "pro"
+  return plan === "pro" || plan === "enterprise"
 }
 
 /** Pro rotation week options. Starter only allows 4. */

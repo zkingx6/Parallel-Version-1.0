@@ -20,17 +20,27 @@ import { ChangePasswordModal } from "@/components/account/change-password-modal"
 import { ChangeEmailModal } from "@/components/account/change-email-modal"
 import { SignOutConfirmModal } from "@/components/account/sign-out-confirm-modal"
 import { updateProfile } from "@/lib/actions"
+import type { Plan } from "@/lib/plans"
+import type { BillingInfo } from "@/lib/billing"
 
 type SettingsContentProps = {
   userEmail: string
   userName: string
   userAvatar: string
+  plan?: Plan
+  trialActive?: boolean
+  trialDaysLeft?: number
+  billing?: BillingInfo | null
 }
 
 export function SettingsContent({
   userEmail,
   userName,
   userAvatar,
+  plan = "starter",
+  trialActive = false,
+  trialDaysLeft = 0,
+  billing = null,
 }: SettingsContentProps) {
   const router = useRouter()
   const supabase = createClient()
@@ -43,6 +53,8 @@ export function SettingsContent({
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const [changeEmailOpen, setChangeEmailOpen] = useState(false)
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
+  const [manageBillingLoading, setManageBillingLoading] = useState(false)
+  const [manageBillingError, setManageBillingError] = useState<string | null>(null)
 
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -279,19 +291,139 @@ export function SettingsContent({
         <div className="space-y-2 mb-4">
           <p className="text-sm">
             <span className="text-muted-foreground">Plan:</span>{" "}
-            <span className="font-medium">Starter</span>
+            <span className="font-medium">
+              {plan === "starter" ? "Trial" : plan.charAt(0).toUpperCase() + plan.slice(1)}
+            </span>
           </p>
-          <p className="text-sm">
-            <span className="text-muted-foreground">Status:</span>{" "}
-            <span className="font-medium">Active</span>
-          </p>
+          {plan === "starter" && trialActive && (
+            <p className="text-sm">
+              <span className="text-muted-foreground">Trial:</span>{" "}
+              <span className="font-medium">{trialDaysLeft} days remaining</span>
+            </p>
+          )}
+          {plan === "starter" && !trialActive && (
+            <p className="text-sm">
+              <span className="text-muted-foreground">Status:</span>{" "}
+              <span className="font-medium">Ended</span>
+            </p>
+          )}
+          {plan === "pro" && (
+            <p className="text-sm">
+              <span className="text-muted-foreground">Billing:</span>{" "}
+              <span className="font-medium">Active</span>
+            </p>
+          )}
+          {plan === "pro" && billing && (
+            <>
+              {billing.billingAmountCents != null && billing.billingInterval && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Amount:</span>{" "}
+                  <span className="font-medium">
+                    ${(billing.billingAmountCents / 100).toFixed(0)} / {billing.billingInterval}
+                  </span>
+                </p>
+              )}
+              {billing.planStartedAt && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Started on:</span>{" "}
+                  <span className="font-medium">
+                    {new Date(billing.planStartedAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </p>
+              )}
+              {billing.currentPeriodEnd && !billing.cancelAtPeriodEnd && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Next renewal:</span>{" "}
+                  <span className="font-medium">
+                    {new Date(billing.currentPeriodEnd).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </p>
+              )}
+              {billing.cancelAtPeriodEnd && billing.currentPeriodEnd && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Access until:</span>{" "}
+                  <span className="font-medium">
+                    {new Date(billing.currentPeriodEnd).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </p>
+              )}
+            </>
+          )}
         </div>
-        <Link
-          href="/upgrade"
-          className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
-        >
-          Upgrade to Pro
-        </Link>
+        {manageBillingError && (
+          <p className="text-sm text-destructive mb-4">{manageBillingError}</p>
+        )}
+        {plan === "starter" && (
+          <div className="space-y-3">
+            {trialActive && trialDaysLeft > 3 && (
+              <p className="text-sm text-muted-foreground">
+                You are currently on a free trial. Before your trial ends, choose a plan to continue using Parallel.
+              </p>
+            )}
+            {trialActive && trialDaysLeft <= 3 && trialDaysLeft > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Your free trial will end soon. To continue using Parallel, choose Starter or Pro before the trial ends.
+              </p>
+            )}
+            {(!trialActive || trialDaysLeft <= 0) && (
+              <p className="text-sm text-muted-foreground">
+                Your free trial has ended. Choose Starter or Pro to continue using Parallel.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/upgrade"
+                className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+              >
+                Choose a plan
+              </Link>
+              <Link
+                href="/upgrade"
+                className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+              >
+                Upgrade to Pro
+              </Link>
+            </div>
+          </div>
+        )}
+        {plan === "pro" && (
+          <button
+            type="button"
+            disabled={manageBillingLoading || !billing?.stripeCustomerId}
+            onClick={async () => {
+              setManageBillingError(null)
+              setManageBillingLoading(true)
+              try {
+                const res = await fetch("/api/stripe/create-portal", { method: "POST" })
+                const json = await res.json()
+                if (!res.ok) {
+                  setManageBillingError(json.error ?? "Failed to open billing portal")
+                  return
+                }
+                if (json.url) window.location.href = json.url
+              } catch {
+                setManageBillingError("Failed to open billing portal")
+              } finally {
+                setManageBillingLoading(false)
+              }
+            }}
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {manageBillingLoading ? "Opening…" : "Manage billing"}
+          </button>
+        )}
       </section>
 
       {/* Security card */}
@@ -318,6 +450,29 @@ export function SettingsContent({
           </div>
           <div>
             <SignOutButton onClick={() => setSignOutConfirmOpen(true)} />
+          </div>
+        </div>
+      </section>
+
+      {/* Support card */}
+      <section className="rounded-xl border border-border/50 bg-card p-5 mb-6">
+        <h3 className="text-sm font-semibold mb-4">Support</h3>
+        <div className="space-y-3">
+          <div>
+            <a
+              href="mailto:support@parallelflow.app?subject=Bug%20Report"
+              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer"
+            >
+              Report a bug
+            </a>
+          </div>
+          <div>
+            <a
+              href="mailto:support@parallelflow.app?subject=Feedback"
+              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer"
+            >
+              Send feedback
+            </a>
           </div>
         </div>
       </section>

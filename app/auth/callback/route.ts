@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createServerSupabase } from "@/lib/supabase-server"
-import { resolvePostLoginRedirect } from "@/lib/actions"
+import { resolveFinalRedirect } from "@/lib/actions"
 import { syncProfileFromAuth } from "@/lib/profile-sync"
 
 export async function GET(request: Request) {
@@ -44,13 +44,7 @@ export async function GET(request: Request) {
     await syncProfileFromAuth(supabase, user)
   }
 
-  const safeNext =
-    nextParam &&
-    typeof nextParam === "string" &&
-    nextParam.startsWith("/") &&
-    !nextParam.startsWith("//")
-
-  const target = safeNext ? nextParam : await resolvePostLoginRedirect()
+  const target = await resolveFinalRedirect(nextParam)
   const url = target.startsWith("/") ? `${origin}${target}` : `${origin}/teams`
   return NextResponse.redirect(url)
 }

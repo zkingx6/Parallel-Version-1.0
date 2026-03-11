@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { ChevronDownIcon, Calendar, Info } from "lucide-react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { updateMeetingConfig, createScheduleRecord } from "@/lib/actions"
 import {
@@ -45,6 +44,8 @@ import {
 } from "@/lib/plans"
 import { RotationOutput } from "./rotation-output"
 import { ScheduleAnalysisContent } from "./schedule-analysis-content"
+import { ExplanationPanelContent } from "./explanation-panel"
+import { generateExplanation } from "@/lib/explanation-generator"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -623,6 +624,7 @@ export function RotationSection({
   const [rotationError, setRotationError] = useState<string | null>(null)
   const [isPublishing, setIsPublishing] = useState(false)
   const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [explanationOpen, setExplanationOpen] = useState(false)
   const [isPreviewFromRelaxedConstraint, setIsPreviewFromRelaxedConstraint] = useState(false)
   const [previewRelaxedMemberName, setPreviewRelaxedMemberName] = useState<string | null>(null)
   const router = useRouter()
@@ -1167,16 +1169,8 @@ export function RotationSection({
         )}
 
         {rotationError && !noViableResult && !isGenerating && (
-          <div className="rounded-xl border border-stretch/40 bg-stretch/15 p-4 text-center animate-in fade-in-0 duration-300 space-y-3">
+          <div className="rounded-xl border border-stretch/40 bg-stretch/15 p-4 text-center animate-in fade-in-0 duration-300">
             <p className="text-sm text-stretch-foreground">{rotationError}</p>
-            {rotationError.includes("Starter supports rotations") && (
-              <Link
-                href="/upgrade"
-                className="inline-flex items-center justify-center rounded-lg bg-[#0d9488] px-4 py-2 text-[0.84rem] font-medium text-white hover:bg-[#0f766e] transition-colors cursor-pointer"
-              >
-                Upgrade to Pro
-              </Link>
-            )}
           </div>
         )}
 
@@ -1263,6 +1257,14 @@ export function RotationSection({
               <Button
                 variant="outline"
                 size="lg"
+                className="w-full sm:w-auto h-12 text-sm font-medium rounded-xl border-border/60 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                onClick={() => setExplanationOpen(true)}
+              >
+                Why this schedule?
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
                 className="w-full sm:w-auto h-12 text-sm font-medium rounded-xl border-primary/40 text-primary hover:bg-primary/10 hover:border-primary/60"
                 onClick={() => setAnalysisOpen(true)}
               >
@@ -1298,6 +1300,29 @@ export function RotationSection({
         </div>
       </footer>
 
+      <Dialog open={explanationOpen} onOpenChange={setExplanationOpen}>
+        <DialogContent className="w-[90vw] max-w-[560px] max-h-[85vh] overflow-y-auto p-8">
+          <DialogHeader>
+            <DialogTitle>Why this schedule?</DialogTitle>
+            <DialogDescription>
+              How Parallel chose this rotation for {meeting.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {rotation && rotationResult && (
+              <ExplanationPanelContent
+                sections={generateExplanation({
+                  weeks: rotation,
+                  team,
+                  explain: rotationResult.explain,
+                  meetingTitle: meeting.title,
+                  rotationWeeks: rotation.length,
+                })}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={analysisOpen} onOpenChange={setAnalysisOpen}>
         <DialogContent className="w-[90vw] max-w-[1000px] max-h-[85vh] overflow-y-auto p-8">
           <DialogHeader>

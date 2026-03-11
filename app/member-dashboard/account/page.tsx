@@ -8,6 +8,7 @@ import { MemberTopNav } from "@/components/parallel/member-top-nav"
 import { PageBackLink } from "@/components/ui/page-back-link"
 import { SignOutButton } from "@/components/ui/sign-out-button"
 import { ChangePasswordModal } from "@/components/account/change-password-modal"
+import { ChangeEmailModal } from "@/components/account/change-email-modal"
 import { SignOutConfirmModal } from "@/components/account/sign-out-confirm-modal"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -40,6 +41,7 @@ export default function MemberAccountPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarRemoved, setAvatarRemoved] = useState(false)
+  const [changeEmailOpen, setChangeEmailOpen] = useState(false)
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
 
@@ -203,9 +205,13 @@ export default function MemberAccountPage() {
           </div>
         </section>
 
-        <p className="text-[0.82rem] text-[#9ca3af] mb-6">
-          Role: Member
-        </p>
+        <section className="rounded-xl border border-[#edeef0] bg-white p-5 mb-6 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
+          <h3 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-4">Team Role</h3>
+          <p className="text-[0.88rem] font-medium text-[#1a1a2e] mb-1">Member</p>
+          <p className="text-[0.82rem] text-[#9ca3af]">
+            You are part of a team managed by the workspace owner.
+          </p>
+        </section>
 
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
@@ -315,6 +321,15 @@ export default function MemberAccountPage() {
             <div>
               <button
                 type="button"
+                onClick={() => setChangeEmailOpen(true)}
+                className="text-[0.88rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors cursor-pointer"
+              >
+                Change email
+              </button>
+            </div>
+            <div>
+              <button
+                type="button"
                 onClick={() => setChangePasswordOpen(true)}
                 className="text-[0.88rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors cursor-pointer"
               >
@@ -327,6 +342,34 @@ export default function MemberAccountPage() {
           </div>
         </section>
 
+        <section className="rounded-xl border border-[#edeef0] bg-white p-5 mb-6 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
+          <h3 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-4">Support</h3>
+          <div className="space-y-3">
+            <div>
+              <a
+                href="mailto:support@parallelflow.app?subject=Bug%20Report"
+                className="text-[0.88rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors cursor-pointer"
+              >
+                Report a bug
+              </a>
+            </div>
+            <div>
+              <a
+                href="mailto:support@parallelflow.app?subject=Feedback"
+                className="text-[0.88rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors cursor-pointer"
+              >
+                Send feedback
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <ChangeEmailModal
+          open={changeEmailOpen}
+          onOpenChange={setChangeEmailOpen}
+          currentEmail={data.memberEmail ?? ""}
+          onSuccess={() => router.refresh()}
+        />
         <ChangePasswordModal
           open={changePasswordOpen}
           onOpenChange={setChangePasswordOpen}

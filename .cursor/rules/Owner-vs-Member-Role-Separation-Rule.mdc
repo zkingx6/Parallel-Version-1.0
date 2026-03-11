@@ -97,6 +97,17 @@ else
 
 ---
 
+## 3.1 Active Membership Only
+
+Member routing depends on **active current membership**, not historical membership.
+
+- If an owner removes a user from the team (deletes their `member_submissions` row), that user must **no longer** be routed to the member dashboard on future login.
+- Treat removed users as normal independent users: no member dashboard access, no owner Pro access unless they have their own qualifying account/plan.
+- Do not treat past membership as permanent membership.
+- Source of truth: live query `member_submissions` where `user_id = auth.uid()`. No rows = not a member.
+
+---
+
 ## 4. Invite Link Rule
 
 - Invite links (`/join/[token]`) must always open the member onboarding flow.
