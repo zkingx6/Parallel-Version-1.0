@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import Stripe from "stripe"
 import { createServerSupabase } from "@/lib/supabase-server"
 
-export async function POST() {
+export async function POST(req: Request) {
   const secret = process.env.STRIPE_SECRET_KEY
   if (!secret) {
     return NextResponse.json({ error: "Missing STRIPE_SECRET_KEY" }, { status: 500 })
@@ -17,9 +17,28 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const priceId = process.env.STRIPE_PRO_MONTHLY_PRICE_ID
+  let billingInterval: "monthly" | "yearly" = "monthly"
+  try {
+    const body = await req.json()
+    if (body?.billingInterval === "yearly" || body?.billingInterval === "monthly") {
+      billingInterval = body.billingInterval
+    }
+  } catch {
+    // Default to monthly when body is missing or invalid
+  }
+
+  const priceId =
+    billingInterval === "yearly"
+      ? process.env.STRIPE_PRO_YEARLY_PRICE_ID
+      : process.env.STRIPE_PRO_MONTHLY_PRICE_ID
+
   if (!priceId) {
-    return NextResponse.json({ error: "Missing STRIPE_PRO_MONTHLY_PRICE_ID" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: `Missing ${billingInterval === "yearly" ? "STRIPE_PRO_YEARLY_PRICE_ID" : "STRIPE_PRO_MONTHLY_PRICE_ID"}`,
+      },
+      { status: 500 }
+    )
   }
 
   let baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"

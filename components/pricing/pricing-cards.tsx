@@ -387,7 +387,7 @@ export type PricingCardsProps = {
   resolvedPlan?: ResolvedPlan
   /** @deprecated Use resolvedPlan. Kept for backward compatibility with marketing mode. */
   currentPlan?: AppPlan
-  onUpgradeClick?: () => void
+  onUpgradeClick?: (billingInterval: "monthly" | "yearly") => void
   showBillingToggle?: boolean
   showHeader?: boolean
   showOwnerNote?: boolean
@@ -480,7 +480,9 @@ export function PricingCards({
             index={i}
             isYearly={isYearly}
             onUpgradeClick={
-              plan.name === "Pro" && mode === "upgrade" ? onUpgradeClick : undefined
+              plan.name === "Pro" && mode === "upgrade"
+                ? () => onUpgradeClick?.(isYearly ? "yearly" : "monthly")
+                : undefined
             }
           />
         ))}

@@ -7,10 +7,14 @@ import { PricingCards } from "@/components/pricing/pricing-cards"
 export function UpgradePageContent({ resolvedPlan }: { resolvedPlan: ResolvedPlan }) {
   const [loading, setLoading] = useState(false)
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (billingInterval: "monthly" | "yearly") => {
     setLoading(true)
     try {
-      const res = await fetch("/api/stripe/create-checkout", { method: "POST" })
+      const res = await fetch("/api/stripe/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ billingInterval }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? "Failed to create checkout")
       if (data.url) window.location.href = data.url
