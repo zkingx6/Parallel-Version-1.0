@@ -23,21 +23,25 @@ export function Navbar() {
       <div className="mx-auto max-w-5xl">
         <nav
           className={cn(
-            "flex h-14 items-center justify-between rounded-full px-6 py-3 sm:px-8",
+            "relative flex h-14 items-center rounded-full px-6 py-3 sm:px-8",
             "bg-white/80 backdrop-blur-md",
             "border border-border",
             "shadow-[0_4px_24px_-4px_rgba(44,43,42,0.08),0_0_1px_rgba(44,43,42,0.04)]",
             "transition-shadow duration-200 hover:shadow-[0_8px_30px_-6px_rgba(44,43,42,0.1),0_0_1px_rgba(44,43,42,0.04)]"
           )}
         >
-          <a
-            href="#top"
-            className="text-lg font-semibold tracking-tight text-foreground hover:text-muted-foreground transition-colors"
-          >
-            Parallel
-          </a>
+          {/* Left: logo */}
+          <div className="flex min-w-0 flex-1 items-center">
+            <a
+              href="#top"
+              className="text-lg font-semibold tracking-tight text-foreground hover:text-muted-foreground transition-colors"
+            >
+              Parallel
+            </a>
+          </div>
 
-          <div className="hidden md:flex items-center gap-8">
+          {/* Center: nav links — absolutely centered relative to full navbar */}
+          <div className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 md:flex items-center gap-8">
             {navLinks.map((link) => {
               const slug = link.href.slice(1);
               const isActive = activeSection === slug;
@@ -56,7 +60,8 @@ export function Navbar() {
             })}
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-4">
+          {/* Right: auth / CTA */}
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-3 sm:gap-4">
             <Link
               href="/login"
               className="hidden sm:inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200"

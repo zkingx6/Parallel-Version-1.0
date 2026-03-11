@@ -157,8 +157,11 @@ function PricingCard({
       "block w-full py-3 rounded-xl text-[0.92rem] border-0 text-center"
     const filledClass =
       "text-white cursor-pointer"
-    const outlineClass =
-      "bg-white text-[#1a1a2e] border border-[#d1d5db] cursor-pointer"
+    const isStarterPrimaryCta =
+      plan.name === "Starter" && plan.cta === "Start free"
+    const outlineClass = isStarterPrimaryCta
+      ? "bg-white text-emerald-600 border border-emerald-200 cursor-pointer transition-colors duration-200 hover:border-emerald-400 hover:bg-emerald-50"
+      : "bg-white text-[#1a1a2e] border border-[#d1d5db] cursor-pointer"
 
     if (plan.ctaDisabled) {
       return (
@@ -195,11 +198,18 @@ function PricingCard({
           <motion.span
             className={`${baseButtonClass} ${outlineClass}`}
             style={{ fontWeight: 500 }}
-            whileHover={{
-              borderColor: "#0d9488",
-              color: "#0d9488",
-              boxShadow: "0 2px 12px rgba(13, 148, 136, 0.08)",
-            }}
+            whileHover={
+              isStarterPrimaryCta
+                ? {
+                    borderColor: "#34d399",
+                    backgroundColor: "#ecfdf5",
+                  }
+                : {
+                    borderColor: "#0d9488",
+                    color: "#0d9488",
+                    boxShadow: "0 2px 12px rgba(13, 148, 136, 0.08)",
+                  }
+            }
             whileTap={{ scale: 0.98 }}
             transition={{ duration: 0.2 }}
           >

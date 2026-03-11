@@ -74,15 +74,25 @@ export function LoginForm() {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <h1 className="text-[17px] font-semibold tracking-tight text-primary">
-            Parallel
+            {isSignUp ? "Start your free trial" : "Parallel"}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {isSignUp
-              ? "Create your manager account"
+              ? "Create your Parallel manager account"
               : redirectTo
                 ? "Sign in to join the team"
                 : "Sign in to manage meetings"}
           </p>
+          {isSignUp && (
+            <p className="mt-2 text-xs text-muted-foreground/90 max-w-[280px] mx-auto">
+              Set up your first team and generate fair meeting rotations in minutes.
+            </p>
+          )}
+          {isSignUp && (
+            <p className="mt-3 text-[11px] text-muted-foreground/70 tracking-wide">
+              Create account • Add your team • Generate rotation
+            </p>
+          )}
         </div>
 
         <form action={formAction} className="space-y-4">
@@ -145,6 +155,11 @@ export function LoginForm() {
           >
             {isPending ? "Working…" : isSignUp ? "Create account" : "Sign in"}
           </Button>
+          {isSignUp && (
+            <p className="text-center text-[11px] text-muted-foreground/70 mt-2">
+              Free 14-day trial • No credit card required
+            </p>
+          )}
         </form>
 
         <div className="space-y-4">
