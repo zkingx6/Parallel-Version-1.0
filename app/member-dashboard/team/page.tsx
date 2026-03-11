@@ -58,8 +58,8 @@ type DashboardData = {
 
 export default function MemberTeamDetailPage() {
   const searchParams = useSearchParams()
-  const token = searchParams.get("token")
-  const memberId = searchParams.get("memberId")
+  const token = searchParams?.get("token") ?? null
+  const memberId = searchParams?.get("memberId") ?? null
 
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)

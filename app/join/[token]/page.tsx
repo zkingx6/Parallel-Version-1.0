@@ -30,8 +30,8 @@ export default function JoinPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const token = params.token as string
-  const memberIdFromUrl = searchParams.get("memberId")
+  const token = (params?.token as string) ?? ""
+  const memberIdFromUrl = searchParams?.get("memberId") ?? null
 
   const [meeting, setMeeting] = useState<MeetingInfo | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)

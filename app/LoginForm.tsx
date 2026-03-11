@@ -37,10 +37,10 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const defaultSignUp = pathname === "/signup" || searchParams.get("signup") === "1"
+  const defaultSignUp = pathname === "/signup" || searchParams?.get("signup") === "1"
   const [isSignUp, setIsSignUp] = useState(defaultSignUp)
-  const redirectTo = searchParams.get("redirect")
-  const urlError = searchParams.get("error")
+  const redirectTo = searchParams?.get("redirect") ?? null
+  const urlError = searchParams?.get("error") ?? null
 
   const [state, formAction, isPending] = useActionState(
     async (_prev: { error: string | null; signUpSuccess?: boolean } | null, formData: FormData) => {

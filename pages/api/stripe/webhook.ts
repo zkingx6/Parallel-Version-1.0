@@ -45,11 +45,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id
     const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id
     if (!customerId || !subscriptionId) {
-      const { err } = await supabase
+      const { error: updateError } = await supabase
         .from("profiles")
         .update({ plan: "pro", trial_ends_at: null })
         .eq("user_id", userId)
-      if (err) return res.status(500).json({ error: err.message })
+      if (updateError) return res.status(500).json({ error: updateError.message })
       return res.status(200).json({ received: true })
     }
 
@@ -73,9 +73,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         billing_interval: billingInterval,
         billing_amount_cents: amountCents,
         billing_status: billingStatus,
-        current_period_end: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
-          : null,
+        current_period_end: (() => {
+          const end = (subscription as { current_period_end?: number }).current_period_end
+          return end ? new Date(end * 1000).toISOString() : null
+        })(),
         plan_started_at: subscription.created
           ? new Date(subscription.created * 1000).toISOString()
           : null,
@@ -136,9 +137,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         billing_interval: billingInterval,
         billing_amount_cents: amountCents,
         billing_status: billingStatus,
-        current_period_end: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
-          : null,
+        current_period_end: (() => {
+          const end = (subscription as { current_period_end?: number }).current_period_end
+          return end ? new Date(end * 1000).toISOString() : null
+        })(),
         cancel_at_period_end: subscription.cancel_at_period_end ?? false,
       })
       .eq("user_id", userId)

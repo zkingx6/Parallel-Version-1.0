@@ -15,8 +15,8 @@ export function MemberLayoutClient({
 }) {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const token = searchParams.get("token")
-  const memberId = searchParams.get("memberId")
+  const token = searchParams?.get("token") ?? null
+  const memberId = searchParams?.get("memberId") ?? null
 
   const [navContext, setNavContext] = useState<{
     teamUrl: string

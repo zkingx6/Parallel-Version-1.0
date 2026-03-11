@@ -36,9 +36,9 @@ function MissingParamsMessage() {
 
 export default function MemberDashboardPage() {
   const searchParams = useSearchParams()
-  const token = searchParams.get("token")
-  const memberId = searchParams.get("memberId")
-  const tab = searchParams.get("tab") || "team"
+  const token = searchParams?.get("token") ?? null
+  const memberId = searchParams?.get("memberId") ?? null
+  const tab = searchParams?.get("tab") || "team"
 
   const [teams, setTeams] = useState<TeamSummary[]>([])
   const [navMemberDisplay, setNavMemberDisplay] = useState<{ name: string; avatarUrl: string } | null>(null)

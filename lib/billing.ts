@@ -97,6 +97,7 @@ export async function syncBillingFromStripe(
         ? "active"
         : (expanded.status as string)
 
+  const periodEnd = (expanded as { current_period_end?: number }).current_period_end
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -105,8 +106,8 @@ export async function syncBillingFromStripe(
       billing_interval: billingInterval,
       billing_amount_cents: amountCents,
       billing_status: billingStatus,
-      current_period_end: expanded.current_period_end
-        ? new Date(expanded.current_period_end * 1000).toISOString()
+      current_period_end: periodEnd
+        ? new Date(periodEnd * 1000).toISOString()
         : null,
       plan_started_at: expanded.created
         ? new Date(expanded.created * 1000).toISOString()

@@ -214,7 +214,7 @@ function LoadingOverlay() {
 
 export function ParallelApp() {
   const searchParams = useSearchParams()
-  const shareParam = searchParams.get("d")
+  const shareParam = searchParams?.get("d") ?? null
 
   const [shareData, setShareData] = useState<{
     team: TeamMember[]

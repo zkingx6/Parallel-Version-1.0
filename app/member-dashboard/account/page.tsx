@@ -31,8 +31,8 @@ type MemberData = {
 export default function MemberAccountPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const token = searchParams.get("token")
-  const memberId = searchParams.get("memberId")
+  const token = searchParams?.get("token") ?? null
+  const memberId = searchParams?.get("memberId") ?? null
 
   const [data, setData] = useState<MemberData | null>(null)
   const [error, setError] = useState<string | null>(null)
