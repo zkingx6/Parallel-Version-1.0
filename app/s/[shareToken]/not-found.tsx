@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 
 export default function PublicScheduleNotFound() {
   return (
@@ -11,9 +12,9 @@ export default function PublicScheduleNotFound() {
       </p>
       <Link
         href="/"
-        className="text-[0.88rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors"
+        className="text-[0.88rem] font-medium text-[#3A7D73] hover:text-[#2d635b] transition-colors inline-flex items-center gap-1"
       >
-        Go to Parallel
+        Go to <ParallelWordmark />
       </Link>
     </div>
   )

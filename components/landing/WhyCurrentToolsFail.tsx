@@ -5,6 +5,7 @@ import { CalendarDays, RefreshCw, Check, X, ArrowRight } from "lucide-react";
 import { Container } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark";
 
 const comparisonFeatures = [
   { label: "Find available time", others: true, parallel: true },
@@ -77,7 +78,7 @@ export function WhyCurrentToolsFail() {
               </div>
               <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
                 <h3 className="text-[1.05rem] font-semibold text-foreground">
-                  Parallel
+                  <ParallelWordmark />
                 </h3>
                 <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-primary/10 text-primary shrink-0">
                   Fair by design
@@ -102,7 +103,7 @@ export function WhyCurrentToolsFail() {
               Others
             </span>
             <span className="text-xs font-semibold uppercase tracking-wider text-primary text-center">
-              Parallel
+              <ParallelWordmark />
             </span>
           </div>
           {comparisonFeatures.map((feature) => (

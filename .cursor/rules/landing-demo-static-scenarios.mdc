@@ -1,0 +1,57 @@
+# Landing Demo — Static Scenario Architecture
+
+## Purpose
+
+The landing-page demo is **fully static**. Each demo team is a curated marketing snapshot, not live engine output. No Supabase, no auth, no generation. All data is manually authored and aligned.
+
+## Architecture Rule
+
+**Each demo team = one self-contained static scenario object.**
+
+For every demo team, there must be **one single** `DemoScenario` in `lib/demo-data.ts` that contains everything needed for all demo screens.
+
+## Scenario Fields (Single Source of Truth)
+
+Each `DemoScenario` must define:
+
+| Field | Purpose |
+|-------|---------|
+| `meeting` | Team/meeting metadata (id, title, duration, rotation_weeks, etc.) |
+| `members` | Member list — same order everywhere (Teams, Rotation, Schedule, Analysis) |
+| `schedule.scheduleId` | ID for schedule list/detail routing |
+| `schedule.utcHours` | UTC hours per week for schedule preview |
+| `schedule.weekOverrides` | Per-week, per-member discomfort (stretch/comfortable) |
+| `schedule.weekExplanations` | Week card explanation copy |
+| `burden.memberCounts` | Uncomfortable count per member (for burden bars) |
+| `burden.maxUncomfortable` | Max count for summary bullets |
+| `burden.maxDiff` | Max spread for summary bullets |
+| `summaryBullets?` | Optional override for summary text |
+| `tagline?` | Short scenario tagline for UI |
+
+## Consistency Requirement
+
+All demo screens (Teams, Team detail, Rotation, Schedule list, Schedule detail, Analysis) must read from the same scenario. No derivation, no live computation.
+
+- Team view → `scenario.members`
+- Schedule weeks → `buildWeeksFromScenario(scenario)`
+- Burden bars → `scenario.burden.memberCounts`
+- Summary bullets → `scenario.burden` or `scenario.summaryBullets`
+- Week explanations → `scenario.schedule.weekExplanations`
+
+## No Pseudo-Dynamic Behavior
+
+- Do **not** show "Analyzing…", "Generating…", or similar copy in demo mode.
+- Do **not** make it feel like the schedule is being computed from the team live.
+- Rotation view in demo mode shows a static preview only — no config form, no Generate button.
+
+## Copy Rule
+
+Because this is static demo data, UI copy should sound like a **product preview**, not like a mathematically guaranteed live computation. Use phrases like "Preview of how Parallel distributes…" where appropriate.
+
+## Change Control
+
+When adding or editing a demo scenario:
+
+1. Update the single `DemoScenario` object in `lib/demo-data.ts`.
+2. Ensure `members`, `schedule.weekOverrides`, `burden.memberCounts`, and `schedule.weekExplanations` are all aligned.
+3. Verify all demo screens render consistently.

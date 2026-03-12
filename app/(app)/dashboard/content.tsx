@@ -7,6 +7,7 @@ import { createMeeting, deleteMeeting } from "@/lib/actions"
 import { Plus, Users, ChevronRight, X } from "lucide-react"
 import { useSetup } from "@/lib/setup-context"
 import type { DbMeeting } from "@/lib/database.types"
+import { cn } from "@/lib/utils"
 
 type DashboardContentProps = {
   meetings: DbMeeting[]
@@ -117,14 +118,31 @@ export function DashboardContent({
               {!showCreate ? (
                 <motion.button
                   key="trigger"
-                  onClick={() => setShowCreate(true)}
-                  className="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl border-2 border-dashed border-[#e0e2e6] bg-white/50 hover:border-[#0d9488]/40 hover:bg-[#f0fdfa]/50 transition-all duration-200 cursor-pointer text-[0.88rem] text-[#9ca3af] hover:text-[#0d9488] group"
+                  type="button"
+                  onClick={() => !demoMode && setShowCreate(true)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-5 py-3.5 rounded-xl border-2 border-dashed border-[#e0e2e6] bg-white/50 transition-all duration-200 text-[0.88rem] text-[#9ca3af]",
+                    demoMode
+                      ? "cursor-default opacity-70"
+                      : "cursor-pointer hover:border-[#0d9488]/40 hover:bg-[#f0fdfa]/50 hover:text-[#0d9488] group"
+                  )}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0, scale: 0.98 }}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-[#f0f0f2] group-hover:bg-[#ccfbf1] flex items-center justify-center transition-colors duration-200">
-                    <Plus size={16} className="text-[#9ca3af] group-hover:text-[#0d9488] transition-colors" />
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200",
+                      demoMode ? "bg-[#f0f0f2]" : "bg-[#f0f0f2] group-hover:bg-[#ccfbf1]"
+                    )}
+                  >
+                    <Plus
+                      size={16}
+                      className={cn(
+                        "text-[#9ca3af] transition-colors",
+                        !demoMode && "group-hover:text-[#0d9488]"
+                      )}
+                    />
                   </div>
                   Create a new team
                 </motion.button>

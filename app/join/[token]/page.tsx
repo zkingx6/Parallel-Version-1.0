@@ -7,6 +7,7 @@ import { addStoredMemberTeam } from "@/lib/member-teams-storage"
 import { ParticipantForm } from "@/components/parallel/participant-form"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
 import { PageBackLink } from "@/components/ui/page-back-link"
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 import { isComplementOfOverlapPattern } from "@/lib/hard-no-ranges"
 import type { HardNoRange } from "@/lib/types"
 
@@ -102,7 +103,7 @@ export default function JoinPage() {
       <div className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
         <div className="text-center space-y-3 max-w-sm">
           <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
-            Parallel
+            <ParallelWordmark />
           </h1>
           <p className="text-[0.88rem] text-[#9ca3af]">{loadError}</p>
         </div>

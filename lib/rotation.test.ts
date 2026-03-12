@@ -4,7 +4,9 @@ import {
   isRotationResult,
   getBurdenCounts,
   getBaseTimeStatus,
+  getZeroBurdenAlternatives,
   alternatingPatternJitter,
+  computeConsecutiveMax,
 } from "./rotation"
 import type { TeamMember, MeetingConfig } from "./types"
 import { DEFAULT_FAIRNESS_THRESHOLDS } from "./types"
@@ -224,6 +226,87 @@ describe("Fairness Guarantee", () => {
     const jitter = alternatingPatternJitter(r1.weeks.map((w) => ({ utcHour: w.utcHour })))
     expect(typeof jitter).toBe("number")
     expect(jitter).toBeGreaterThanOrEqual(0)
+  })
+
+  describe("computeConsecutiveMax: zero-burden weeks are not treated as max-burden streak", () => {
+    it("all-empty max member ids yields consecutiveMax = 0", () => {
+      expect(computeConsecutiveMax(["", "", "", ""])).toBe(0)
+      expect(computeConsecutiveMax(["", "", "", "", "", "", "", ""])).toBe(0)
+    })
+    it("empty entries do not count as real max member streak", () => {
+      expect(computeConsecutiveMax(["ny", "ny", "", "ny"])).toBe(2)
+      expect(computeConsecutiveMax(["ny", "", "", "ny"])).toBe(1)
+      expect(computeConsecutiveMax(["", "ny", "ny", "ny"])).toBe(3)
+    })
+    it("real member streaks are unchanged", () => {
+      expect(computeConsecutiveMax(["ny", "ny", "ny", "ny"])).toBe(4)
+      expect(computeConsecutiveMax(["ny", "ny", "lon", "lon"])).toBe(2)
+    })
+  })
+
+  it("getZeroBurdenAlternatives: returns alternatives when multiple zero-burden options exist", () => {
+    const team: TeamMember[] = [
+      makeMember("ny", "New York", "America/New_York", 9, 18, [{ start: 0, end: 6 }]),
+      makeMember("lon", "London", "Europe/London", 9, 18, [{ start: 0, end: 6 }]),
+      makeMember("ath", "Athens", "Europe/Athens", 9, 18, [{ start: 0, end: 6 }]),
+    ]
+    const config: MeetingConfig = {
+      ...defaultConfig,
+      baseTimeMinutes: undefined,
+      rotationWeeks: 8,
+      dayOfWeek: 3,
+      startDateIso: "2025-03-12",
+    }
+    const result = generateRotation(team, config)
+    expect(isRotationResult(result)).toBe(true)
+    if (!isRotationResult(result)) return
+    const alternatives = getZeroBurdenAlternatives(
+      team,
+      config,
+      result.weeks,
+      "America/New_York"
+    )
+    expect(alternatives).not.toBeNull()
+    expect(alternatives!.length).toBeGreaterThan(0)
+    expect(alternatives!.length).toBeLessThanOrEqual(3)
+    for (const alt of alternatives!) {
+      expect(alt.label).toMatch(/\d{1,2}:\d{2}\s*(AM|PM)/)
+      expect(alt.baseTimeMinutes).toBeGreaterThanOrEqual(0)
+      expect(alt.baseTimeMinutes).toBeLessThan(1440)
+    }
+  })
+
+  it("zero-burden schedule: NY/London/Athens 8-week with 9–6 work and 12am–6am hard: no unnecessary burden", () => {
+    const team: TeamMember[] = [
+      makeMember("ny", "New York", "America/New_York", 9, 18, [{ start: 0, end: 6 }]),
+      makeMember("lon", "London", "Europe/London", 9, 18, [{ start: 0, end: 6 }]),
+      makeMember("ath", "Athens", "Europe/Athens", 9, 18, [{ start: 0, end: 6 }]),
+    ]
+    const config: MeetingConfig = {
+      ...defaultConfig,
+      baseTimeMinutes: undefined,
+      rotationWeeks: 8,
+      dayOfWeek: 3,
+      startDateIso: "2025-03-12",
+    }
+    const result = generateRotation(team, config)
+    expect(isRotationResult(result)).toBe(true)
+    if (!isRotationResult(result)) return
+    const { weeks } = result
+    expect(weeks.length).toBe(8)
+    const burdenData = getBurdenCounts(weeks, team)
+    const totalBurden = burdenData.reduce((s, d) => s + d.count, 0)
+    expect(totalBurden).toBe(0)
+    const uncomfortableCount = burdenData.filter((d) => d.count > 0).length
+    expect(uncomfortableCount).toBe(0)
+    for (const week of weeks) {
+      for (const mt of week.memberTimes) {
+        if (mt.memberId === "ny") {
+          expect(mt.localHour).toBeGreaterThanOrEqual(9)
+          expect(mt.localHour).toBeLessThan(18)
+        }
+      }
+    }
   })
 
   it("when NO shareable plan exists: returns forced plan with shareablePlanExists=false, forcedReason and evidence", () => {

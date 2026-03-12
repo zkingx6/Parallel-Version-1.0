@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getPublicScheduleByToken } from "@/lib/public-schedule"
 import { RotationOutput } from "@/components/parallel/rotation-output"
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 
 export default async function PublicSchedulePage({
   params,
@@ -42,9 +43,9 @@ export default async function PublicSchedulePage({
           Powered by{" "}
           <Link
             href="/"
-            className="text-[#0d9488] hover:text-[#0f766e] font-medium transition-colors"
+            className="text-[#3A7D73] hover:text-[#2d635b] font-medium transition-colors inline"
           >
-            Parallel
+            <ParallelWordmark />
           </Link>
           {" — "}fair scheduling for distributed teams.
         </p>

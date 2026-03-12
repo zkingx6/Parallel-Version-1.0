@@ -18,6 +18,7 @@ import {
   getTimezoneOptions,
 } from "@/lib/timezone";
 import { BASE_TIME_OPTIONS } from "@/lib/types";
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark";
 import { Button } from "@/components/ui/button";
 import {
   DEMO_TEAMS,
@@ -510,8 +511,8 @@ export function DemoSchedulerPreview() {
           <span className="size-3 rounded-full bg-[#FFBD2E]" />
           <span className="size-3 rounded-full bg-[#28C840]" />
         </div>
-        <span className="text-xs text-muted-foreground font-medium">
-          Parallel — Demo
+        <span className="text-xs text-muted-foreground font-medium inline-flex items-center gap-1">
+          <ParallelWordmark /> — Demo
         </span>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto bg-background p-5 sm:p-8 lg:p-10">

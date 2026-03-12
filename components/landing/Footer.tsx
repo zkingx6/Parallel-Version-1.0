@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { Container } from "@/components/ui";
+import { ParallelLogo } from "./ParallelLogo";
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark";
 
 export function Footer() {
   return (
@@ -9,7 +11,12 @@ export function Footer() {
       <Container>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
           <div>
-            <p className="font-semibold text-foreground">Parallel</p>
+            <div className="flex items-center gap-2">
+              <ParallelLogo className="size-6 shrink-0" />
+              <span className="font-semibold text-foreground">
+                <ParallelWordmark />
+              </span>
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">
               Fair meeting rotation for global teams
             </p>
@@ -36,7 +43,7 @@ export function Footer() {
           </div>
         </div>
         <p className="mt-8 pt-8 border-t border-border text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Parallel. All rights reserved.
+          © {new Date().getFullYear()} <ParallelWordmark />. All rights reserved.
         </p>
       </Container>
     </footer>

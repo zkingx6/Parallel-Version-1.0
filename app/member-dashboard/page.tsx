@@ -9,6 +9,7 @@ import { getStoredMemberTeams, addStoredMemberTeam } from "@/lib/member-teams-st
 import { getCachedMember, setCachedMember } from "@/lib/member-avatar-cache"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
 import { ScheduleListContent } from "@/components/parallel/schedule-list-content"
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 
 type TeamSummary = {
   token: string
@@ -23,7 +24,7 @@ function MissingParamsMessage() {
     <main className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
       <div className="text-center space-y-3 max-w-sm">
         <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
-          Parallel
+          <ParallelWordmark />
         </h1>
         <p className="text-[0.88rem] text-[#9ca3af]">Missing token or member ID.</p>
         <p className="text-[0.82rem] text-[#9ca3af]/80">

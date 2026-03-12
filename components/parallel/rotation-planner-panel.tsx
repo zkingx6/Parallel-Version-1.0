@@ -30,6 +30,7 @@ import {
   canGenerateRotation,
   getBaseTimeStatus,
   getBurdenCounts,
+  getZeroBurdenAlternatives,
   hasConsecutiveStretch,
   isInputContractViolation,
   isNoViableTimeResult,
@@ -45,6 +46,8 @@ import {
 import { RotationOutput } from "./rotation-output"
 import { ScheduleAnalysisContent } from "./schedule-analysis-content"
 import { ExplanationPanelContent } from "./explanation-panel"
+import { BurdenScoreHelp } from "./burden-score-help"
+import { getDemoBurdenData, DEMO_BURDEN_SUMMARY } from "@/lib/demo-data"
 import { generateExplanation } from "@/lib/explanation-generator"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -556,6 +559,7 @@ export function RotationSection({
   membersDisplay,
   plan = "starter",
   demoMode,
+  demoPreviewWeeks,
   onBack,
   onUpdateMeeting,
   onPublishSchedule,
@@ -568,6 +572,8 @@ export function RotationSection({
   plan?: Plan
   /** When true, use demo handlers instead of server actions. */
   demoMode?: boolean
+  /** When set (demo mode), show this static preview instead of generate flow. Curated snapshot, not live output. */
+  demoPreviewWeeks?: RotationWeekData[] | null
   /** When provided (e.g. in demo mode), used for Back to team instead of href. */
   onBack?: () => void
   onUpdateMeeting?: (id: string, patch: Record<string, unknown>) => void
@@ -627,6 +633,7 @@ export function RotationSection({
   const [explanationOpen, setExplanationOpen] = useState(false)
   const [isPreviewFromRelaxedConstraint, setIsPreviewFromRelaxedConstraint] = useState(false)
   const [previewRelaxedMemberName, setPreviewRelaxedMemberName] = useState<string | null>(null)
+  const generateOverrideRef = useRef<{ baseTimeMinutes: number; anchorOffset: number } | null>(null)
   const router = useRouter()
 
   const rotation = orderedWeeks ?? rotationResult?.weeks ?? null
@@ -693,6 +700,21 @@ export function RotationSection({
     [demoMode, meeting, onUpdateMeeting, plan]
   )
 
+  const handleApplyAlternative = useCallback(
+    (baseTimeMinutes: number) => {
+      const anchorOffset =
+        DateTime.now().setZone(displayTimezoneIana).offset / 60
+      generateOverrideRef.current = { baseTimeMinutes, anchorOffset }
+      handleConfigChange({
+        base_time_minutes: baseTimeMinutes,
+        anchor_offset: anchorOffset,
+      }).then(() => {
+        handleGenerate()
+      })
+    },
+    [displayTimezoneIana, handleConfigChange]
+  )
+
   useEffect(() => {
     if (demoMode) return
     if (
@@ -719,8 +741,19 @@ export function RotationSection({
       console.log("[DEBUG] Plan button clicked")
     }
 
+    const override = generateOverrideRef.current
+    const configToUse =
+      override
+        ? {
+            ...dbMeetingToConfig(meeting),
+            baseTimeMinutes: override.baseTimeMinutes,
+            anchorOffset: override.anchorOffset,
+          }
+        : effectiveConfig
+    if (override) generateOverrideRef.current = null
+
     const limits = getPlanLimits(plan)
-    if (effectiveConfig.rotationWeeks > limits.maxRotationWeeks) {
+    if (configToUse.rotationWeeks > limits.maxRotationWeeks) {
       setRotationError(
         "Starter supports rotations up to 4 weeks. Upgrade to Pro to generate longer schedules."
       )
@@ -733,7 +766,7 @@ export function RotationSection({
       typeof process !== "undefined" &&
       process.env.NEXT_PUBLIC_DEBUG_ROTATION === "1"
     ) {
-      verifyInputIntegrity(team, effectiveConfig)
+      verifyInputIntegrity(team, configToUse)
     }
 
     if (team.length < 2) {
@@ -744,13 +777,13 @@ export function RotationSection({
       setNoViableResult(null)
       return
     }
-    if (isFixedBaseTimeBlocked) {
+    if (!override && isFixedBaseTimeBlocked) {
       setRotationError("Blocked by hard boundaries — choose a different time.")
       setRotationResult(null)
       setNoViableResult(null)
       return
     }
-    const validation = canGenerateRotation(team, effectiveConfig)
+    const validation = canGenerateRotation(team, configToUse)
     if (!validation.valid) {
       const reason = validation.reason ?? ""
       const isInfeasible =
@@ -775,7 +808,7 @@ export function RotationSection({
     }
     if (process.env.NODE_ENV === "development") {
       console.log("[DEBUG] Team length:", team?.length)
-      console.log("Rotation config:", effectiveConfig)
+      console.log("Rotation config:", configToUse)
       console.log("[DEBUG] Calling generateRotationGuarded")
     }
     setIsGenerating(true)
@@ -787,7 +820,7 @@ export function RotationSection({
     setPreviewRelaxedMemberName(null)
     setTimeout(() => {
       try {
-        const result = generateRotationGuarded(team, effectiveConfig)
+        const result = generateRotationGuarded(team, configToUse)
         if (process.env.NODE_ENV === "development") {
           console.log("[DEBUG] generateRotationGuarded result:", result)
         }
@@ -932,6 +965,91 @@ export function RotationSection({
     : 0
   const isEven = maxMemberCount - minMemberCount <= 1
   const consecutive = rotation ? hasConsecutiveStretch(rotation, team) : false
+
+  // Demo mode: show static curated preview only — no config, no generate
+  if (demoMode && demoPreviewWeeks?.length) {
+    const demoRotation = demoPreviewWeeks
+    const demoTeam = initialMembers.map(dbMemberToTeamMember)
+    const demoBurdenData = getDemoBurdenData(initialMeeting.id, membersDisplay)
+    const demoSummary = DEMO_BURDEN_SUMMARY[initialMeeting.id]
+    const demoMaxCount = demoBurdenData.length
+      ? Math.max(...demoBurdenData.map((d) => d.count), 1)
+      : 0
+    const demoMaxMemberCount = demoSummary?.maxUncomfortable ?? 0
+    const demoMinMemberCount = demoMaxMemberCount - (demoSummary?.maxDiff ?? 0)
+    const demoIsEven = demoMaxMemberCount - demoMinMemberCount <= 1
+    const demoConsecutive = false
+    return (
+      <main className="max-w-5xl mx-auto px-6 py-8 bg-[#f7f8fa]">
+        <div className="max-w-2xl mx-auto">
+          <PageBackLink onClick={onBack} className="mb-6">
+            Back to team
+          </PageBackLink>
+          <div className="mb-8">
+            <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] mb-1 font-semibold">
+              {initialMeeting.title}
+            </h1>
+            <p className="text-[#9ca3af] text-[0.88rem]">
+              Preview of how Parallel distributes meeting times across the team.
+            </p>
+          </div>
+          <section className="bg-white rounded-2xl border border-[#edeef0] shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-6 mb-6">
+            <RotationOutput
+              weeks={demoRotation}
+              team={demoTeam}
+              displayTimezone={initialMeeting.display_timezone ?? "America/New_York"}
+              useBaseTime={initialMeeting.base_time_minutes != null}
+            />
+            <div className="mt-6 pt-6 border-t border-[#edeef0]">
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <h3 className="text-sm font-semibold">
+                  Over {initialMeeting.rotation_weeks} weeks
+                </h3>
+                <BurdenScoreHelp className="shrink-0" />
+              </div>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">·</span>
+                  No one has more than {demoMaxMemberCount} uncomfortable{" "}
+                  {demoMaxMemberCount === 1 ? "meeting" : "meetings"}
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className={cn("mt-0.5", demoIsEven ? "text-primary" : "text-stretch-foreground")}>·</span>
+                  {demoIsEven
+                    ? "Burden is evenly distributed across the team"
+                    : `Burden differs by at most ${demoMaxMemberCount - demoMinMemberCount} between members`}
+                </li>
+                {!demoConsecutive && (
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">·</span>
+                    No one carries consecutive stretch weeks
+                  </li>
+                )}
+              </ul>
+              {demoBurdenData.length > 0 && (
+                <div className="space-y-2.5 pt-1">
+                  {demoBurdenData.map((d) => (
+                    <BurdenBar
+                      key={d.memberId}
+                      name={d.name}
+                      avatarUrl={membersDisplay.get(d.memberId)?.avatarUrl}
+                      count={d.count}
+                      sacrificeCount={d.sacrificeCount}
+                      sacrificePoints={d.sacrificePoints}
+                      max={demoMaxCount * 1.2}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+          <div className="pt-4">
+            <PageBackLink onClick={onBack} className="mb-0">Back to team</PageBackLink>
+          </div>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-8 bg-[#f7f8fa]">
@@ -1184,6 +1302,38 @@ export function RotationSection({
                 )}
               </div>
             )}
+            {(() => {
+              const alternatives =
+                rotation &&
+                getZeroBurdenAlternatives(
+                  team,
+                  effectiveConfig,
+                  rotation,
+                  displayTimezoneIana
+                )
+              return alternatives && alternatives.length > 0 ? (
+                <div className="rounded-lg border border-[#0d9488]/20 bg-[#f0fdfa] px-4 py-3 mb-4 space-y-2 animate-in fade-in-0 duration-300">
+                  <p className="text-[0.88rem] font-medium text-[#1a1a2e]">
+                    Other equally comfortable options available
+                  </p>
+                  <p className="text-[0.78rem] text-[#6b7280] leading-relaxed">
+                    Parallel also found additional meeting times that keep everyone within working hours and avoid any burden.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {alternatives.map((alt) => (
+                      <button
+                        key={alt.baseTimeMinutes}
+                        type="button"
+                        onClick={() => handleApplyAlternative(alt.baseTimeMinutes)}
+                        className="inline-flex items-center px-3 py-1.5 text-[0.8rem] font-medium rounded-lg border border-[#0d9488]/30 bg-white text-[#0d9488] hover:bg-[#0d9488]/10 hover:border-[#0d9488]/50 transition-colors cursor-pointer"
+                      >
+                        {alt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            })()}
             <RotationOutput
               weeks={rotation}
               team={team}
@@ -1204,11 +1354,13 @@ export function RotationSection({
             )}
             <section className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 fill-mode-both">
               <div className="rounded-2xl border border-border/50 bg-card shadow-sm p-5 sm:p-6 space-y-5">
-                <div>
-                  <h3 className="text-sm font-semibold mb-3">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <h3 className="text-sm font-semibold">
                     Over {meeting.rotation_weeks} weeks
                   </h3>
-                  <ul className="space-y-1.5 text-sm text-muted-foreground">
+                  <BurdenScoreHelp className="shrink-0" />
+                </div>
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
                     <li className="flex items-start gap-2">
                       <span className="text-primary mt-0.5">·</span>
                       No one has more than {maxMemberCount} uncomfortable{" "}
@@ -1234,7 +1386,6 @@ export function RotationSection({
                       </li>
                     )}
                   </ul>
-                </div>
                 {burdenData && (
                   <div className="space-y-2.5 pt-1">
                     {burdenData.map((d) => (
@@ -1302,11 +1453,14 @@ export function RotationSection({
 
       <Dialog open={explanationOpen} onOpenChange={setExplanationOpen}>
         <DialogContent className="w-[90vw] max-w-[560px] max-h-[85vh] overflow-y-auto p-8">
-          <DialogHeader>
-            <DialogTitle>Why this schedule?</DialogTitle>
-            <DialogDescription>
-              How Parallel chose this rotation for {meeting.title}
-            </DialogDescription>
+          <DialogHeader className="flex flex-row items-start justify-between gap-4 pr-10 sm:text-left">
+            <div className="flex flex-col gap-1 min-w-0">
+              <DialogTitle>Why this schedule?</DialogTitle>
+              <DialogDescription>
+                How Parallel chose this rotation for {meeting.title}
+              </DialogDescription>
+            </div>
+            <BurdenScoreHelp className="shrink-0 mt-0.5" />
           </DialogHeader>
           <div className="mt-4">
             {rotation && rotationResult && (

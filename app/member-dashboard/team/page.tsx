@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { PageBackLink } from "@/components/ui/page-back-link"
 import { MemberAvatar } from "@/components/ui/avatar"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 
 const DAY_NAMES = [
   "",
@@ -85,7 +86,7 @@ export default function MemberTeamDetailPage() {
       <main className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
         <div className="text-center space-y-3 max-w-sm">
           <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
-            Parallel
+            <ParallelWordmark />
           </h1>
           <p className="text-[0.88rem] text-[#9ca3af]">Missing token or member ID.</p>
           <PageBackLink href="/member-dashboard">Back to teams</PageBackLink>
@@ -99,7 +100,7 @@ export default function MemberTeamDetailPage() {
       <main className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
         <div className="text-center space-y-3 max-w-sm">
           <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
-            Parallel
+            <ParallelWordmark />
           </h1>
           <p className="text-[0.88rem] text-[#9ca3af]">{error}</p>
           <PageBackLink

@@ -25,6 +25,7 @@ import { ensureDisplayTimezoneIana } from "@/lib/timezone"
 import { FairnessSummary } from "./fairness-summary"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 
 const defaultTeam: TeamMember[] = [
   {
@@ -189,7 +190,7 @@ function ShareView({
         <div className="text-center pt-4">
           <p className="text-xs text-muted-foreground/50">
             Created with{" "}
-            <span className="font-medium text-primary/60">Parallel</span> — we
+            <span className="font-medium text-primary/60"><ParallelWordmark /></span> — we
             shared the weight.
           </p>
         </div>

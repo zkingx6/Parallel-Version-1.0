@@ -13,6 +13,7 @@ export default async function SettingsPage() {
   if (!user) {
     return (
       <SettingsContent
+        userId={undefined}
         userEmail=""
         userName=""
         userAvatar=""
@@ -40,6 +41,7 @@ export default async function SettingsPage() {
 
   return (
     <SettingsContent
+      userId={user.id}
       userEmail={user.email || ""}
       userName={userName}
       userAvatar={userAvatar}

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 import { useSetup } from "@/lib/setup-context"
 import { MemberAvatar } from "@/components/ui/avatar"
 
@@ -63,7 +64,7 @@ export function TopNav({ userEmail, userName, userAvatar }: TopNavProps) {
           className="flex items-center gap-2 bg-transparent border-0 cursor-pointer p-0"
         >
           <span className="text-[#1a1a2e] text-[0.95rem] tracking-[-0.02em] font-semibold">
-            Parallel
+            <ParallelWordmark />
           </span>
         </Link>
 

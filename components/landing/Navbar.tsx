@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ParallelLogo } from "./ParallelLogo";
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark";
 import { useActiveSection } from "@/lib/useActiveSection";
 
 const navLinks = [
@@ -31,12 +33,13 @@ export function Navbar() {
           )}
         >
           {/* Left: logo */}
-          <div className="flex min-w-0 flex-1 items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <a
               href="#top"
-              className="text-lg font-semibold tracking-tight text-foreground hover:text-muted-foreground transition-colors"
+              className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground hover:text-muted-foreground transition-colors"
             >
-              Parallel
+              <ParallelLogo className="size-6 shrink-0" />
+              <ParallelWordmark />
             </a>
           </div>
 

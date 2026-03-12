@@ -10,6 +10,7 @@ import {
 } from "@/lib/database.types"
 import { ensureDisplayTimezoneIana } from "@/lib/timezone"
 import { getBurdenCounts, hasConsecutiveStretch } from "@/lib/rotation"
+import { getDemoBurdenData, DEMO_BURDEN_SUMMARY } from "@/lib/demo-data"
 import { RotationOutput } from "./rotation-output"
 import { MemberAvatar } from "@/components/ui/avatar"
 import { PageBackLink } from "@/components/ui/page-back-link"
@@ -275,18 +276,26 @@ export function ScheduleDetailContent({
     )
   }
 
-  const burdenData = getBurdenCounts(weeks, team)
-  const maxCount = burdenData
+  const burdenData = demoMode
+    ? getDemoBurdenData(meeting.id, membersDisplay)
+    : getBurdenCounts(weeks, team)
+  const summaryOverride = demoMode ? DEMO_BURDEN_SUMMARY[meeting.id] : null
+  const maxCount = burdenData.length
     ? Math.max(...burdenData.map((d) => d.count), 1)
     : 0
-  const maxMemberCount = burdenData
-    ? Math.max(...burdenData.map((d) => d.count))
-    : 0
-  const minMemberCount = burdenData
+  const maxMemberCount = summaryOverride
+    ? summaryOverride.maxUncomfortable
+    : burdenData.length
+      ? Math.max(...burdenData.map((d) => d.count))
+      : 0
+  const minMemberCount = burdenData.length
     ? Math.min(...burdenData.map((d) => d.count))
     : 0
-  const isEven = maxMemberCount - minMemberCount <= 1
-  const consecutive = hasConsecutiveStretch(weeks, team)
+  const maxDiff = summaryOverride
+    ? summaryOverride.maxDiff
+    : maxMemberCount - minMemberCount
+  const isEven = maxDiff <= 1
+  const consecutive = demoMode ? false : hasConsecutiveStretch(weeks, team)
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-8">
@@ -360,7 +369,7 @@ export function ScheduleDetailContent({
                 </span>
                 {isEven
                   ? "Burden is evenly distributed across the team"
-                  : `Burden differs by at most ${maxMemberCount - minMemberCount} between members`}
+                  : `Burden differs by at most ${maxDiff} between members`}
               </li>
               {!consecutive && (
                 <li className="flex items-start gap-2">

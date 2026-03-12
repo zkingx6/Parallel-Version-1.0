@@ -1376,19 +1376,30 @@ function getThresholds(config: MeetingConfig): FairnessThresholds {
   }
 }
 
-/** Compute max consecutive weeks same member is max-burden. */
-function computeConsecutiveMax(
+/** Compute max consecutive weeks same member is max-burden.
+ * Empty string = no max (all members comfortable); empty entries do not
+ * extend or create a streak. Exported for regression tests. */
+export function computeConsecutiveMax(
   maxMemberIdsPerWeek: string[]
 ): number {
   if (maxMemberIdsPerWeek.length === 0) return 0
-  let best = 1
-  let run = 1
-  for (let i = 1; i < maxMemberIdsPerWeek.length; i++) {
-    if (maxMemberIdsPerWeek[i] === maxMemberIdsPerWeek[i - 1]) {
+  if (maxMemberIdsPerWeek.every((id) => !id)) return 0
+  let best = 0
+  let run = 0
+  let currentId: string | null = null
+  for (const id of maxMemberIdsPerWeek) {
+    if (!id) {
+      run = 0
+      currentId = null
+      continue
+    }
+    if (id === currentId) {
       run++
       best = Math.max(best, run)
     } else {
+      currentId = id
       run = 1
+      best = Math.max(best, run)
     }
   }
   return best
@@ -2796,6 +2807,78 @@ export function getBurdenCounts(
     sacrificeCount: data[m.id].sacrificeCount,
     sacrificePoints: data[m.id].sacrificePoints,
   }))
+}
+
+/** Zero-burden alternative times for the full rotation.
+ * Only returns when: (1) current schedule has zero total burden,
+ * (2) there are other hard-valid times that are zero-burden for all weeks,
+ * (3) at least 2 total zero-burden options exist.
+ * Used for "Other equally comfortable options" UX. */
+export function getZeroBurdenAlternatives(
+  team: TeamMember[],
+  config: MeetingConfig,
+  weeks: RotationWeekData[],
+  displayTimezoneIana: string
+): { baseTimeMinutes: number; label: string }[] | null {
+  if (weeks.length === 0) return null
+  const burdenData = getBurdenCounts(weeks, team)
+  const totalBurden = burdenData.reduce((s, d) => s + d.count, 0)
+  if (totalBurden > 0) return null
+
+  const configNoBase = { ...config, baseTimeMinutes: null }
+  let zeroBurdenUtcHours: Set<number> | null = null
+
+  for (const week of weeks) {
+    const utcDateIso = week.utcDateIso
+    if (!utcDateIso) return null
+    const utcDate = DateTime.fromISO(utcDateIso, { zone: "utc" })
+    if (!utcDate.isValid) return null
+
+    const hardValid = findValidCandidates(utcDate, team, configNoBase)
+    const weekZero: Set<number> = new Set()
+    for (const utcHour of hardValid) {
+      const memberTimes = computeMemberTimes(utcDate, utcHour, team)
+      const allZero = memberTimes.every((mt) => (mt.score ?? 0) === 0)
+      if (allZero) weekZero.add(utcHour)
+    }
+
+    if (zeroBurdenUtcHours === null) {
+      zeroBurdenUtcHours = new Set(weekZero)
+    } else {
+      for (const h of zeroBurdenUtcHours) {
+        if (!weekZero.has(h)) zeroBurdenUtcHours.delete(h)
+      }
+    }
+    if (zeroBurdenUtcHours.size === 0) return null
+  }
+
+  const chosenUtcHours = new Set(weeks.map((w) => w.utcHour))
+  const alternatives: number[] = []
+  for (const h of zeroBurdenUtcHours!) {
+    if (!chosenUtcHours.has(h)) alternatives.push(h)
+  }
+  if (alternatives.length === 0) return null
+  if (zeroBurdenUtcHours!.size < 2) return null
+
+  const week1Date = DateTime.fromISO(weeks[0]!.utcDateIso!, { zone: "utc" })
+  const displayOffsetHours =
+    week1Date.setZone(displayTimezoneIana).offset / 60
+
+  const seen = new Set<number>()
+  const result: { baseTimeMinutes: number; label: string }[] = []
+  for (const utcHour of alternatives.slice(0, 5)) {
+    const displayHour = utcHour + displayOffsetHours
+    const wrapped = ((displayHour % 24) + 24) % 24
+    const baseTimeMinutes = Math.round(wrapped * 60) % 1440
+    if (seen.has(baseTimeMinutes)) continue
+    seen.add(baseTimeMinutes)
+    result.push({
+      baseTimeMinutes,
+      label: formatHourLabel(wrapped),
+    })
+    if (result.length >= 3) break
+  }
+  return result.length > 0 ? result : null
 }
 
 export function hasConsecutiveStretch(

@@ -31,19 +31,19 @@ const cities = [
     isBurden: false,
   },
   {
-    name: "Tokyo",
-    flag: "🇯🇵",
-    time: "11:00 PM",
-    offset: "UTC+9",
+    name: "Shanghai",
+    flag: "🇨🇳",
+    time: "10:00 PM",
+    offset: "UTC+8",
     isBurden: true,
   },
 ];
 
 const weeks = [
-  { label: "Week 1", times: ["9:00 AM", "2:00 PM", "11:00 PM"] },
-  { label: "Week 2", times: ["9:00 AM", "2:00 PM", "11:00 PM"] },
-  { label: "Week 3", times: ["9:00 AM", "2:00 PM", "11:00 PM"] },
-  { label: "Week 4", times: ["9:00 AM", "2:00 PM", "11:00 PM"] },
+  { label: "Week 1", times: ["9:00 AM", "2:00 PM", "10:00 PM"] },
+  { label: "Week 2", times: ["9:00 AM", "2:00 PM", "10:00 PM"] },
+  { label: "Week 3", times: ["9:00 AM", "2:00 PM", "10:00 PM"] },
+  { label: "Week 4", times: ["9:00 AM", "2:00 PM", "10:00 PM"] },
 ];
 
 const explanationCards = [
@@ -331,10 +331,10 @@ export function Problem() {
               whileHover={{ scale: 1.02 }}
               transition={{ duration: 0.2 }}
             >
-              <span className="text-xl shrink-0">🇯🇵</span>
+              <span className="text-xl shrink-0">🇨🇳</span>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-destructive">
-                  Tokyo took the late call <strong>4 out of 4 weeks</strong>
+                  Shanghai took the late call <strong>4 out of 4 weeks</strong>
                 </p>
                 <p className="text-xs text-destructive/80 mt-0.5">
                   The same teammate keeps adjusting — every single time.

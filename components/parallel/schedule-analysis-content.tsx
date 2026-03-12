@@ -17,9 +17,11 @@ import {
   dbMemberToTeamMember,
 } from "@/lib/database.types"
 import { getBurdenCounts, hasConsecutiveStretch } from "@/lib/rotation"
+import { getDemoBurdenData, DEMO_BURDEN_SUMMARY } from "@/lib/demo-data"
 import type { RotationWeekData } from "@/lib/types"
 import { formatHourLabel } from "@/lib/types"
 import { MemberAvatar } from "@/components/ui/avatar"
+import { BurdenScoreHelp } from "./burden-score-help"
 import { PageBackLink } from "@/components/ui/page-back-link"
 import {
   Tooltip,
@@ -100,16 +102,26 @@ export function ScheduleAnalysisContent({
       avatar_url: resolved?.avatarUrl ?? base.avatar_url,
     }
   })
-  const burdenData = weeks.length ? getBurdenCounts(weeks, team) : []
-  const maxMemberCount = burdenData.length
-    ? Math.max(...burdenData.map((d) => d.count))
-    : 0
+  const meetingId = members[0]?.meeting_id ?? ""
+  const summaryOverride = demoMode ? DEMO_BURDEN_SUMMARY[meetingId] : null
+  const burdenData = demoMode
+    ? getDemoBurdenData(meetingId, membersDisplay)
+    : weeks.length
+      ? getBurdenCounts(weeks, team)
+      : []
+  const maxMemberCount = summaryOverride
+    ? summaryOverride.maxUncomfortable
+    : burdenData.length
+      ? Math.max(...burdenData.map((d) => d.count))
+      : 0
   const minMemberCount = burdenData.length
     ? Math.min(...burdenData.map((d) => d.count))
     : 0
-  const spread = maxMemberCount - minMemberCount
+  const spread = summaryOverride
+    ? summaryOverride.maxDiff
+    : maxMemberCount - minMemberCount
   const isEven = spread <= 1
-  const consecutive = weeks.length ? hasConsecutiveStretch(weeks, team) : false
+  const consecutive = demoMode ? false : weeks.length ? hasConsecutiveStretch(weeks, team) : false
   const maxCount = burdenData.length
     ? Math.max(...burdenData.map((d) => d.count), 1)
     : 0
@@ -336,11 +348,14 @@ export function ScheduleAnalysisContent({
         {/* Left column: Member Burden Distribution */}
         <div>
           <section className="rounded-2xl border border-[#edeef0] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-5 sm:p-6 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-shadow">
-            <div className="flex items-center gap-2 mb-1">
-              <Users size={15} className="text-[#0d9488] shrink-0" />
-              <h2 className="text-[#1a1a2e] text-[0.9rem] font-semibold">
-                Member Burden Distribution
-              </h2>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <Users size={15} className="text-[#0d9488] shrink-0" />
+                <h2 className="text-[#1a1a2e] text-[0.9rem] font-semibold">
+                  Member Burden Distribution
+                </h2>
+              </div>
+              <BurdenScoreHelp className="shrink-0" />
             </div>
             <p className="text-[#9ca3af] text-[0.78rem] mb-5">
               Total inconvenience score across the {weeksCount}-week cycle.

@@ -1,15 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { getMemberDashboardData, updateMemberProfile } from "@/lib/actions"
 import { setCachedMember } from "@/lib/member-avatar-cache"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 import { PageBackLink } from "@/components/ui/page-back-link"
 import { SignOutButton } from "@/components/ui/sign-out-button"
 import { ChangePasswordModal } from "@/components/account/change-password-modal"
 import { ChangeEmailModal } from "@/components/account/change-email-modal"
 import { SignOutConfirmModal } from "@/components/account/sign-out-confirm-modal"
+import { FeedbackModal } from "@/components/feedback/feedback-modal"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
   Dialog,
@@ -23,7 +25,7 @@ import { Input } from "@/components/ui/input"
 
 type MemberData = {
   meeting: { id: string; title: string }
-  member: { id: string; name: string; avatar_url?: string | null; updated_at?: string }
+  member: { id: string; name: string; avatar_url?: string | null; updated_at?: string; user_id?: string | null }
   memberDisplay: { name: string; avatarUrl: string }
   memberEmail?: string | null
 }
@@ -31,6 +33,7 @@ type MemberData = {
 export default function MemberAccountPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
   const token = searchParams?.get("token") ?? null
   const memberId = searchParams?.get("memberId") ?? null
 
@@ -44,6 +47,8 @@ export default function MemberAccountPage() {
   const [changeEmailOpen, setChangeEmailOpen] = useState(false)
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackDefaultType, setFeedbackDefaultType] = useState<"bug" | "general">("general")
 
   useEffect(() => {
     if (!token || !memberId) return
@@ -66,7 +71,7 @@ export default function MemberAccountPage() {
       <main className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
         <div className="text-center space-y-3 max-w-sm">
           <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
-            Parallel
+            <ParallelWordmark />
           </h1>
           <p className="text-[0.88rem] text-[#9ca3af]">Missing token or member ID.</p>
         </div>
@@ -79,7 +84,7 @@ export default function MemberAccountPage() {
       <main className="min-h-screen bg-[#f7f8fa] flex items-center justify-center px-6">
         <div className="text-center space-y-3 max-w-sm">
           <h1 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
-            Parallel
+            <ParallelWordmark />
           </h1>
           <p className="text-[0.88rem] text-[#9ca3af]">{error}</p>
         </div>
@@ -346,23 +351,42 @@ export default function MemberAccountPage() {
           <h3 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-4">Support</h3>
           <div className="space-y-3">
             <div>
-              <a
-                href="mailto:support@parallelflow.app?subject=Bug%20Report"
-                className="text-[0.88rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors cursor-pointer"
+              <button
+                type="button"
+                onClick={() => {
+                  setFeedbackDefaultType("bug")
+                  setFeedbackOpen(true)
+                }}
+                className="text-[0.88rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors cursor-pointer bg-transparent border-0 p-0"
               >
                 Report a bug
-              </a>
+              </button>
             </div>
             <div>
-              <a
-                href="mailto:support@parallelflow.app?subject=Feedback"
-                className="text-[0.88rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors cursor-pointer"
+              <button
+                type="button"
+                onClick={() => {
+                  setFeedbackDefaultType("general")
+                  setFeedbackOpen(true)
+                }}
+                className="text-[0.88rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors cursor-pointer bg-transparent border-0 p-0"
               >
                 Send feedback
-              </a>
+              </button>
             </div>
           </div>
         </section>
+
+        <FeedbackModal
+          open={feedbackOpen}
+          onOpenChange={setFeedbackOpen}
+          source="member_dashboard"
+          defaultType={feedbackDefaultType}
+          defaultEmail={data.memberEmail ?? ""}
+          userId={data.member.user_id ?? undefined}
+          teamId={data.meeting.id}
+          pagePath={pathname ?? undefined}
+        />
 
         <ChangeEmailModal
           open={changeEmailOpen}

@@ -3,24 +3,40 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Send, MessageCircle } from "lucide-react";
+import { submitFeedback, type FeedbackType } from "@/lib/feedback";
 
-const quickTags = [
-  { emoji: "👍", label: "Love it" },
-  { emoji: "🤔", label: "Confusing" },
-  { emoji: "🐞", label: "Found a bug" },
-  { emoji: "💡", label: "I have an idea" },
+const quickTags: { emoji: string; label: string; type: FeedbackType }[] = [
+  { emoji: "👍", label: "Love it", type: "love_it" },
+  { emoji: "🤔", label: "Confusing", type: "confusing" },
+  { emoji: "🐞", label: "Found a bug", type: "bug" },
+  { emoji: "💡", label: "I have an idea", type: "idea" },
 ];
 
 export function FeedbackSection() {
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [activeTag, setActiveTag] = useState<FeedbackType | null>(null);
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError(null);
+    const result = await submitFeedback({
+      type: activeTag ?? "general",
+      source: "landing_page",
+      message: message.trim(),
+      email: email.trim() || undefined,
+    });
+    setSubmitting(false);
+    if (result.success) {
+      setSubmitted(true);
+    } else {
+      setSubmitError(result.error);
+    }
   };
 
   return (
@@ -83,14 +99,14 @@ export function FeedbackSection() {
                       key={tag.label}
                       type="button"
                       onClick={() =>
-                        setActiveTag(activeTag === tag.label ? null : tag.label)
+                        setActiveTag(activeTag === tag.type ? null : tag.type)
                       }
                       className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[0.82rem] border cursor-pointer transition-colors ${
-                        activeTag === tag.label
+                        activeTag === tag.type
                           ? "bg-[#ecfdf5] border-[#0d9488] text-[#0d9488]"
                           : "bg-white border-[#e5e7eb] text-[#4b5563] hover:border-[#d1d5db]"
                       }`}
-                      style={{ fontWeight: activeTag === tag.label ? 500 : 400 }}
+                      style={{ fontWeight: activeTag === tag.type ? 500 : 400 }}
                       whileTap={{ scale: 0.96 }}
                     >
                       <span>{tag.emoji}</span>
@@ -108,6 +124,10 @@ export function FeedbackSection() {
                   className="w-full px-4 py-3 rounded-xl bg-white border border-[#e5e7eb] text-[#1a1a2e] text-[0.9rem] resize-none focus:outline-none focus:border-[#0d9488] focus:ring-2 focus:ring-[#0d9488]/10 transition-all placeholder:text-[#c4c8ce]"
                 />
 
+                {submitError && (
+                  <p className="text-[0.85rem] text-red-600 mt-2">{submitError}</p>
+                )}
+
                 {/* Email + submit row */}
                 <div className="flex flex-col sm:flex-row gap-3 mt-4">
                   <input
@@ -119,25 +139,25 @@ export function FeedbackSection() {
                   />
                   <motion.button
                     type="submit"
-                    disabled={!message.trim()}
+                    disabled={!message.trim() || submitting}
                     className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-white text-[0.9rem] border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{
                       fontWeight: 500,
                       backgroundColor: "#0d9488",
                     }}
                     whileHover={
-                      message.trim()
+                      message.trim() && !submitting
                         ? {
                             backgroundColor: "#0f766e",
                             boxShadow: "0 4px 16px rgba(13,148,136,0.2)",
                           }
                         : {}
                     }
-                    whileTap={message.trim() ? { scale: 0.97 } : {}}
+                    whileTap={message.trim() && !submitting ? { scale: 0.97 } : {}}
                     transition={{ duration: 0.2 }}
                   >
                     <Send size={15} />
-                    Send Feedback
+                    {submitting ? "Sending…" : "Send Feedback"}
                   </motion.button>
                 </div>
 
@@ -184,6 +204,7 @@ export function FeedbackSection() {
                     setMessage("");
                     setEmail("");
                     setActiveTag(null);
+                    setSubmitError(null);
                   }}
                   className="mt-6 text-[#0d9488] text-[0.85rem] bg-transparent border-0 cursor-pointer hover:underline"
                   style={{ fontWeight: 500 }}

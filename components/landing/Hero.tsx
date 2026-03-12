@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "motion/react";
-import { ArrowRight, Globe, Clock, Users, Repeat } from "lucide-react";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
+import { ArrowRight, Globe, Clock, Users, Repeat, Zap, RotateCw, MessageSquare } from "lucide-react";
 import { DemoSandbox } from "@/components/demo";
 
 const rotatingWords = ["late meetings", "early calls", "weekly syncs"];
@@ -80,6 +80,165 @@ function FloatingPill({ pill }: { pill: (typeof floatingPills)[0] }) {
         {pill.time}
       </span>
     </motion.div>
+  );
+}
+
+const whyTeamsCards = [
+  {
+    icon: Zap,
+    title: "10× faster scheduling",
+    description:
+      "Stop manual time-zone math. Parallel analyzes everyone's availability instantly.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Generate weeks of meetings in seconds",
+    description:
+      "Instead of endless Slack messages or polls, Parallel creates a fair multi-week schedule in one click.",
+  },
+  {
+    icon: RotateCw,
+    title: "Fair rotation built in",
+    description:
+      "No one gets stuck with early mornings or late nights forever. Parallel rotates the inconvenience automatically.",
+  },
+];
+
+function WhyTeamsCard({
+  card,
+  index,
+}: {
+  card: (typeof whyTeamsCards)[0];
+  index: number;
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const rotateX = useTransform(mouseY, [-150, 150], [4, -4]);
+  const rotateY = useTransform(mouseX, [-150, 150], [-4, 4]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    mouseX.set(e.clientX - rect.left - rect.width / 2);
+    mouseY.set(e.clientY - rect.top - rect.height / 2);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    mouseX.set(0);
+    mouseY.set(0);
+  };
+
+  const Icon = card.icon;
+
+  return (
+    <motion.div
+      className="relative h-full"
+      style={{ perspective: 800 }}
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4, delay: index * 0.1 }}
+    >
+      <motion.div
+        className="relative w-full h-full"
+        style={{
+          rotateX,
+          rotateY,
+          transformStyle: "preserve-3d",
+        }}
+        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+        onMouseMove={handleMouseMove}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={handleMouseLeave}
+      >
+        <motion.div
+          className="relative bg-card rounded-2xl p-6 h-full flex flex-col overflow-hidden border border-border shadow-sm"
+          animate={{
+            borderColor: isHovered ? "#b2dfdb" : "#e8e8e8",
+            boxShadow: isHovered
+              ? "0 12px 40px rgba(13, 148, 136, 0.12)"
+              : "0 1px 4px rgba(0, 0, 0, 0.04)",
+          }}
+          style={{ backfaceVisibility: "hidden" }}
+        >
+          <motion.div
+            className="absolute inset-0 rounded-2xl pointer-events-none bg-primary/5"
+            animate={{ opacity: isHovered ? 1 : 0 }}
+            transition={{ duration: 0.3 }}
+          />
+          {isHovered && (
+            <>
+              {[...Array(3)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute w-1 h-1 rounded-full bg-primary"
+                  initial={{ opacity: 0, x: 30 + i * 60, y: 100 }}
+                  animate={{
+                    opacity: [0, 0.4, 0],
+                    y: [100, 30 + i * 15],
+                    x: 30 + i * 60 + (i % 2 === 0 ? 10 : -10),
+                  }}
+                  transition={{
+                    duration: 1.8,
+                    delay: i * 0.3,
+                    repeat: Infinity,
+                    ease: "easeOut",
+                  }}
+                />
+              ))}
+            </>
+          )}
+          <motion.div
+            className="w-10 h-10 rounded-xl flex items-center justify-center mb-4 relative bg-primary/10"
+            animate={{ scale: isHovered ? 1.1 : 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <Icon size={18} className="text-primary" />
+            {isHovered && (
+              <motion.div
+                className="absolute inset-0 rounded-xl border-2 border-primary"
+                initial={{ opacity: 0, scale: 1 }}
+                animate={{
+                  opacity: [0, 0.3, 0],
+                  scale: [1, 1.4],
+                }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+              />
+            )}
+          </motion.div>
+          <h3 className="text-foreground text-[0.95rem] mb-2 relative font-semibold">
+            {card.title}
+          </h3>
+          <p className="text-muted-foreground text-[0.82rem] leading-relaxed relative flex-1">
+            {card.description}
+          </p>
+          <motion.div
+            className="absolute bottom-0 left-1/2 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent rounded-full"
+            animate={{
+              width: isHovered ? "80%" : "0%",
+              marginLeft: isHovered ? "-40%" : "0%",
+            }}
+            transition={{ duration: 0.4 }}
+          />
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function WhyTeamsSection() {
+  return (
+    <div className="mt-16 md:mt-20">
+      <h3 className="text-center text-[0.9rem] font-semibold text-[#1a1a2e] mb-6">
+        Why teams use Parallel
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-4xl mx-auto">
+        {whyTeamsCards.map((card, i) => (
+          <WhyTeamsCard key={card.title} card={card} index={i} />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -228,11 +387,9 @@ export function Hero() {
           >
             <Link href="/signup">
               <motion.span
-                className="inline-flex items-center gap-2 bg-white text-emerald-600 border border-emerald-200 px-7 py-3 rounded-full text-[0.92rem] cursor-pointer transition-colors duration-200 hover:border-emerald-400 hover:bg-emerald-50"
-                style={{ fontWeight: 500 }}
+                className="inline-flex items-center gap-2 bg-chart-1 text-white border-0 px-7 py-3 rounded-full text-[0.92rem] cursor-pointer transition-colors duration-200 hover:opacity-90"
+                style={{ fontWeight: 500, backgroundColor: "var(--chart-1)" }}
                 whileHover={{
-                  borderColor: "#34d399",
-                  backgroundColor: "#ecfdf5",
                   gap: "10px",
                 }}
                 whileTap={{ scale: 0.97 }}
@@ -285,13 +442,29 @@ export function Hero() {
         </div>
         </div>
 
-        {/* Demo preview — unchanged */}
+        {/* Demo preview */}
         <div className="relative z-20 mx-auto w-full max-w-5xl px-5 sm:px-6 lg:px-8 mt-16 md:mt-24">
-          <p className="text-center text-sm text-muted-foreground mb-4">
-            No perfect meeting time exists for this team. Parallel distributes
-            the inconvenience more fairly across the cycle.
-          </p>
           <DemoSandbox />
+
+          {/* Explanation block — below demo */}
+          <div className="text-center mt-10 space-y-2 max-w-2xl mx-auto">
+            <p className="text-sm text-muted-foreground">
+              There is rarely a perfect meeting time across global teams.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Parallel finds the{" "}
+              <span className="text-[#0d9488] font-medium">best possible schedule</span>{" "}
+              across{" "}
+              <span className="text-[#0d9488]/90">time zones, working hours, and hard constraints</span>.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              When a perfect split isn&apos;t possible, Parallel{" "}
+              <span className="text-[#0d9488] font-medium">rotates the burden fairly</span>.
+            </p>
+          </div>
+
+          {/* Why teams use Parallel — reuses Solution card hover style */}
+          <WhyTeamsSection />
         </div>
       </div>
     </section>

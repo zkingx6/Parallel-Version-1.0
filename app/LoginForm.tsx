@@ -7,6 +7,7 @@ import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { signInAction } from "@/lib/actions"
 import { createClient } from "@/lib/supabase/client"
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 
 function GoogleIcon() {
   return (
@@ -73,8 +74,8 @@ export function LoginForm() {
     <div className="min-h-screen flex items-center justify-center px-5">
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
-          <h1 className="text-[17px] font-semibold tracking-tight text-primary">
-            {isSignUp ? "Start your free trial" : "Parallel"}
+          <h1 className="text-[17px] font-semibold tracking-tight text-foreground">
+            {isSignUp ? "Start your free trial" : <ParallelWordmark />}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {isSignUp

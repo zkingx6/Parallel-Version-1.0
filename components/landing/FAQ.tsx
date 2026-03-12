@@ -5,36 +5,98 @@ import { ChevronDown } from "lucide-react";
 import { Container } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
+const highlight = (text: string) => (
+  <span className="text-[#0d9488] font-semibold">{text}</span>
+);
+
 const faqs = [
   {
     question: "How does Parallel differ from Calendly or Doodle?",
-    answer:
-      "Calendly and Doodle help teams find a time that works for everyone once. Parallel focuses on recurring meetings across time zones. Instead of always picking the same \"least bad\" time, Parallel makes scheduling burden visible and rotates inconvenient meeting times over weeks so the cost is shared across the team. The goal isn't perfect equality — it's intentional fairness over time.",
-  },
-  {
-    question: "Does Parallel guarantee equal meeting times for everyone?",
-    answer:
-      "No. Parallel doesn't promise mathematically equal meeting times. Every team has different time zones, working hours, and constraints. Instead, Parallel helps teams avoid the same person always taking the early or late meeting by rotating inconvenience across the schedule whenever possible.",
-  },
-  {
-    question: "What time zones does Parallel support?",
-    answer:
-      "Parallel supports all IANA time zones, such as America/New_York, Europe/London, and Asia/Tokyo. Using IANA time zones helps ensure accurate local time calculations for distributed teams around the world.",
-  },
-  {
-    question: "Can I use Parallel with my existing calendar?",
-    answer:
-      "Yes — but integrations are intentionally simple right now. Parallel currently supports schedule export through a shareable link and ICS calendar files. That means teams can bring schedules into Google Calendar, Outlook, or other calendar tools using export/import workflows for now. Deeper integrations may come later.",
+    answer: (
+      <>
+        Calendly and Doodle help teams find a time that works <strong>once</strong>. Parallel focuses on{" "}
+        {highlight("recurring meetings")} across {highlight("time zones")}.
+        <br /><br />
+        Instead of always picking the same &quot;least bad&quot; meeting time, Parallel makes scheduling burden visible and{" "}
+        {highlight("rotates inconvenient meeting times across weeks")} so the cost is shared across the team.
+        <br /><br />
+        The goal isn&apos;t perfect equality — it&apos;s {highlight("intentional fairness over time")}.
+      </>
+    ),
   },
   {
     question: "Who should use Parallel?",
-    answer:
-      "Parallel is built for distributed teams with recurring meetings, such as weekly standups, cross-time-zone team syncs, and project or leadership reviews. If the same people often end up joining very early or very late meetings, Parallel helps teams share that burden more fairly over time.",
+    answer: (
+      <>
+        Parallel is built for {highlight("distributed teams")} with {highlight("recurring meetings")}.
+        <br /><br />
+        Common use cases include:
+        <br />• <strong>Weekly standups</strong>
+        <br />• {highlight("Cross-time-zone team syncs")}
+        <br />• <strong>Leadership or project reviews</strong>
+        <br /><br />
+        If the same people often end up joining very early or very late meetings, Parallel helps teams{" "}
+        {highlight("share that burden fairly over time")}.
+      </>
+    ),
+  },
+  {
+    question: "Does Parallel guarantee equal meeting times for everyone?",
+    answer: (
+      <>
+        No. Parallel doesn&apos;t promise {highlight("mathematically equal meeting times")}.
+        <br /><br />
+        Every team has different {highlight("time zones")}, working hours, and constraints.
+        <br /><br />
+        Instead, Parallel helps teams avoid the same person always taking the early morning or late night meeting by{" "}
+        {highlight("rotating inconvenience across the schedule whenever possible")}.
+      </>
+    ),
   },
   {
     question: "Why not just pick the \"best time\" every week?",
-    answer:
-      "Because the \"best time\" often means the same people sacrifice every week. Parallel helps teams rotate inconvenient meeting times so no one is always stuck with the worst slot.",
+    answer: (
+      <>
+        Because the {highlight("\"best time\"")} often means the same people sacrifice every week.
+        <br /><br />
+        Parallel helps teams {highlight("rotate inconvenient meeting times")} so no one is always stuck with the worst slot.
+      </>
+    ),
+  },
+  {
+    question: "What time zones does Parallel support?",
+    answer: (
+      <>
+        Parallel supports all {highlight("IANA time zones")}, such as <strong>America/New_York</strong>,{" "}
+        <strong>Europe/London</strong>, and <strong>Asia/Shanghai</strong>.
+        <br /><br />
+        Using {highlight("IANA time zones")} ensures accurate local time calculations for {highlight("distributed teams")} around the world.
+      </>
+    ),
+  },
+  {
+    question: "Can I use Parallel with my existing calendar?",
+    answer: (
+      <>
+        Yes — integrations are intentionally simple right now.
+        <br /><br />
+        Parallel supports schedule export through a {highlight("shareable link")} and {highlight("ICS calendar files")}.
+        <br /><br />
+        This allows teams to import schedules into {highlight("Google Calendar")}, {highlight("Outlook")}, or other calendar tools.
+        <br /><br />
+        Deeper integrations may come later.
+      </>
+    ),
+  },
+  {
+    question: "Is there a free trial?",
+    answer: (
+      <>
+        Yes. Parallel offers a {highlight("14-day free trial")} for the {highlight("Starter plan")} so teams can try scheduling rotations with real meetings.
+        <br /><br />
+        You can explore how {highlight("fair meeting rotation")} works across {highlight("time zones")} before deciding to upgrade.
+      </>
+    ),
   },
 ];
 
@@ -72,9 +134,9 @@ export function FAQ() {
               </button>
               {openIndex === i && (
                 <div className="border-t border-white bg-white px-5 py-4">
-                  <p className="text-sm text-muted-foreground leading-relaxed">
+                  <div className="text-sm text-muted-foreground leading-relaxed">
                     {faq.answer}
-                  </p>
+                  </div>
                 </div>
               )}
             </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -19,12 +19,14 @@ import { SignOutButton } from "@/components/ui/sign-out-button"
 import { ChangePasswordModal } from "@/components/account/change-password-modal"
 import { ChangeEmailModal } from "@/components/account/change-email-modal"
 import { SignOutConfirmModal } from "@/components/account/sign-out-confirm-modal"
+import { FeedbackModal } from "@/components/feedback/feedback-modal"
 import { updateProfile } from "@/lib/actions"
 import type { Plan } from "@/lib/plans"
 import type { BillingInfo } from "@/lib/billing"
 import { PRICING_SECONDARY_CLASSES } from "@/lib/pricing-button-styles"
 
 type SettingsContentProps = {
+  userId?: string
   userEmail: string
   userName: string
   userAvatar: string
@@ -35,6 +37,7 @@ type SettingsContentProps = {
 }
 
 export function SettingsContent({
+  userId,
   userEmail,
   userName,
   userAvatar,
@@ -44,6 +47,7 @@ export function SettingsContent({
   billing = null,
 }: SettingsContentProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -56,6 +60,8 @@ export function SettingsContent({
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
   const [manageBillingLoading, setManageBillingLoading] = useState(false)
   const [manageBillingError, setManageBillingError] = useState<string | null>(null)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackDefaultType, setFeedbackDefaultType] = useState<"bug" | "general">("general")
 
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -460,23 +466,41 @@ export function SettingsContent({
         <h3 className="text-sm font-semibold mb-4">Support</h3>
         <div className="space-y-3">
           <div>
-            <a
-              href="mailto:support@parallelflow.app?subject=Bug%20Report"
-              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer"
+            <button
+              type="button"
+              onClick={() => {
+                setFeedbackDefaultType("bug")
+                setFeedbackOpen(true)
+              }}
+              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer bg-transparent border-0 p-0"
             >
               Report a bug
-            </a>
+            </button>
           </div>
           <div>
-            <a
-              href="mailto:support@parallelflow.app?subject=Feedback"
-              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer"
+            <button
+              type="button"
+              onClick={() => {
+                setFeedbackDefaultType("general")
+                setFeedbackOpen(true)
+              }}
+              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer bg-transparent border-0 p-0"
             >
               Send feedback
-            </a>
+            </button>
           </div>
         </div>
       </section>
+
+      <FeedbackModal
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        source="owner_dashboard"
+        defaultType={feedbackDefaultType}
+        defaultEmail={userEmail}
+        userId={userId}
+        pagePath={pathname ?? undefined}
+      />
 
       <ChangeEmailModal
         open={changeEmailOpen}

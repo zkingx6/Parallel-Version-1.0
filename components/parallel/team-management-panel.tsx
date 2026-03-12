@@ -92,6 +92,11 @@ export function TeamSection({
     return () => clearTimeout(id)
   }, [])
 
+  useEffect(() => {
+    setMeeting(initialMeeting)
+    setMembers(initialMembers)
+  }, [initialMeeting, initialMembers])
+
   const handleRenameOpen = () => {
     setRenameValue(meeting.title)
     setRenameModalOpen(true)

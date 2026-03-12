@@ -11,7 +11,15 @@ import { ScheduleDetailContent } from "@/components/parallel/schedule-detail-con
 import { ScheduleAnalysisContent } from "@/components/parallel/schedule-analysis-content"
 import { cn } from "@/lib/utils"
 import type { DbMeeting, DbMemberSubmission } from "@/lib/database.types"
-import type { DemoSchedule } from "@/lib/demo-data"
+import {
+  type DemoSchedule,
+  getDemoMeetingAndMembersByScheduleId,
+  getDemoMeetingAndMembersByMeetingId,
+  getDemoMembersDisplay,
+  getDemoPreviewWeeksForMeeting,
+} from "@/lib/demo-data"
+import { ParallelLogo } from "@/components/landing/ParallelLogo"
+import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 import { DateTime } from "luxon"
 
 function getModeLabel(modeUsed: string | undefined): string {
@@ -68,9 +76,10 @@ function DemoTopNav({
   return (
     <header className="sticky top-0 z-10 w-full shrink-0 bg-white/80 backdrop-blur-md border-b border-[#edeef0]">
       <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-2">
+          <ParallelLogo className="size-5 shrink-0" />
           <span className="text-[#1a1a2e] text-[0.95rem] tracking-[-0.02em] font-semibold">
-            Parallel
+            <ParallelWordmark />
           </span>
         </div>
 
@@ -130,7 +139,6 @@ function DemoSandboxInner() {
     membersByMeeting,
     schedules,
     onNavigate,
-    getMembersDisplay,
     addMeeting,
     removeMeeting,
     addSchedule,
@@ -249,15 +257,30 @@ function DemoSandboxInner() {
   const selectedSchedule = selectedScheduleId
     ? schedules.find((s) => s.id === selectedScheduleId)
     : null
+
+  // For schedule views: resolve from scenario by scheduleId
+  const scheduleResolved =
+    selectedSchedule && view !== "teams" && view !== "team" && view !== "rotation"
+      ? getDemoMeetingAndMembersByScheduleId(selectedSchedule.id)
+      : null
+
+  // For team/rotation views: resolve from scenario by meetingId
+  const teamResolved =
+    selectedMeetingId && (view === "team" || view === "rotation")
+      ? getDemoMeetingAndMembersByMeetingId(selectedMeetingId)
+      : null
+
   const selectedMeeting =
-    selectedMeetingId
-      ? meetings.find((m) => m.id === selectedMeetingId)
-      : selectedSchedule
-        ? meetings.find((m) => m.id === selectedSchedule.team_id) ?? null
-        : null
-  const selectedMembers = selectedMeeting
-    ? membersByMeeting[selectedMeeting.id] ?? []
-    : []
+    scheduleResolved?.meeting ??
+    teamResolved?.meeting ??
+    (selectedMeetingId ? meetings.find((m) => m.id === selectedMeetingId) ?? null : null) ??
+    (selectedSchedule ? meetings.find((m) => m.id === selectedSchedule.team_id) ?? null : null)
+  const selectedMembers =
+    scheduleResolved?.members ?? teamResolved?.members ?? (selectedMeeting ? membersByMeeting[selectedMeeting.id] ?? [] : [])
+
+  // Always build membersDisplay from selectedMembers so names match exactly (no context drift)
+  const selectedMembersDisplay =
+    selectedMembers.length > 0 ? getDemoMembersDisplay(selectedMembers) : new Map<string, { name: string; avatarUrl: string }>()
 
   if (view === "teams") {
     return (
@@ -300,7 +323,7 @@ function DemoSandboxInner() {
             members={selectedMembers}
             hasOwnerParticipant={selectedMembers.some((m) => m.is_owner_participant)}
             userEmail="demo@parallel.app"
-            membersDisplay={getMembersDisplay(selectedMeeting.id)}
+            membersDisplay={selectedMembersDisplay}
             plan="pro"
             demoMode
             hideOwnerActions={!isOwner}
@@ -328,9 +351,10 @@ function DemoSandboxInner() {
           <RotationSection
             meeting={selectedMeeting}
             members={selectedMembers}
-            membersDisplay={getMembersDisplay(selectedMeeting.id)}
+            membersDisplay={selectedMembersDisplay}
             plan="pro"
             demoMode
+            demoPreviewWeeks={getDemoPreviewWeeksForMeeting(selectedMeeting.id)}
             onBack={() => onNavigate("teams")}
             onUpdateMeeting={(id, patch) => updateMeeting(id, patch)}
             onPublishSchedule={handlePublishSchedule}
@@ -401,7 +425,7 @@ function DemoSandboxInner() {
             meeting={selectedMeeting}
             members={selectedMembers}
             weeks={weeks}
-            membersDisplay={getMembersDisplay(selectedMeeting.id)}
+            membersDisplay={selectedMembersDisplay}
             scheduleBasePath="/schedule"
             showShareActions={isOwner}
             demoMode
@@ -442,7 +466,7 @@ function DemoSandboxInner() {
             explain={explain}
             members={selectedMembers}
             weeks={weeks}
-            membersDisplay={getMembersDisplay(selectedMeeting.id)}
+            membersDisplay={selectedMembersDisplay}
             displayTimezone={selectedMeeting.display_timezone ?? "America/New_York"}
             modeUsed={modeUsed}
             useFixedBaseTime={selectedMeeting.base_time_minutes != null}
