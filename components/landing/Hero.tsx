@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { scrollToSection } from "@/lib/utils";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "motion/react";
 import { ArrowRight, Globe, Clock, Users, Repeat, Zap, RotateCw, MessageSquare } from "lucide-react";
 import { DemoSandbox } from "@/components/demo";
@@ -400,7 +401,13 @@ export function Hero() {
               </motion.span>
             </Link>
 
-            <Link href="#pricing">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                scrollToSection("pricing")
+              }}
+            >
               <motion.span
                 className="inline-flex items-center justify-center bg-white text-emerald-600 border border-emerald-200 px-6 py-3 rounded-full text-[0.92rem] cursor-pointer transition-colors duration-200 hover:border-emerald-400 hover:bg-emerald-50"
                 style={{ fontWeight: 500 }}
@@ -413,7 +420,7 @@ export function Hero() {
               >
                 See pricing
               </motion.span>
-            </Link>
+            </button>
           </motion.div>
 
           {/* Stat chips row */}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { ChevronDownIcon, Calendar, Info } from "lucide-react"
+import { ChevronDownIcon, Calendar, Info, HelpCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { updateMeetingConfig, createScheduleRecord } from "@/lib/actions"
 import {
@@ -60,6 +60,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { PageBackLink } from "@/components/ui/page-back-link"
 import { MemberAvatar } from "@/components/ui/avatar"
@@ -367,12 +373,65 @@ function BurdenBar({
   )
 }
 
+const NEVER_TIME_TOOLTIP =
+  "These blocked hours remove possible meeting slots entirely."
+const WORKING_HOURS_TOOLTIP =
+  "These hours don't block scheduling directly, but they make comfortable overlap harder to find."
+
+function BlockerBadgeWithTooltip({
+  label,
+  tooltip,
+}: {
+  label: string
+  tooltip: string
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex items-center gap-1 cursor-help">
+          <Badge variant="outline" className="text-xs font-normal">
+            {label}
+          </Badge>
+          <HelpCircle className="size-3 text-muted-foreground" aria-hidden />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[240px]">
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+function formatBlockersSummary(blockers: NoViableTimeResult["diagnosis"]["blockers"]): string {
+  const hardCount = blockers.filter((b) => b.blockingType === "HARD_BOUNDARY").length
+  const workCount = blockers.filter((b) => b.blockingType === "WORKING_HOURS").length
+  const parts: string[] = []
+  if (hardCount > 0) {
+    parts.push(
+      hardCount === 1
+        ? "1 blocked 'never' time"
+        : `${hardCount} blocked 'never' times`
+    )
+  }
+  if (workCount > 0) {
+    parts.push(
+      workCount === 1
+        ? "1 working-hour pressure"
+        : `${workCount} working-hour pressures`
+    )
+  }
+  if (parts.length === 0) return `${blockers.length} members are limiting the schedule`
+  return parts.join(" • ")
+}
+
 function NoViableTimePanel({
   result,
   onApplySuggestion,
+  isPreviewNoOverlap,
 }: {
   result: NoViableTimeResult
   onApplySuggestion: (suggestionId: string, params?: unknown) => void
+  isPreviewNoOverlap?: boolean
 }) {
   const [showBlockers, setShowBlockers] = useState(false)
   const [modalSuggestion, setModalSuggestion] = useState<{
@@ -384,12 +443,12 @@ function NoViableTimePanel({
 
   const { diagnosis, suggestions } = result
 
-  // Prefer "Allow slightly earlier or later times" as recommended (less intrusive)
-  const sortedSuggestions = [...suggestions].sort((a, b) => {
-    if (a.id === "ALLOW_OUTSIDE_WORKING_HOURS") return -1
-    if (b.id === "ALLOW_OUTSIDE_WORKING_HOURS") return 1
-    return 0
-  })
+  // Primary: relax hard boundary (only action that can change candidate existence).
+  // Secondary: allow outside working hours (soft constraint; won't override blocked times).
+  const relaxSuggestion = suggestions.find((s) => s.id === "RELAX_HARD_BOUNDARY_1H")
+  const workingHoursSuggestion = suggestions.find((s) => s.id === "ALLOW_OUTSIDE_WORKING_HOURS")
+
+  const blockersSummary = formatBlockersSummary(diagnosis.blockers)
 
   const handleApplyClick = (s: (typeof suggestions)[0]) => {
     setModalSuggestion({
@@ -409,76 +468,70 @@ function NoViableTimePanel({
 
   return (
     <>
+      <TooltipProvider delayDuration={100}>
       <div className="rounded-xl border border-border/60 bg-card p-5 sm:p-6 space-y-6 animate-in fade-in-0 duration-300">
+        {isPreviewNoOverlap && (
+          <div className="rounded-lg border border-stretch/40 bg-stretch/15 px-4 py-3 text-sm text-muted-foreground">
+            <p>Even with this option, blocked times still leave no overlap.</p>
+          </div>
+        )}
+
         <div>
           <h3 className="text-base font-semibold text-foreground">
-            No shared time works for this team
+            No shared time fits everyone&apos;s limits
           </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Working hours and boundaries leave no overlapping meeting window.
+          <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+            Blocked times overlap, so there&apos;s currently no meeting time that works for everyone.
+            Some members&apos; working hours also make the overlap tighter.
           </p>
         </div>
 
         <section>
           <h4 className="text-sm font-medium text-foreground mb-2">
-            Why this happens
+            What&apos;s limiting options?
           </h4>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Your team spans multiple time zones and members have set limits on when they can meet.
+          <p className="text-sm text-muted-foreground">
+            {blockersSummary}
           </p>
-          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-            Right now, those limits leave no shared meeting window.
-          </p>
-        </section>
-
-        <section>
-          <div className="flex items-center justify-between gap-2">
-            <h4 className="text-sm font-medium text-foreground">
-              What&apos;s limiting options?
-            </h4>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs"
-              onClick={() => setShowBlockers((b) => !b)}
-            >
-              {showBlockers ? "Hide explanation" : "Why no time works"}
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2 text-xs h-auto py-1 px-0"
+            onClick={() => setShowBlockers((b) => !b)}
+          >
+            {showBlockers ? "Hide details" : "Show details"}
+          </Button>
           {showBlockers && (
-            <>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {diagnosis.blockers.some((b) => b.blockingType === "HARD_BOUNDARY")
-                  ? "These members' limits leave no shared meeting window."
-                  : "These members' working hours leave no shared meeting window."}
-              </p>
-              <ul className="mt-3 space-y-2.5">
-                {diagnosis.blockers.map((b) => (
-                  <li
-                    key={b.memberId}
-                    className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-sm space-y-1"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-foreground">{b.name}</span>
-                      <Badge
-                        variant="outline"
-                        className="text-xs font-normal"
-                      >
-                        {b.blockingType === "HARD_BOUNDARY"
+            <ul className="mt-3 space-y-2.5">
+              {diagnosis.blockers.map((b) => (
+                <li
+                  key={b.memberId}
+                  className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-sm space-y-1"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground">{b.name}</span>
+                    <BlockerBadgeWithTooltip
+                      label={
+                        b.blockingType === "HARD_BOUNDARY"
                           ? "Never time"
-                          : "Working hours"}
-                      </Badge>
-                      <span className="text-muted-foreground text-xs">
-                        {getTimezoneDisplayLabelNow(b.timezone)}
-                      </span>
-                    </div>
-                    <p className="text-muted-foreground text-xs">
-                      {b.localBlockedSummary}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </>
+                          : "Working hours pressure"
+                      }
+                      tooltip={
+                        b.blockingType === "HARD_BOUNDARY"
+                          ? NEVER_TIME_TOOLTIP
+                          : WORKING_HOURS_TOOLTIP
+                      }
+                    />
+                    <span className="text-muted-foreground text-xs">
+                      {getTimezoneDisplayLabelNow(b.timezone)}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    {b.localBlockedSummary}
+                  </p>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
 
@@ -487,44 +540,68 @@ function NoViableTimePanel({
             Ways to resolve this
           </h4>
           <div className="space-y-3">
-            {sortedSuggestions.map((s, index) => {
-              const isRecommended = index === 0
-              return (
-                <div
-                  key={s.id}
-                  className={`rounded-lg border p-4 space-y-2 transition-colors cursor-pointer ${
-                    isRecommended
-                      ? "border-primary/40 bg-primary/10 hover:border-primary/60 hover:bg-primary/15"
-                      : "border-border/50 bg-card hover:border-primary/30 hover:bg-primary/5"
-                  }`}
+            {relaxSuggestion && (
+              <div
+                className="rounded-lg border border-primary/40 bg-primary/10 hover:border-primary/60 hover:bg-primary/15 p-4 space-y-2 transition-colors cursor-pointer"
+                onClick={() => handleApplyClick(relaxSuggestion)}
+              >
+                <h5 className="text-sm font-medium text-foreground">
+                  Relax one &quot;never&quot; time
+                </h5>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {relaxSuggestion.description}
+                </p>
+                <p className="text-xs text-muted-foreground/80">
+                  {relaxSuggestion.impactSummary}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 rounded-full px-6 py-3 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleApplyClick(relaxSuggestion)
+                  }}
                 >
-                  <h5 className="text-sm font-medium text-foreground">
-                    {s.title}
-                  </h5>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {s.description}
-                  </p>
-                  <p className="text-xs text-muted-foreground/80">
-                    {s.impactSummary}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={
-                      isRecommended
-                        ? "mt-2 rounded-full px-6 py-3 bg-primary text-primary-foreground hover:bg-primary/90 border-primary"
-                        : "mt-2 rounded-full px-6 py-3"
-                    }
-                    onClick={() => handleApplyClick(s)}
-                  >
-                    Generate preview
-                  </Button>
-                </div>
-              )
-            })}
+                  Generate preview
+                </Button>
+              </div>
+            )}
+            {workingHoursSuggestion && (
+              <div
+                className="rounded-lg border border-border/50 bg-card hover:border-primary/30 hover:bg-primary/5 p-4 space-y-2 transition-colors cursor-pointer"
+                onClick={() => handleApplyClick(workingHoursSuggestion)}
+              >
+                <h5 className="text-sm font-medium text-foreground">
+                  Review working hours flexibility
+                </h5>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {workingHoursSuggestion.description}
+                </p>
+                <p className="text-xs text-muted-foreground/80">
+                  {workingHoursSuggestion.impactSummary}
+                </p>
+                <p className="text-xs text-muted-foreground/70 italic">
+                  This won&apos;t override blocked &quot;never&quot; times. It only helps if members
+                  can be flexible outside normal working hours.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 rounded-full px-6 py-3"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleApplyClick(workingHoursSuggestion)
+                  }}
+                >
+                  Generate preview
+                </Button>
+              </div>
+            )}
           </div>
         </section>
       </div>
+      </TooltipProvider>
 
       <Dialog open={!!modalSuggestion} onOpenChange={(o) => !o && setModalSuggestion(null)}>
         <DialogContent className="max-w-md">
@@ -1276,18 +1353,11 @@ export function RotationSection({
         )}
 
         {noViableResult && !isGenerating && (
-          <>
-            {rotationError === "PREVIEW_NO_OVERLAP" && (
-              <div className="rounded-lg border border-stretch/40 bg-stretch/15 px-4 py-3 text-sm text-muted-foreground animate-in fade-in-0 duration-300 mb-4">
-                <p>Even with this option, the team still has no overlapping meeting window.</p>
-                <p className="mt-1.5 text-xs text-muted-foreground/90">You may need to adjust member availability or remove some constraints.</p>
-              </div>
-            )}
-            <NoViableTimePanel
-              result={noViableResult}
-              onApplySuggestion={handleApplySuggestion}
-            />
-          </>
+          <NoViableTimePanel
+            result={noViableResult}
+            onApplySuggestion={handleApplySuggestion}
+            isPreviewNoOverlap={rotationError === "PREVIEW_NO_OVERLAP"}
+          />
         )}
 
         {rotationError && !noViableResult && !isGenerating && (

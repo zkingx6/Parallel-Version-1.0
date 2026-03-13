@@ -1,3 +1,4 @@
+export { LandingScrollHandler } from "./LandingScrollHandler";
 export { Navbar } from "./Navbar";
 export { Hero } from "./Hero";
 export { Problem } from "./Problem";

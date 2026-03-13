@@ -4,17 +4,17 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, scrollToSection } from "@/lib/utils";
 import { ParallelLogo } from "./ParallelLogo";
 import { ParallelWordmark } from "@/components/ui/parallel-wordmark";
 import { useActiveSection } from "@/lib/useActiveSection";
 
 const navLinks = [
-  { href: "#problem", label: "Problem" },
-  { href: "#solution", label: "Solution" },
-  { href: "#how-it-works", label: "How it works" },
-  { href: "#pricing", label: "Pricing" },
-  { href: "#faq", label: "FAQ" },
+  { id: "problem", label: "Problem" },
+  { id: "solution", label: "Solution" },
+  { id: "how-it-works", label: "How it works" },
+  { id: "pricing", label: "Pricing" },
+  { id: "faq", label: "FAQ" },
 ];
 
 export function Navbar() {
@@ -22,10 +22,7 @@ export function Navbar() {
   const pathname = usePathname();
   const activeSection = useActiveSection();
 
-  // On landing page: use hash links for in-page scroll. Else: navigate to /#anchor
   const isLanding = pathname === "/" || pathname === "/landing";
-  const logoHref = isLanding ? "#top" : "/";
-  const sectionHref = (hash: string) => (isLanding ? hash : `/${hash}`);
 
   return (
     <header className="sticky top-0 z-[100] w-full pt-4 px-4 sm:px-6">
@@ -41,31 +38,85 @@ export function Navbar() {
         >
           {/* Left: logo */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <a
-              href={logoHref}
-              className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground hover:text-muted-foreground transition-colors"
-            >
-              <ParallelLogo className="size-6 shrink-0" />
-              <ParallelWordmark />
-            </a>
+            {isLanding ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  console.log("[URL_DEBUG] logo BEFORE", {
+                    href: window.location.href,
+                    hash: window.location.hash,
+                    target: (e.target as HTMLElement)?.tagName,
+                    activeElement: document.activeElement?.tagName,
+                    time: performance.now().toFixed(1),
+                  })
+                  e.preventDefault()
+                  window.scrollTo({ top: 0, behavior: "smooth" })
+                  console.log("[URL_DEBUG] logo AFTER scrollTo", {
+                    href: window.location.href,
+                    hash: window.location.hash,
+                    time: performance.now().toFixed(1),
+                  })
+                  setTimeout(() => {
+                    console.log("[URL_DEBUG] logo 50ms", {
+                      href: window.location.href,
+                      hash: window.location.hash,
+                      time: performance.now().toFixed(1),
+                    })
+                  }, 50)
+                  setTimeout(() => {
+                    console.log("[URL_DEBUG] logo 200ms", {
+                      href: window.location.href,
+                      hash: window.location.hash,
+                      time: performance.now().toFixed(1),
+                    })
+                  }, 200)
+                }}
+                className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground hover:text-muted-foreground transition-colors"
+              >
+                <ParallelLogo className="size-6 shrink-0" />
+                <ParallelWordmark />
+              </button>
+            ) : (
+              <Link
+                href="/"
+                className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground hover:text-muted-foreground transition-colors"
+              >
+                <ParallelLogo className="size-6 shrink-0" />
+                <ParallelWordmark />
+              </Link>
+            )}
           </div>
 
           {/* Center: nav links — absolutely centered relative to full navbar */}
           <div className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 md:flex items-center gap-8">
             {navLinks.map((link) => {
-              const slug = link.href.slice(1);
-              const isActive = activeSection === slug;
-              return (
-                <a
-                  key={link.href}
-                  href={sectionHref(link.href)}
+              const isActive = activeSection === link.id;
+              return isLanding ? (
+                <button
+                  key={link.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    scrollToSection(link.id)
+                  }}
                   className={cn(
                     "text-sm font-medium transition-colors duration-200 nav-link",
                     isActive && "nav-link-active"
                   )}
                 >
                   {link.label}
-                </a>
+                </button>
+              ) : (
+                <Link
+                  key={link.id}
+                  href={`/?section=${link.id}`}
+                  className={cn(
+                    "text-sm font-medium transition-colors duration-200 nav-link",
+                    isActive && "nav-link-active"
+                  )}
+                >
+                  {link.label}
+                </Link>
               );
             })}
           </div>
@@ -105,12 +156,28 @@ export function Navbar() {
           >
             <div className="px-4 py-4 space-y-1">
               {navLinks.map((link) => {
-                const slug = link.href.slice(1);
-                const isActive = activeSection === slug;
-                return (
-                  <a
-                    key={link.href}
-                    href={sectionHref(link.href)}
+                const isActive = activeSection === link.id;
+                return isLanding ? (
+                  <button
+                    key={link.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      scrollToSection(link.id)
+                      setMobileOpen(false)
+                    }}
+                    className={cn(
+                      "block w-full text-left rounded-lg py-2.5 px-3 text-sm font-medium transition-colors nav-link",
+                      isActive && "nav-link-active",
+                      !isActive && "hover:bg-accent/30"
+                    )}
+                  >
+                    {link.label}
+                  </button>
+                ) : (
+                  <Link
+                    key={link.id}
+                    href={`/?section=${link.id}`}
                     className={cn(
                       "block rounded-lg py-2.5 px-3 text-sm font-medium transition-colors nav-link",
                       isActive && "nav-link-active",
@@ -119,7 +186,7 @@ export function Navbar() {
                     onClick={() => setMobileOpen(false)}
                   >
                     {link.label}
-                  </a>
+                  </Link>
                 );
               })}
               <div className="mt-3 flex flex-col gap-2">

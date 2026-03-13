@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import {
   Navbar,
   Hero,
@@ -9,11 +10,15 @@ import {
   FAQ,
   FeedbackSection,
   Footer,
+  LandingScrollHandler,
 } from "@/components/landing"
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen">
+      <Suspense fallback={null}>
+        <LandingScrollHandler />
+      </Suspense>
       <Navbar />
       <Hero />
       <Problem />
