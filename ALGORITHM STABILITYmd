@@ -1,0 +1,46 @@
+PARALLEL PROJECT RULE — ALGORITHM STABILITY
+
+The scheduling algorithm used in Parallel has already been tested and validated.  
+Do NOT modify or refactor the scheduling algorithm unless a confirmed bug has been identified and approved.
+
+Specifically:
+
+1. Do NOT change the core rotation or fairness algorithm.
+2. Do NOT modify scoring logic, burden calculation, or rotation logic.
+3. Do NOT alter constraint evaluation logic (timezone handling, hard boundaries, working hours).
+4. Do NOT refactor algorithm files for style, optimization, or structure.
+5. Do NOT rename algorithm functions or move them between files.
+
+Allowed changes:
+• UI improvements
+• Validation messages
+• Tooltips / explanations
+• Empty state UI
+• Error handling
+• Form validation
+• Frontend user experience improvements
+
+If a bug is suspected:
+
+1. First reproduce the issue.
+2. Identify the exact algorithm function involved.
+3. Explain the bug clearly.
+4. Propose the minimal possible fix.
+5. Wait for approval before modifying the algorithm.
+
+If any change might affect scheduling output, it must be treated as an algorithm change and must not be implemented automatically.
+
+Priority order when modifying code:
+1. Preserve algorithm correctness
+2. Avoid regressions
+3. Improve user clarity without changing scheduling results
+
+ALGORITHM CHANGE PROTOCOL
+
+If an algorithm-related change is required:
+
+1. Show the current code.
+2. Explain what behavior will change.
+3. Explain why the change is necessary.
+4. Show before / after examples of scheduling results.
+5. Only then implement the modification.

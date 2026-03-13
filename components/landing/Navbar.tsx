@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ParallelLogo } from "./ParallelLogo";
@@ -18,10 +19,16 @@ const navLinks = [
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
   const activeSection = useActiveSection();
 
+  // On landing page: use hash links for in-page scroll. Else: navigate to /#anchor
+  const isLanding = pathname === "/" || pathname === "/landing";
+  const logoHref = isLanding ? "#top" : "/";
+  const sectionHref = (hash: string) => (isLanding ? hash : `/${hash}`);
+
   return (
-    <header className="sticky top-0 z-50 w-full pt-4 px-4 sm:px-6">
+    <header className="sticky top-0 z-[100] w-full pt-4 px-4 sm:px-6">
       <div className="mx-auto max-w-5xl">
         <nav
           className={cn(
@@ -35,7 +42,7 @@ export function Navbar() {
           {/* Left: logo */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <a
-              href="#top"
+              href={logoHref}
               className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground hover:text-muted-foreground transition-colors"
             >
               <ParallelLogo className="size-6 shrink-0" />
@@ -51,7 +58,7 @@ export function Navbar() {
               return (
                 <a
                   key={link.href}
-                  href={link.href}
+                  href={sectionHref(link.href)}
                   className={cn(
                     "text-sm font-medium transition-colors duration-200 nav-link",
                     isActive && "nav-link-active"
@@ -103,7 +110,7 @@ export function Navbar() {
                 return (
                   <a
                     key={link.href}
-                    href={link.href}
+                    href={sectionHref(link.href)}
                     className={cn(
                       "block rounded-lg py-2.5 px-3 text-sm font-medium transition-colors nav-link",
                       isActive && "nav-link-active",

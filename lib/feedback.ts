@@ -3,7 +3,7 @@
  */
 
 export type FeedbackType = "bug" | "idea" | "confusing" | "love_it" | "general"
-export type FeedbackSource = "landing_page" | "owner_dashboard" | "member_dashboard"
+export type FeedbackSource = "landing_page" | "owner_dashboard" | "member_dashboard" | "privacy_page" | "terms_page" | "footer"
 
 export type SubmitFeedbackPayload = {
   type: FeedbackType

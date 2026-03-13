@@ -290,7 +290,7 @@ export function ParticipantForm({
       <section className="rounded-xl border border-[#edeef0] bg-white p-5 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
         <h2 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-2">Never available (hard boundaries)</h2>
         <p className="text-[0.82rem] text-[#9ca3af] mb-4">
-          Time ranges when you are absolutely unavailable. Up to 6 hours each.
+          Time ranges when you are absolutely unavailable. Up to 6 hours each. Parallel will never schedule meetings during these times.
         </p>
         <div className="space-y-3">
           {hardNoRanges.map((range, i) => (

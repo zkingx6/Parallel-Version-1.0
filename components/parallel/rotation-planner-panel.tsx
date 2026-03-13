@@ -827,7 +827,7 @@ export function RotationSection({
         if (isInputContractViolation(result)) {
           const msg =
             result.error.details
-              ?.map((d) => d.reason || `${d.field}: invalid`)
+              ?.map((d) => (d.name ? `${d.name}: ${d.reason || `${d.field}: invalid`}` : d.reason || `${d.field}: invalid`))
               .join("; ") ?? result.error.message
           setRotationError(msg)
           setRotationResult(null)
@@ -883,7 +883,7 @@ export function RotationSection({
           const result = generateRotationGuarded(modifiedTeam, effectiveConfig)
           if (isInputContractViolation(result)) {
             const msg =
-              result.error.details?.map((d) => d.reason || `${d.field}: invalid`).join("; ") ??
+              result.error.details?.map((d) => (d.name ? `${d.name}: ${d.reason || `${d.field}: invalid`}` : d.reason || `${d.field}: invalid`)).join("; ") ??
               result.error.message
             setRotationError(msg)
             setRotationResult(null)
@@ -1051,6 +1051,8 @@ export function RotationSection({
     )
   }
 
+  const hasNoAvailability = team.length >= 2 && team.some((m) => !m.timezone?.trim())
+
   return (
     <main className="max-w-5xl mx-auto px-6 py-8 bg-[#f7f8fa]">
       <div className="max-w-2xl mx-auto">
@@ -1173,7 +1175,7 @@ export function RotationSection({
                 )}
                 {useFixedBaseTime && (
                   <>
-                    <p>Anchor time in {getTimezoneDisplayLabelNow(displayTimezoneIana)}.</p>
+                    <p>Fixed meeting time in {getTimezoneDisplayLabelNow(displayTimezoneIana)}. This sets the meeting time for every week.</p>
                     {fixedBaseTimeStatus && (
                       <>
                         {fixedBaseTimeStatus.blockedByHardNo && (
@@ -1241,20 +1243,22 @@ export function RotationSection({
             size="lg"
             className={cn(
               "w-full py-3.5 text-[0.92rem] font-medium rounded-xl bg-[#0d9488] hover:bg-[#0f766e] hover:shadow-[0_6px_24px_rgba(13,148,136,0.20)] text-white border-0 transition-all duration-200",
-              (team.length < 2 || isFixedBaseTimeBlocked) && "opacity-50 cursor-not-allowed"
+              (team.length < 2 || isFixedBaseTimeBlocked || hasNoAvailability) && "opacity-50 cursor-not-allowed"
             )}
-            disabled={team.length < 2 || isGenerating || isFixedBaseTimeBlocked}
+            disabled={team.length < 2 || isGenerating || isFixedBaseTimeBlocked || hasNoAvailability}
             onClick={handleGenerate}
           >
             {isGenerating
               ? "Planning…"
               : `Plan the next ${displayRotationWeeks} weeks fairly`}
           </Button>
-          {(team.length < 2 || isFixedBaseTimeBlocked) && (
+          {(team.length < 2 || isFixedBaseTimeBlocked || hasNoAvailability) && (
             <p className="text-xs text-muted-foreground/60 text-center mt-2">
               {team.length < 2
                 ? "At least 2 members needed. Share the invite link."
-                : "Blocked by hard boundaries — choose a different time."}
+                : hasNoAvailability
+                  ? "No availability submitted yet. Share the invite link so members can set their times."
+                  : "Blocked by hard boundaries — choose a different time."}
             </p>
           )}
         </div>

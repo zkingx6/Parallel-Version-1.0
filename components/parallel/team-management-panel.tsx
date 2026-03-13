@@ -327,36 +327,40 @@ export function TeamSection({
             <p className="text-[#9ca3af] text-[0.82rem] mb-3">
               Share this link with your team. They set their own timezone and boundaries.
             </p>
-            {inviteLimitReached && (
+            {!demoMode && inviteLimitReached && (
               <p className="mb-3 text-[0.88rem] text-[#dc2626] bg-[#fef2f2] rounded-lg px-4 py-3 border border-[#fecaca]">
                 This team has reached the Starter plan limit of 5 members. Manage your plan in Account.
               </p>
             )}
             <div className="bg-white rounded-xl border border-[#edeef0] px-4 py-3 flex items-center gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
               <code className="flex-1 text-[0.8rem] text-[#6b7280] truncate font-mono">
-                {inviteUrl || "Loading…"}
+                {demoMode
+                  ? "Demo mode preview — Invite links are available when you create your own workspace."
+                  : inviteUrl || "Loading…"}
               </code>
-              <button
-                onClick={handleCopyLink}
-                disabled={inviteLimitReached}
-                className={cn(
-                  "flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e5e7eb] bg-white text-[0.8rem] cursor-pointer hover:border-[#d1d5db] hover:bg-[#f9fafb] transition-all font-medium",
-                  copied && "text-[#0d9488] border-[#0d9488]/30",
-                  inviteLimitReached && "opacity-50 cursor-not-allowed hover:bg-white hover:border-[#e5e7eb]"
-                )}
-              >
-                {copied ? (
-                  <>
-                    <Check size={13} />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy size={13} />
-                    Copy
-                  </>
-                )}
-              </button>
+              {!demoMode && (
+                <button
+                  onClick={handleCopyLink}
+                  disabled={inviteLimitReached}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#e5e7eb] bg-white text-[0.8rem] cursor-pointer hover:border-[#d1d5db] hover:bg-[#f9fafb] transition-all font-medium",
+                    copied && "text-[#0d9488] border-[#0d9488]/30",
+                    inviteLimitReached && "opacity-50 cursor-not-allowed hover:bg-white hover:border-[#e5e7eb]"
+                  )}
+                >
+                  {copied ? (
+                    <>
+                      <Check size={13} />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={13} />
+                      Copy
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </section>
         )}

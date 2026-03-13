@@ -166,6 +166,7 @@ export async function resolveFinalRedirect(requestedRedirect: string | null): Pr
 
 import type { HardNoRange } from "./types"
 import { isComplementOfOverlapPattern } from "./hard-no-ranges"
+import { isValidIanaTimezone } from "./contract/validateTeamInput"
 import { getPlanLimits } from "./plans"
 import { getEffectivePlanFromDb } from "./plan-resolver"
 
@@ -471,6 +472,9 @@ export async function upsertOwnerParticipant(
   } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
 
+  if (!isValidIanaTimezone(payload.timezone ?? "")) {
+    return { error: "Invalid timezone. Please select a valid timezone." }
+  }
   const userDefined = Array.isArray(payload.hard_no_ranges)
     ? payload.hard_no_ranges
     : []
@@ -764,6 +768,9 @@ export async function submitMember(
     }
   }
 
+  if (!isValidIanaTimezone(input.timezone ?? "")) {
+    return { error: "Invalid timezone. Please select a valid timezone." }
+  }
   const userDefined = Array.isArray(input.hard_no_ranges)
     ? input.hard_no_ranges
     : []
