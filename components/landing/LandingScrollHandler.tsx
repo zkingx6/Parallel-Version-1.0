@@ -16,7 +16,7 @@ export function LandingScrollHandler() {
 
   useEffect(() => {
     installLandingUrlDebug()
-    const section = searchParams.get("section")
+    const section = searchParams?.get("section") ?? null
     if (isValidSectionId(section)) {
       requestAnimationFrame(() => scrollToSection(section))
       router.replace("/", { scroll: false })
