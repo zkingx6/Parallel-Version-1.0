@@ -38,9 +38,7 @@ export async function getPublicScheduleByToken(
     .eq("share_token", shareToken)
     .single()
 
-  if (process.env.NEXT_PUBLIC_DEBUG_SHARE_LINK === "1") {
-    console.warn("[share-link] token=" + shareToken + " host=" + urlHost + " serviceKey=" + serviceKeyPresent + " error=" + (error?.message ?? "none") + " scheduleId=" + (schedule?.id ?? "null"))
-  }
+  console.warn("[share-debug] schedule found:", !!schedule)
 
   if (!schedule) return null
 
@@ -49,6 +47,8 @@ export async function getPublicScheduleByToken(
     .select("title, display_timezone, base_time_minutes, manager_id")
     .eq("id", schedule.team_id)
     .single()
+
+  console.warn("[share-debug] meeting found:", !!meeting)
 
   if (!meeting) return null
 
@@ -59,6 +59,9 @@ export async function getPublicScheduleByToken(
     .order("is_owner_participant", { ascending: false })
     .order("created_at")
 
+  console.warn("[share-debug] members count:", members?.length ?? 0)
+  console.warn("[share-debug] rotation_result exists:", !!schedule.rotation_result)
+
   const rotationResult = schedule.rotation_result as { weeks: RotationWeekData[] } | null
   const weeks: RotationWeekData[] =
     rotationResult && Array.isArray(rotationResult.weeks)
@@ -68,6 +71,8 @@ export async function getPublicScheduleByToken(
   const ownerProfile = meeting.manager_id
     ? (await fetchProfilesForUserIds([meeting.manager_id])).get(meeting.manager_id) ?? null
     : null
+  console.warn("[share-debug] ownerProfile found:", !!ownerProfile)
+
   const membersDisplay = await resolveMembersDisplay(
     (members ?? []).map((m) => ({
       id: m.id,
