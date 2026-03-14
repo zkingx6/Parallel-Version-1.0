@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import { createServiceSupabase } from "@/lib/supabase-server"
 import { getPublicScheduleByToken } from "@/lib/public-schedule"
 import { RotationOutput } from "@/components/parallel/rotation-output"
 import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
@@ -19,12 +20,29 @@ export default async function PublicSchedulePage({
   console.warn("[shareToken-page] params.shareToken=" + shareToken + " searchParams=" + JSON.stringify(rawSearchParams) + " debug=" + debug)
 
   if (debug) {
+    const supabase = createServiceSupabase()
+    const { data: row, error } = await supabase
+      .from("schedules")
+      .select("id, name, share_token")
+      .eq("share_token", shareToken)
+      .single()
+
+    const ok = !!row && !error
     return (
       <div className="min-h-screen bg-[#f7f8fa] p-8 font-mono text-sm">
         <h1 className="text-lg font-semibold mb-4">DEBUG ROUTE ACTIVE</h1>
-        <pre className="bg-white p-4 rounded border">
-          shareToken: {shareToken}
-          debug: {String(debug)}
+        <pre className="bg-white p-4 rounded border whitespace-pre-wrap">
+{`shareToken: ${shareToken}
+debug: ${String(debug)}
+fetch status: ${ok ? "OK" : "FAILED"}
+${ok
+  ? `id: ${row.id}
+name: ${row.name}
+share_token: ${row.share_token}`
+  : `error: ${error?.message ?? "unknown"}
+code: ${error?.code ?? "—"}
+details: ${error?.details ?? "—"}`}
+`}
         </pre>
       </div>
     )
