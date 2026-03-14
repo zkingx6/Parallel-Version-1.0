@@ -1059,7 +1059,7 @@ export function RotationSection({
         hardValidCandidatesCount: 12,
         totalCandidatesCount: 24,
         rejectedBy: { burdenDiff: 0, consecutiveMax: 0 },
-        failureReason: null as const,
+        failureReason: null,
       })),
       modeUsed: "STRICT" as const,
       shareablePlanExists: true,
