@@ -1,0 +1,35 @@
+---
+alwaysApply: true
+---
+
+# Parallel Scheduling Regression Gate
+
+For any change to rotation, beam search, candidate generation, burden scoring, fairness spread, or fallback selection, the following checks are mandatory.
+
+## Mandatory audit checklist
+
+### 1. Candidate generation audit
+- Are all hard-valid candidates generated correctly?
+- Are IANA timezone conversions correct?
+- Is DST handled correctly?
+- Is duration handled correctly?
+
+### 2. Candidate pruning audit
+- Does any ordering, slicing, beam topK, or ranking step remove zero-burden candidates too early?
+- Are comfortable overlap candidates still present when scoring begins?
+- Do fallback paths apply the same prioritization?
+
+### 3. Burden priority audit
+- If zero-burden candidates exist, are non-zero-burden candidates excluded from final selection?
+- Can fairness logic accidentally override a zero-burden option?
+
+### 4. Explanation audit
+- Does “Why this schedule?” match the actual computed reasoning?
+- Does the UI avoid claiming sacrifice when no sacrifice exists?
+
+### 5. Suggestion UI audit
+- Are alternative time chips computed from real schedule candidates?
+- Are any chips static, dead, mocked, or seed-driven?
+
+## Blocking rule
+If any path allows a burden-producing candidate to win while a zero-burden candidate exists, treat it as a blocking algorithm regression.

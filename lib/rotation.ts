@@ -357,6 +357,28 @@ function sortByBaseTimePreference(
   })
 }
 
+/**
+ * Sort candidates so zero-burden slots come first (all members in working hours).
+ * Within zero-burden: sort by UTC hour ascending (deterministic).
+ * Within non-zero: sort by total score ascending, then UTC hour ascending.
+ */
+function sortCandidatesByBurden(
+  candidates: number[],
+  utcDate: DateTime,
+  team: TeamMember[]
+): number[] {
+  const scored = candidates.map((utcHour) => {
+    const mt = computeMemberTimes(utcDate, utcHour, team)
+    const total = mt.reduce((s, m) => s + (m.score ?? 0), 0)
+    return { utcHour, total }
+  })
+  scored.sort((a, b) => {
+    if (a.total !== b.total) return a.total - b.total
+    return a.utcHour - b.utcHour
+  })
+  return scored.map((s) => s.utcHour)
+}
+
 // --- Constraint modes ---
 type ConstraintMode = "STRICT" | "RELAXED" | "FALLBACK"
 
@@ -589,6 +611,8 @@ function generateRotationWithMode(
         baseTimeMinutes,
         weekOffset
       )
+    } else {
+      hardValidCandidates = sortCandidatesByBurden(hardValidCandidates, utcDate, team)
     }
 
     const rejectedBy = { burdenDiff: 0, consecutiveMax: 0 }
@@ -1541,6 +1565,8 @@ function fairnessGuaranteeBeamSearch(
         baseTimeMinutes,
         weekOffset
       )
+    } else {
+      hardValid = sortCandidatesByBurden(hardValid, utcDate, team)
     }
     const topK = hardValid.slice(0, FAIRNESS_BEAM_K)
     if (topK.length === 0) {
@@ -1682,7 +1708,12 @@ function fairnessGuaranteeBeamSearch(
         return a.totalSlotDeviation - b.totalSlotDeviation
       const varietyA = uniqueSlotCount(a.weeks)
       const varietyB = uniqueSlotCount(b.weeks)
-      if (varietyA !== varietyB) return varietyB - varietyA
+      if (varietyA !== varietyB) {
+        if (a.totalPenalty === 0 && b.totalPenalty === 0) {
+          return varietyA - varietyB
+        }
+        return varietyB - varietyA
+      }
       const jitterA = alternatingPatternJitter(a.weeks)
       const jitterB = alternatingPatternJitter(b.weeks)
       if (jitterA !== jitterB) return jitterA - jitterB
@@ -1781,6 +1812,8 @@ function runFallbackBeamNoPruning(
         baseTimeMinutes,
         weekOffset
       )
+    } else {
+      hardValid = sortCandidatesByBurden(hardValid, utcDate, team)
     }
     const topK = hardValid.slice(0, FAIRNESS_BEAM_K)
     if (topK.length === 0) return null
@@ -1848,7 +1881,12 @@ function runFallbackBeamNoPruning(
         return a.totalSlotDeviation - b.totalSlotDeviation
       const varietyA = uniqueSlotCount(a.weeks)
       const varietyB = uniqueSlotCount(b.weeks)
-      if (varietyA !== varietyB) return varietyB - varietyA
+      if (varietyA !== varietyB) {
+        if (a.totalPenalty === 0 && b.totalPenalty === 0) {
+          return varietyA - varietyB
+        }
+        return varietyB - varietyA
+      }
       const jitterA = alternatingPatternJitter(a.weeks)
       const jitterB = alternatingPatternJitter(b.weeks)
       if (jitterA !== jitterB) return jitterA - jitterB
@@ -1951,6 +1989,8 @@ function beamSearchBetterPlan(
         baseTimeMinutes,
         weekOffset
       )
+    } else {
+      hardValid = sortCandidatesByBurden(hardValid, utcDate, team)
     }
     const topK = hardValid.slice(0, FAIRNESS_BEAM_K)
     if (topK.length === 0) return null

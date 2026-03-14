@@ -1,0 +1,118 @@
+---
+alwaysApply: true
+---
+
+# Parallel Project Rule — Zero-Burden Priority
+
+## Core Product Principle
+
+Rotation is for distributing unavoidable inconvenience, not for creating inconvenience when a fully comfortable shared time already exists.
+
+If there is at least one valid meeting time where:
+- no participant violates a hard no-time boundary
+- all participants are within working hours
+- total burden is zero
+- max individual burden is zero
+
+then the scheduler MUST choose from that zero-burden candidate set first.
+
+The system must never manufacture inconvenience for the sake of rotation or fairness when a fully comfortable shared option already exists.
+
+---
+
+## Required Scheduling Behavior
+
+### 1. Zero-burden candidates always win
+Before fairness spread, beam ranking, topK pruning, or fallback selection can choose an inconvenient slot, the scheduler must first detect whether zero-burden candidates exist.
+
+If zero-burden candidates exist:
+- selection must be restricted to the zero-burden subset
+- fairness logic may only be used as a deterministic tie-breaker within that zero-burden subset
+- non-zero-burden candidates must not be selected
+
+### 2. Rotation only applies when inconvenience is unavoidable
+Only when zero-burden candidates do not exist may the scheduler begin distributing inconvenience across weeks.
+
+### 3. Hard boundaries remain absolute
+Hard no-time boundaries remain the only hard constraint.
+This rule does not weaken or reinterpret hard boundary behavior.
+
+### 4. Working hours remain soft globally, but zero-burden is a priority state
+Working hours are still modeled as soft constraints in general scoring.
+However, if a candidate keeps all members inside working hours and produces zero burden for all, that candidate class has strict priority over all burden-producing candidates.
+
+### 5. Determinism is mandatory
+Given identical inputs, the scheduler must return identical outputs.
+Any tie-breaking inside the zero-burden subset must remain deterministic.
+
+---
+
+## Beam Search / Candidate Pruning Rule
+
+Any beam search, topK pruning, candidate filtering, or fallback search path must preserve the zero-burden priority rule.
+
+This means:
+- no pruning step may remove zero-burden candidates before they are evaluated against burden-producing candidates
+- if topK is used, candidate ordering must ensure zero-burden options are considered first
+- fallback and forced search paths must follow the same rule, not just the main path
+
+If a search path can exclude zero-burden candidates because of ordering, slicing, or ranking before burden-aware evaluation, that is a blocking bug.
+
+---
+
+## UI / Explanation Rule
+
+If zero-burden overlap exists, UI and explanation must reflect that reality.
+
+### Required behavior:
+- the selected schedule should come from the zero-burden subset
+- the explanation must not imply unavoidable sacrifice if none exists
+- if additional equally comfortable options exist, those options must be real computed alternatives, not mock/static/demo data
+
+### Suggestion chips:
+Any “other equally comfortable options” UI must:
+- use real computed candidates
+- respect IANA timezones
+- respect DST
+- respect duration
+- respect hard no-times
+- respect working hours
+- exclude the currently selected time
+- be deterministic and deduplicated
+
+Mock, seed, placeholder, or dead-data suggestion chips are not allowed in production scheduling UI.
+
+---
+
+## Regression Requirements
+
+Any scheduling change must be checked against these invariant scenarios:
+
+### Scenario A — Full shared overlap exists
+If a team has one or more zero-burden shared times, output must come from that set.
+
+### Scenario B — No full shared overlap exists
+If no zero-burden option exists, fairness rotation may distribute inconvenience.
+
+### Scenario C — Hard boundary conflict
+No candidate may violate hard no-times even if it would otherwise reduce burden.
+
+### Scenario D — DST-sensitive overlap
+Zero-burden detection must still work across DST changes using IANA timezones.
+
+### Scenario E — Main path / fallback path parity
+Main search, fallback search, and forced search must all preserve zero-burden-first behavior.
+
+---
+
+## Change Control
+
+When modifying scheduling logic:
+- make the smallest safe localized change
+- do not refactor unrelated scoring or fairness logic
+- do not rename tested functions unless necessary
+- explicitly identify every path where candidate pruning happens
+- document before/after behavior
+- run regression checks before and after the change
+
+Any change that allows fairness or beam pruning to override an available zero-burden option is a regression.

@@ -1,0 +1,199 @@
+---
+description: 
+alwaysApply: true
+---
+
+# Parallel Project Rule — Zero-Burden Invariant
+
+## Core Product Rule
+
+Rotation is for distributing unavoidable inconvenience, not for creating inconvenience when a fully comfortable shared time already exists.
+
+If any valid zero-burden candidate exists, no non-zero-burden candidate may win.
+
+Rotation exists to distribute unavoidable inconvenience.
+It must never create inconvenience when a fully comfortable shared time already exists.
+
+A valid zero-burden candidate means:
+- passes all hard no-time constraints
+- all participants are within working hours
+- total burden = 0
+- max individual burden = 0
+
+This is a strict product invariant, not a preference.
+
+---
+
+## Required Scheduler Behavior
+
+### 1. Zero-burden-first invariant
+Before any fairness balancing, beam ranking, topK pruning, greedy comparison, anchor preference, fallback search, or forced search can select a burden-producing time, the scheduler must first preserve and prioritize the zero-burden candidate set.
+
+If one or more valid zero-burden candidates exist:
+- final selection must come only from that zero-burden subset
+- fairness may only be used as a deterministic tie-breaker within that zero-burden subset
+- anchor/base-time preference may only be used as a deterministic tie-breaker within that zero-burden subset
+- non-zero-burden candidates must not be allowed to win
+
+### 2. Inconvenience rotation starts only when zero-burden is impossible
+Only when there are no valid zero-burden candidates may the scheduler begin distributing inconvenience.
+
+### 3. Hard boundaries remain unchanged
+Hard no-time boundaries remain the only hard scheduling constraint.
+This rule does not weaken or reinterpret hard boundaries.
+
+### 4. Working hours remain soft globally, but zero-burden is a protected class
+Working hours are still modeled as soft constraints in general scoring.
+However, when a candidate keeps all members within working hours and creates zero burden for all members, that candidate class has strict priority over all burden-producing candidates.
+
+### 5. Determinism remains mandatory
+Given identical inputs, the scheduler must return identical outputs.
+Tie-breaking inside the zero-burden subset must remain deterministic.
+
+---
+
+## Candidate Preservation Rule
+
+No candidate ordering, sorting, slicing, beam pruning, or fallback filtering step may eliminate zero-burden candidates before burden-aware comparison is complete.
+
+This applies to:
+- main search
+- beam search
+- fallback beam search
+- forced search
+- greedy selection
+- anchor mode
+- debug verification search
+- any helper that reorders candidates before final comparison
+
+If a path can remove or disadvantage zero-burden candidates before they are compared against non-zero-burden candidates, that is a blocking algorithm bug.
+
+---
+
+## Anchor / Base Time Rule
+
+Anchor or base-time preference is subordinate to zero-burden priority.
+
+This means:
+- anchor proximity may not rank a non-zero-burden candidate above a zero-burden candidate
+- in anchor mode, ordering must still preserve zero-burden-first behavior
+- anchor preference may only decide ordering within the zero-burden subset or within the non-zero subset after zero-burden handling is complete
+
+---
+
+## Equity / Fairness Adjustment Rule
+
+Equity balancing may not convert a zero-burden candidate into a loser against a non-zero-burden candidate.
+
+This means:
+- fairness-adjusted scoring must not cause a burden-producing candidate to beat a valid zero-burden candidate
+- if a zero-burden candidate exists, fairness adjustment may only break ties within the zero-burden subset
+- zero-burden must remain a protected priority state throughout scoring
+
+---
+
+## Beam / TopK Rule
+
+Any beam or topK search must preserve zero-burden candidates.
+
+This means:
+- topK slicing may only happen after zero-burden-safe ordering
+- if zero-burden candidates exist, they must survive into the compared subset
+- no natural UTC ordering, base-time ordering, or other pre-sort may cause zero-burden candidates to be sliced away
+
+If topK can exclude zero-burden candidates before evaluation, that path is invalid.
+
+---
+
+## Greedy Selection Rule
+
+Any greedy week-by-week selection path must obey the same invariant.
+
+This means:
+- if zero-burden candidates exist for the current week and pass all relevant constraints, selection must be restricted to those zero-burden candidates
+- fairness-adjusted or composite scoring may only compare candidates inside that zero-burden subset
+- non-zero-burden candidates must not be selected while valid zero-burden candidates exist
+
+---
+
+## UI / Explanation Rule
+
+If zero-burden overlap exists, the product must reflect that truth.
+
+### Required behavior:
+- selected schedule must come from a real computed zero-burden candidate
+- explanation must not imply unavoidable sacrifice when none exists
+- “other equally comfortable options” must use real computed alternatives, never mock/static/demo/dead data
+
+### Suggestion chip requirements:
+- derived from real scheduler candidates
+- respect IANA timezones
+- respect DST
+- respect duration
+- respect hard no-times
+- respect working hours
+- exclude currently selected time
+- deterministic
+- deduplicated
+- limited to a small useful count
+
+---
+
+## Mandatory Audit Targets
+
+Any change touching scheduling must explicitly audit all of the following:
+
+1. Candidate generation
+2. Hard-valid filtering
+3. Candidate ordering helpers
+4. Beam/topK pruning
+5. Greedy selection paths
+6. Fairness/equity adjustment functions
+7. Anchor/base-time ordering
+8. Fallback/forced search paths
+9. Debug verification search parity
+10. UI suggestion data source
+
+---
+
+## Mandatory Regression Scenarios
+
+### Scenario A — Full shared overlap exists
+If a team has one or more zero-burden shared times, final output must come from that set.
+
+### Scenario B — No zero-burden overlap exists
+If no zero-burden option exists, fairness rotation may distribute inconvenience.
+
+### Scenario C — Hard boundary conflict
+No candidate may violate hard no-times even if it would otherwise reduce burden.
+
+### Scenario D — Anchor mode with zero-burden options
+Base-time preference must not override zero-burden priority.
+
+### Scenario E — Greedy path parity
+Greedy selection must obey the same zero-burden-first invariant as beam search.
+
+### Scenario F — Fallback / forced path parity
+Fallback and forced paths must preserve zero-burden-first behavior.
+
+### Scenario G — DST-sensitive overlap
+Zero-burden detection must still work correctly across DST changes using IANA timezones.
+
+### Scenario H — Explanation / UI parity
+The explanation and suggestion chips must reflect real computed schedule data.
+
+---
+
+## Change Control
+
+When modifying scheduling logic:
+- make the smallest safe localized change
+- do not refactor unrelated fairness or rotation logic
+- do not rename stable tested functions unless necessary
+- identify every path where candidates are sorted, sliced, or re-scored
+- document before/after behavior
+- verify determinism after changes
+- verify no hard-boundary regression
+- verify zero-burden-first invariant in all affected paths
+
+Any change that allows a non-zero-burden candidate to win while a valid zero-burden candidate exists is a blocking regression.
