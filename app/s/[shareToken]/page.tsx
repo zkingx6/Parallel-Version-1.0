@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { createServiceSupabase } from "@/lib/supabase-server"
 import { getPublicScheduleByToken } from "@/lib/public-schedule"
 import { RotationOutput } from "@/components/parallel/rotation-output"
 import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
@@ -20,28 +19,30 @@ export default async function PublicSchedulePage({
   console.warn("[shareToken-page] params.shareToken=" + shareToken + " searchParams=" + JSON.stringify(rawSearchParams) + " debug=" + debug)
 
   if (debug) {
-    const supabase = createServiceSupabase()
-    const { data: row, error } = await supabase
-      .from("schedules")
-      .select("id, name, share_token")
-      .eq("share_token", shareToken)
-      .single()
+    let data: Awaited<ReturnType<typeof getPublicScheduleByToken>> = null
+    let err: unknown = null
+    try {
+      data = await getPublicScheduleByToken(shareToken)
+    } catch (e) {
+      err = e
+    }
 
-    const ok = !!row && !error
+    const ok = !!data && !err
+    const errObj = err as { message?: string; code?: string; stack?: string } | null
     return (
       <div className="min-h-screen bg-[#f7f8fa] p-8 font-mono text-sm">
         <h1 className="text-lg font-semibold mb-4">DEBUG ROUTE ACTIVE</h1>
         <pre className="bg-white p-4 rounded border whitespace-pre-wrap">
-{`shareToken: ${shareToken}
-debug: ${String(debug)}
-fetch status: ${ok ? "OK" : "FAILED"}
-${ok
-  ? `id: ${row.id}
-name: ${row.name}
-share_token: ${row.share_token}`
-  : `error: ${error?.message ?? "unknown"}
-code: ${error?.code ?? "—"}
-details: ${error?.details ?? "—"}`}
+{`function call: ${ok ? "SUCCESS" : "FAILED"}
+${ok && data
+  ? `schedule id: ${data.scheduleId}
+team id: ${data.teamId}
+weeks count: ${data.weeks.length}`
+  : errObj
+    ? `error message: ${errObj.message ?? String(err)}
+error code: ${errObj.code ?? "—"}
+error stack: ${errObj.stack ?? "—"}`
+    : "getPublicScheduleByToken returned null (no throw)"}
 `}
         </pre>
       </div>

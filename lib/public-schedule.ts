@@ -13,6 +13,8 @@ import type { TeamMember } from "./types"
 import { resolveMembersDisplay, fetchProfilesForUserIds } from "./profile-resolver"
 
 export type PublicScheduleData = {
+  scheduleId: string
+  teamId: string
   scheduleName: string
   meetingTitle: string
   displayTimezone: string
@@ -99,6 +101,8 @@ export async function getPublicScheduleByToken(
   const useBaseTime = (meeting.base_time_minutes ?? null) != null
 
   return {
+    scheduleId: schedule.id,
+    teamId: schedule.team_id,
     scheduleName: schedule.name,
     meetingTitle: meeting.title,
     displayTimezone,
