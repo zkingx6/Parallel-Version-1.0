@@ -6,49 +6,10 @@ import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 
 export default async function PublicSchedulePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ shareToken: string }>
-  searchParams?: Promise<{ _debug?: string }>
 }) {
-  const rawParams = await params
-  const shareToken = rawParams.shareToken
-  const rawSearchParams = await searchParams?.catch(() => ({} as Record<string, string | undefined>))
-  const debug = rawSearchParams?._debug === "1"
-
-  console.warn("[shareToken-page] params.shareToken=" + shareToken + " searchParams=" + JSON.stringify(rawSearchParams) + " debug=" + debug)
-
-  if (debug) {
-    let data: Awaited<ReturnType<typeof getPublicScheduleByToken>> = null
-    let err: unknown = null
-    try {
-      data = await getPublicScheduleByToken(shareToken)
-    } catch (e) {
-      err = e
-    }
-
-    const ok = !!data && !err
-    const errObj = err as { message?: string; code?: string; stack?: string } | null
-    return (
-      <div className="min-h-screen bg-[#f7f8fa] p-8 font-mono text-sm">
-        <h1 className="text-lg font-semibold mb-4">DEBUG ROUTE ACTIVE</h1>
-        <pre className="bg-white p-4 rounded border whitespace-pre-wrap">
-{`function call: ${ok ? "SUCCESS" : "FAILED"}
-${ok && data
-  ? `schedule id: ${data.scheduleId}
-team id: ${data.teamId}
-weeks count: ${data.weeks.length}`
-  : errObj
-    ? `error message: ${errObj.message ?? String(err)}
-error code: ${errObj.code ?? "—"}
-error stack: ${errObj.stack ?? "—"}`
-    : "getPublicScheduleByToken returned null (no throw)"}
-`}
-        </pre>
-      </div>
-    )
-  }
-
+  const { shareToken } = await params
   const data = await getPublicScheduleByToken(shareToken)
 
   if (!data || !data.weeks.length) {

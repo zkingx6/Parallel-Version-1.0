@@ -342,7 +342,7 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.15 }}
           >
-            Fairer meeting times
+            Rotate meeting times
             <br />
             for{" "}
             <span className="relative">
@@ -369,14 +369,12 @@ export function Hero() {
 
           {/* Subtext */}
           <motion.p
-            className="text-[#9ca3af] text-[0.95rem] max-w-md mx-auto leading-relaxed mb-10"
+            className="text-[#9ca3af] text-[0.95rem] max-w-lg mx-auto leading-relaxed mb-10"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.5 }}
           >
-            Across time zones, someone always takes the late meeting or the early
-            morning call. Parallel rotates who adjusts — not perfectly equal, but
-            shared more intentionally over time.
+            When teams span time zones, someone takes the early or late call. Parallel rotates who adjusts so the inconvenience is shared over time.
           </motion.p>
 
           {/* CTAs */}

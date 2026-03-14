@@ -13,8 +13,6 @@ import type { TeamMember } from "./types"
 import { resolveMembersDisplay, fetchProfilesForUserIds } from "./profile-resolver"
 
 export type PublicScheduleData = {
-  scheduleId: string
-  teamId: string
   scheduleName: string
   meetingTitle: string
   displayTimezone: string
@@ -26,19 +24,13 @@ export type PublicScheduleData = {
 export async function getPublicScheduleByToken(
   shareToken: string
 ): Promise<PublicScheduleData | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKeyPresent = !!process.env.SUPABASE_SERVICE_ROLE_KEY
-  const urlHost = supabaseUrl ? new URL(supabaseUrl).host : "(missing)"
-
   const supabase = createServiceSupabase()
 
-  const { data: schedule, error } = await supabase
+  const { data: schedule } = await supabase
     .from("schedules")
     .select("id, name, team_id, rotation_result")
     .eq("share_token", shareToken)
     .single()
-
-  console.warn("[share-debug] schedule found:", !!schedule)
 
   if (!schedule) return null
 
@@ -48,21 +40,12 @@ export async function getPublicScheduleByToken(
     .eq("id", schedule.team_id)
     .single()
 
-  console.warn("[share-debug] meeting found:", !!meeting)
-
-  if (!meeting) {
-    console.warn("[share-debug] fallback: using schedule data (meeting row missing)")
-  }
-
   const { data: members } = await supabase
     .from("member_submissions")
     .select("id, name, timezone, avatar_url, user_id, is_owner_participant")
     .eq("meeting_id", schedule.team_id)
     .order("is_owner_participant", { ascending: false })
     .order("created_at")
-
-  console.warn("[share-debug] members count:", members?.length ?? 0)
-  console.warn("[share-debug] rotation_result exists:", !!schedule.rotation_result)
 
   const rotationResult = schedule.rotation_result as { weeks: RotationWeekData[] } | null
   const weeks: RotationWeekData[] =
@@ -73,7 +56,6 @@ export async function getPublicScheduleByToken(
   const ownerProfile = meeting?.manager_id
     ? (await fetchProfilesForUserIds([meeting.manager_id])).get(meeting.manager_id) ?? null
     : null
-  console.warn("[share-debug] ownerProfile found:", !!ownerProfile)
 
   const membersDisplay = await resolveMembersDisplay(
     (members ?? []).map((m) => ({
@@ -108,8 +90,6 @@ export async function getPublicScheduleByToken(
   const useBaseTime = (meeting?.base_time_minutes ?? null) != null
 
   return {
-    scheduleId: schedule.id,
-    teamId: schedule.team_id,
     scheduleName: schedule.name,
     meetingTitle: meeting?.title ?? schedule.name,
     displayTimezone,
