@@ -6,10 +6,30 @@ import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
 
 export default async function PublicSchedulePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ shareToken: string }>
+  searchParams?: Promise<{ _debug?: string }>
 }) {
-  const { shareToken } = await params
+  const rawParams = await params
+  const shareToken = rawParams.shareToken
+  const rawSearchParams = await searchParams?.catch(() => ({} as Record<string, string | undefined>))
+  const debug = rawSearchParams?._debug === "1"
+
+  console.warn("[shareToken-page] params.shareToken=" + shareToken + " searchParams=" + JSON.stringify(rawSearchParams) + " debug=" + debug)
+
+  if (debug) {
+    return (
+      <div className="min-h-screen bg-[#f7f8fa] p-8 font-mono text-sm">
+        <h1 className="text-lg font-semibold mb-4">DEBUG ROUTE ACTIVE</h1>
+        <pre className="bg-white p-4 rounded border">
+          shareToken: {shareToken}
+          debug: {String(debug)}
+        </pre>
+      </div>
+    )
+  }
+
   const data = await getPublicScheduleByToken(shareToken)
 
   if (!data || !data.weeks.length) {

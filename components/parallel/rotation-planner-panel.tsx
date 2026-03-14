@@ -710,8 +710,11 @@ export function RotationSection({
   const [explanationOpen, setExplanationOpen] = useState(false)
   const [isPreviewFromRelaxedConstraint, setIsPreviewFromRelaxedConstraint] = useState(false)
   const [previewRelaxedMemberName, setPreviewRelaxedMemberName] = useState<string | null>(null)
+  const [demoShowResult, setDemoShowResult] = useState(false)
   const generateOverrideRef = useRef<{ baseTimeMinutes: number; anchorOffset: number } | null>(null)
   const router = useRouter()
+
+  const isDemoConfigStep = Boolean(demoMode && demoPreviewWeeks?.length && !demoShowResult)
 
   const rotation = orderedWeeks ?? rotationResult?.weeks ?? null
 
@@ -1028,10 +1031,14 @@ export function RotationSection({
   const isEven = maxMemberCount - minMemberCount <= 1
   const consecutive = rotation ? hasConsecutiveStretch(rotation, team) : false
 
-  // Demo mode: show static curated preview only — no config, no generate
-  if (demoMode && demoPreviewWeeks?.length) {
+  // Demo mode: show static curated preview only after user clicks Plan
+  if (demoMode && demoPreviewWeeks?.length && demoShowResult) {
     const demoRotation = demoPreviewWeeks
-    const demoTeam = initialMembers.map(dbMemberToTeamMember)
+    const demoTeam = initialMembers.map((m) => {
+      const tm = dbMemberToTeamMember(m)
+      const resolved = membersDisplay.get(m.id)
+      return { ...tm, name: resolved?.name ?? tm.name, avatar_url: resolved?.avatarUrl ?? tm.avatar_url }
+    })
     const demoBurdenData = getDemoBurdenData(initialMeeting.id, membersDisplay)
     const demoSummary = DEMO_BURDEN_SUMMARY[initialMeeting.id]
     const demoMaxCount = demoBurdenData.length
@@ -1041,7 +1048,31 @@ export function RotationSection({
     const demoMinMemberCount = demoMaxMemberCount - (demoSummary?.maxDiff ?? 0)
     const demoIsEven = demoMaxMemberCount - demoMinMemberCount <= 1
     const demoConsecutive = false
+
+    const demoBurdenFromWeeks = getBurdenCounts(demoRotation, demoTeam)
+    const maxDemoCount = Math.max(...demoBurdenFromWeeks.map((d) => d.count), 0)
+    const minDemoCount = Math.min(...demoBurdenFromWeeks.map((d) => d.count), 0)
+    const demoMaxBurdenIds = demoBurdenFromWeeks.filter((d) => d.count === maxDemoCount).map((d) => d.memberId)
+    const demoExplain = {
+      weeks: demoRotation.map((_, i) => ({
+        week: i + 1,
+        hardValidCandidatesCount: 12,
+        totalCandidatesCount: 24,
+        rejectedBy: { burdenDiff: 0, consecutiveMax: 0 },
+        failureReason: null as const,
+      })),
+      modeUsed: "STRICT" as const,
+      shareablePlanExists: true,
+      currentPlanMetrics: {
+        maxBurden: maxDemoCount,
+        minBurden: minDemoCount,
+        spread: maxDemoCount - minDemoCount,
+        maxBurdenMemberIds: demoMaxBurdenIds,
+      },
+    }
+
     return (
+      <>
       <main className="max-w-5xl mx-auto px-6 py-8 bg-[#f7f8fa]">
         <div className="max-w-2xl mx-auto">
           <PageBackLink onClick={onBack} className="mb-6">
@@ -1105,11 +1136,88 @@ export function RotationSection({
               )}
             </div>
           </section>
+
+          {/* Demo-only: Why this schedule? and View rotation analysis are clickable; Publish is display-only */}
+          <div className="pt-6 flex flex-col sm:flex-row sm:justify-end sm:items-center gap-4">
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full sm:w-auto h-12 text-sm font-medium rounded-xl border-border/60 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              onClick={() => setExplanationOpen(true)}
+            >
+              Why this schedule?
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full sm:w-auto h-12 text-sm font-medium rounded-xl border-primary/40 text-primary hover:bg-primary/10 hover:border-primary/60"
+              onClick={() => setAnalysisOpen(true)}
+            >
+              View rotation analysis
+            </Button>
+            <div className="w-full sm:w-auto h-12 px-6 flex items-center justify-center rounded-xl bg-primary text-primary-foreground text-sm font-medium shadow-sm pointer-events-none select-none opacity-90">
+              Publish schedule
+            </div>
+          </div>
+
           <div className="pt-4">
             <PageBackLink onClick={onBack} className="mb-0">Back to team</PageBackLink>
           </div>
         </div>
       </main>
+
+      <Dialog open={explanationOpen} onOpenChange={setExplanationOpen}>
+        <DialogContent className="w-[90vw] max-w-[560px] max-h-[85vh] overflow-y-auto p-8">
+          <DialogHeader className="flex flex-row items-start justify-between gap-4 pr-10 sm:text-left">
+            <div className="flex flex-col gap-1 min-w-0">
+              <DialogTitle>Why this schedule?</DialogTitle>
+              <DialogDescription>
+                How Parallel chose this rotation for {initialMeeting.title}
+              </DialogDescription>
+            </div>
+            <BurdenScoreHelp className="shrink-0 mt-0.5" />
+          </DialogHeader>
+          <div className="mt-4">
+            <ExplanationPanelContent
+              sections={generateExplanation({
+                weeks: demoRotation,
+                team: demoTeam,
+                explain: demoExplain,
+                meetingTitle: initialMeeting.title,
+                rotationWeeks: demoRotation.length,
+              })}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={analysisOpen} onOpenChange={setAnalysisOpen}>
+        <DialogContent className="w-[90vw] max-w-[1000px] max-h-[85vh] overflow-y-auto p-8">
+          <DialogHeader>
+            <DialogTitle>Rotation Analysis</DialogTitle>
+            <DialogDescription>
+              Fairness report for {initialMeeting.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <ScheduleAnalysisContent
+              scheduleId="demo-preview"
+              scheduleName={initialMeeting.title}
+              teamName={initialMeeting.title}
+              weeksCount={demoRotation.length}
+              modeLabel={getModeLabel("STRICT")}
+              explain={demoExplain}
+              members={initialMembers}
+              weeks={demoRotation}
+              membersDisplay={membersDisplay}
+              embedded
+              displayTimezone={initialMeeting.display_timezone ?? undefined}
+              modeUsed="STRICT"
+              useFixedBaseTime={initialMeeting.base_time_minutes != null}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
     )
   }
 
@@ -1136,7 +1244,8 @@ export function RotationSection({
         </div>
 
         <div className="space-y-6">
-          {/* The meeting card */}
+          {/* The meeting card — locked in demo config step */}
+          <div className={cn(isDemoConfigStep && "pointer-events-none select-none")}>
           <section className="bg-white rounded-2xl border border-[#edeef0] shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-6">
             <div className="flex items-center gap-2 mb-1">
               <Calendar size={16} className="text-[#0d9488]" />
@@ -1299,22 +1408,23 @@ export function RotationSection({
               </label>
             </div>
           </section>
+          </div>
 
-          <div className="pt-2">
+          <div className={cn("pt-2", isDemoConfigStep && "pointer-events-auto")}>
           <Button
             size="lg"
             className={cn(
               "w-full py-3.5 text-[0.92rem] font-medium rounded-xl bg-[#0d9488] hover:bg-[#0f766e] hover:shadow-[0_6px_24px_rgba(13,148,136,0.20)] text-white border-0 transition-all duration-200",
-              (team.length < 2 || isFixedBaseTimeBlocked || hasNoAvailability) && "opacity-50 cursor-not-allowed"
+              !isDemoConfigStep && (team.length < 2 || isFixedBaseTimeBlocked || hasNoAvailability) && "opacity-50 cursor-not-allowed"
             )}
-            disabled={team.length < 2 || isGenerating || isFixedBaseTimeBlocked || hasNoAvailability}
-            onClick={handleGenerate}
+            disabled={isDemoConfigStep ? false : (team.length < 2 || isGenerating || isFixedBaseTimeBlocked || hasNoAvailability)}
+            onClick={isDemoConfigStep ? () => setDemoShowResult(true) : handleGenerate}
           >
             {isGenerating
               ? "Planning…"
               : `Plan the next ${displayRotationWeeks} weeks fairly`}
           </Button>
-          {(team.length < 2 || isFixedBaseTimeBlocked || hasNoAvailability) && (
+          {!isDemoConfigStep && (team.length < 2 || isFixedBaseTimeBlocked || hasNoAvailability) && (
             <p className="text-xs text-muted-foreground/60 text-center mt-2">
               {team.length < 2
                 ? "At least 2 members needed. Share the invite link."

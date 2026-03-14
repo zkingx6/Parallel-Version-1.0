@@ -3,7 +3,6 @@
 import { useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { scrollToSection, isValidSectionId } from "@/lib/utils"
-import { installLandingUrlDebug } from "@/lib/landing-debug-url"
 
 /**
  * Handles ?section=X on landing page load: scrolls to section and cleans URL.
@@ -15,7 +14,6 @@ export function LandingScrollHandler() {
   const router = useRouter()
 
   useEffect(() => {
-    installLandingUrlDebug()
     const section = searchParams?.get("section") ?? null
     if (isValidSectionId(section)) {
       requestAnimationFrame(() => scrollToSection(section))

@@ -42,34 +42,8 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={(e) => {
-                  console.log("[URL_DEBUG] logo BEFORE", {
-                    href: window.location.href,
-                    hash: window.location.hash,
-                    target: (e.target as HTMLElement)?.tagName,
-                    activeElement: document.activeElement?.tagName,
-                    time: performance.now().toFixed(1),
-                  })
                   e.preventDefault()
                   window.scrollTo({ top: 0, behavior: "smooth" })
-                  console.log("[URL_DEBUG] logo AFTER scrollTo", {
-                    href: window.location.href,
-                    hash: window.location.hash,
-                    time: performance.now().toFixed(1),
-                  })
-                  setTimeout(() => {
-                    console.log("[URL_DEBUG] logo 50ms", {
-                      href: window.location.href,
-                      hash: window.location.hash,
-                      time: performance.now().toFixed(1),
-                    })
-                  }, 50)
-                  setTimeout(() => {
-                    console.log("[URL_DEBUG] logo 200ms", {
-                      href: window.location.href,
-                      hash: window.location.hash,
-                      time: performance.now().toFixed(1),
-                    })
-                  }, 200)
                 }}
                 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground hover:text-muted-foreground transition-colors"
               >

@@ -313,12 +313,20 @@ export function ScheduleDetailContent({
             </p>
             <div className="flex items-center gap-2 shrink-0">
               {showShareActions && (
-                <ShareScheduleDropdown
-                  scheduleName={scheduleName}
-                  meeting={meeting}
-                  weeks={weeks}
-                  shareToken={shareToken}
-                />
+                demoMode ? (
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-[#1a1a2e] text-[0.82rem] border border-[#d1d5db] font-medium shrink-0 pointer-events-none select-none opacity-90">
+                    <Share2 size={14} />
+                    Share schedule
+                    <ChevronDown size={14} className="text-[#9ca3af]" />
+                  </div>
+                ) : (
+                  <ShareScheduleDropdown
+                    scheduleName={scheduleName}
+                    meeting={meeting}
+                    weeks={weeks}
+                    shareToken={shareToken}
+                  />
+                )
               )}
               {demoMode && onAnalysisClick ? (
                 <button

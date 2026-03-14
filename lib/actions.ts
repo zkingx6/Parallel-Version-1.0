@@ -287,9 +287,18 @@ export async function createScheduleRecord(
   } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
 
+  const { data: meeting } = await supabase
+    .from("meetings")
+    .select("id")
+    .eq("id", teamId)
+    .eq("manager_id", user.id)
+    .single()
+  if (!meeting) return { error: "Not authorized to publish for this team" }
+
   const weeks = rotationResult.weeks?.length ?? 0
   const shareToken = generateShareToken()
-  const { data, error } = await supabase
+  const serviceSupabase = createServiceSupabase()
+  const { data, error } = await serviceSupabase
     .from("schedules")
     .insert({
       team_id: teamId,

@@ -24,13 +24,21 @@ export type PublicScheduleData = {
 export async function getPublicScheduleByToken(
   shareToken: string
 ): Promise<PublicScheduleData | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKeyPresent = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  const urlHost = supabaseUrl ? new URL(supabaseUrl).host : "(missing)"
+
   const supabase = createServiceSupabase()
 
-  const { data: schedule } = await supabase
+  const { data: schedule, error } = await supabase
     .from("schedules")
     .select("id, name, team_id, rotation_result")
     .eq("share_token", shareToken)
     .single()
+
+  if (process.env.NEXT_PUBLIC_DEBUG_SHARE_LINK === "1") {
+    console.warn("[share-link] token=" + shareToken + " host=" + urlHost + " serviceKey=" + serviceKeyPresent + " error=" + (error?.message ?? "none") + " scheduleId=" + (schedule?.id ?? "null"))
+  }
 
   if (!schedule) return null
 
