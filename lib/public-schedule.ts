@@ -50,7 +50,9 @@ export async function getPublicScheduleByToken(
 
   console.warn("[share-debug] meeting found:", !!meeting)
 
-  if (!meeting) return null
+  if (!meeting) {
+    console.warn("[share-debug] fallback: using schedule data (meeting row missing)")
+  }
 
   const { data: members } = await supabase
     .from("member_submissions")
@@ -68,7 +70,7 @@ export async function getPublicScheduleByToken(
       ? rotationResult.weeks
       : []
 
-  const ownerProfile = meeting.manager_id
+  const ownerProfile = meeting?.manager_id
     ? (await fetchProfilesForUserIds([meeting.manager_id])).get(meeting.manager_id) ?? null
     : null
   console.warn("[share-debug] ownerProfile found:", !!ownerProfile)
@@ -101,15 +103,15 @@ export async function getPublicScheduleByToken(
   })
 
   const displayTimezone = ensureDisplayTimezoneIana(
-    meeting.display_timezone ?? "America/New_York"
+    meeting?.display_timezone ?? "America/New_York"
   )
-  const useBaseTime = (meeting.base_time_minutes ?? null) != null
+  const useBaseTime = (meeting?.base_time_minutes ?? null) != null
 
   return {
     scheduleId: schedule.id,
     teamId: schedule.team_id,
     scheduleName: schedule.name,
-    meetingTitle: meeting.title,
+    meetingTitle: meeting?.title ?? schedule.name,
     displayTimezone,
     useBaseTime,
     weeks,
