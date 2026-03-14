@@ -244,6 +244,61 @@ describe("Fairness Guarantee", () => {
     })
   })
 
+  it("getZeroBurdenAlternatives: duration-aware range for same-timezone 9–5 (SEED 1 style)", () => {
+    const team: TeamMember[] = [
+      makeMember("a", "Alex", "America/New_York", 9, 17, []),
+      makeMember("b", "Jordan", "America/New_York", 9, 17, []),
+    ]
+    const baseConfig = {
+      ...defaultConfig,
+      baseTimeMinutes: undefined,
+      rotationWeeks: 4,
+      dayOfWeek: 2,
+      startDateIso: "2026-03-17",
+      displayTimezone: "America/New_York",
+    }
+    for (const { durationMinutes, expectStart, expectEnd } of [
+      { durationMinutes: 30, expectStart: "9:00 AM", expectEnd: "4:30 PM" },
+      { durationMinutes: 45, expectStart: "9:00 AM", expectEnd: "4:00 PM" },
+      { durationMinutes: 60, expectStart: "9:00 AM", expectEnd: "4:00 PM" },
+      { durationMinutes: 120, expectStart: "9:00 AM", expectEnd: "3:00 PM" },
+    ]) {
+      const config = { ...baseConfig, durationMinutes }
+      const result = generateRotation(team, config)
+      expect(isRotationResult(result)).toBe(true)
+      if (!isRotationResult(result)) continue
+      const alt = getZeroBurdenAlternatives(team, config, result.weeks, "America/New_York")
+      expect(alt).not.toBeNull()
+      expect(alt!.isContinuous).toBe(true)
+      expect(alt!.rangeStartLabel).toBe(expectStart)
+      expect(alt!.rangeEndLabel).toBe(expectEnd)
+    }
+  })
+
+  it("getZeroBurdenAlternatives: SEED 11 style (NY/London/Berlin 8–18) returns continuous range", () => {
+    const team: TeamMember[] = [
+      makeMember("ny", "Finley NY", "America/New_York", 8, 18, []),
+      makeMember("lon", "Reese London", "Europe/London", 8, 18, []),
+      makeMember("ber", "Drew Berlin", "Europe/Berlin", 8, 18, []),
+    ]
+    const config: MeetingConfig = {
+      ...defaultConfig,
+      baseTimeMinutes: undefined,
+      rotationWeeks: 8,
+      dayOfWeek: 2,
+      durationMinutes: 60,
+      startDateIso: "2026-03-17",
+      displayTimezone: "America/New_York",
+    }
+    const result = generateRotation(team, config)
+    expect(isRotationResult(result)).toBe(true)
+    if (!isRotationResult(result)) return
+    const alt = getZeroBurdenAlternatives(team, config, result.weeks, "America/New_York")
+    expect(alt).not.toBeNull()
+    expect(alt!.count).toBeGreaterThan(0)
+    expect(alt!.all.length).toBe(alt!.count)
+  })
+
   it("getZeroBurdenAlternatives: returns alternatives when multiple zero-burden options exist", () => {
     const team: TeamMember[] = [
       makeMember("ny", "New York", "America/New_York", 9, 18, [{ start: 0, end: 6 }]),
@@ -267,9 +322,9 @@ describe("Fairness Guarantee", () => {
       "America/New_York"
     )
     expect(alternatives).not.toBeNull()
-    expect(alternatives!.length).toBeGreaterThan(0)
-    expect(alternatives!.length).toBeLessThanOrEqual(3)
-    for (const alt of alternatives!) {
+    expect(alternatives!.count).toBeGreaterThan(0)
+    expect(alternatives!.all.length).toBe(alternatives!.count)
+    for (const alt of alternatives!.all) {
       expect(alt.label).toMatch(/\d{1,2}:\d{2}\s*(AM|PM)/)
       expect(alt.baseTimeMinutes).toBeGreaterThanOrEqual(0)
       expect(alt.baseTimeMinutes).toBeLessThan(1440)
@@ -306,6 +361,47 @@ describe("Fairness Guarantee", () => {
           expect(mt.localHour).toBeLessThan(18)
         }
       }
+    }
+  })
+
+  it("burden metrics: minBurden/maxBurden/spread correct when all burdens are positive (no false minBurden=0)", () => {
+    // Regression: Math.min(...values, 0) incorrectly forced minBurden=0 when all burdens > 0.
+    const team: TeamMember[] = [
+      makeMember("a", "Alice", "America/New_York", 9, 18, []),
+      makeMember("b", "Bob", "Europe/London", 9, 18, []),
+      makeMember("c", "Carol", "Asia/Tokyo", 9, 18, []),
+    ]
+    const config: MeetingConfig = {
+      ...defaultConfig,
+      rotationWeeks: 8,
+      baseTimeMinutes: undefined,
+    }
+    const result = generateRotation(team, config)
+    expect(isRotationResult(result)).toBe(true)
+    if (!isRotationResult(result)) return
+    const { weeks, explain } = result
+    const metrics = explain.currentPlanMetrics
+    expect(metrics).toBeDefined()
+    if (!metrics) return
+    // Compute actual burden totals from weeks (source of truth)
+    const burdenTotals: Record<string, number> = {}
+    for (const m of team) burdenTotals[m.id] = 0
+    for (const w of weeks) {
+      for (const mt of w.memberTimes) {
+        burdenTotals[mt.memberId] = (burdenTotals[mt.memberId] ?? 0) + (mt.score ?? 0)
+      }
+    }
+    const values = Object.values(burdenTotals)
+    const actualMin = values.length ? Math.min(...values) : 0
+    const actualMax = values.length ? Math.max(...values) : 0
+    const actualSpread = actualMax - actualMin
+    expect(metrics.minBurden).toBe(actualMin)
+    expect(metrics.maxBurden).toBe(actualMax)
+    expect(metrics.spread).toBe(actualSpread)
+    expect(metrics.spread).toBe(metrics.maxBurden - metrics.minBurden)
+    // When all burdens are positive, minBurden must not be 0
+    if (values.length > 0 && values.every((v) => v > 0)) {
+      expect(metrics.minBurden).toBeGreaterThan(0)
     }
   })
 

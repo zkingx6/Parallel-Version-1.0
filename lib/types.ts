@@ -35,6 +35,22 @@ export type MeetingConfig = {
   displayTimezone?: string
   /** Week 1 calendar date (YYYY-MM-DD). null/undefined = next occurrence of dayOfWeek. */
   startDateIso?: string | null
+  /** Dev-only: skip burden-diff pruning in beam search (diagnostic). */
+  devSkipBurdenDiff?: boolean
+}
+
+/** Zero-burden alternatives result for "Other equally comfortable times" UX. */
+export type ZeroBurdenAlternativesResult = {
+  /** All zero-burden alternative start times (excl. chosen), in display timezone order. */
+  all: { baseTimeMinutes: number; label: string }[]
+  /** Whether the slots form a continuous 30-min block. */
+  isContinuous: boolean
+  /** Range start label when continuous, e.g. "9:00 AM". */
+  rangeStartLabel?: string
+  /** Range end label when continuous, e.g. "4:00 PM". */
+  rangeEndLabel?: string
+  /** Total count of valid alternatives. */
+  count: number
 }
 
 /** Default fairness thresholds for shareable plans. */
@@ -115,6 +131,23 @@ export type ForcedPlanEvidence = {
   /** Debug: actual feasible UTC hours per week (e.g. week1 = index 0). */
   perWeekFeasibleUtcHours?: number[][]
   bestAchievableMetrics: PlanMetrics
+  /** Dev-only: beam search instrumentation when BEAM_EXHAUSTED. */
+  beamDebug?: {
+    beamWidth: number
+    beamK: number
+    perWeek: Array<{
+      week: number
+      statesExplored: number
+      statesKept: number
+      statesPruned: number
+      prunedByBurdenDiff: number
+      prunedByConsecutiveMax: number
+      prunedBySpread: number
+      prunedByConsecutiveMaxLimit: number
+    }>
+    firstBlockingWeek: number | null
+    firstBlockingReason: string | null
+  }
 }
 
 export type RotationExplain = {

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { createServiceSupabase } from "@/lib/supabase-server"
 
-const TYPE_VALUES = ["bug", "idea", "confusing", "love_it", "general"] as const
-const SOURCE_VALUES = ["landing_page", "owner_dashboard", "member_dashboard", "privacy_page", "terms_page", "footer"] as const
+const TYPE_VALUES = ["bug", "idea", "confusing", "love_it", "general", "enterprise_inquiry"] as const
+const SOURCE_VALUES = ["landing_page", "owner_dashboard", "member_dashboard", "privacy_page", "terms_page", "footer", "pricing"] as const
 
 type FeedbackType = (typeof TYPE_VALUES)[number]
 type FeedbackSource = (typeof SOURCE_VALUES)[number]
@@ -24,12 +24,12 @@ function validatePayload(body: unknown): {
 
   const type = b.type
   if (typeof type !== "string" || !TYPE_VALUES.includes(type as FeedbackType)) {
-    return { error: "Invalid type. Must be one of: bug, idea, confusing, love_it, general" }
+    return { error: "Invalid type. Must be one of: bug, idea, confusing, love_it, general, enterprise_inquiry" }
   }
 
   const source = b.source
   if (typeof source !== "string" || !SOURCE_VALUES.includes(source as FeedbackSource)) {
-    return { error: "Invalid source. Must be one of: landing_page, owner_dashboard, member_dashboard, privacy_page, terms_page, footer" }
+    return { error: "Invalid source. Must be one of: landing_page, owner_dashboard, member_dashboard, privacy_page, terms_page, footer, pricing" }
   }
 
   const message = b.message

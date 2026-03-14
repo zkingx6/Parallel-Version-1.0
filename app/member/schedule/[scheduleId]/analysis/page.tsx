@@ -87,6 +87,8 @@ export default async function MemberScheduleAnalysisPage({
     shareablePlanExists?: boolean
     forcedSummary?: string
     forcedReason?: string
+    weeks?: Array<{ hardValidCandidatesCount?: number }>
+    evidence?: { perWeekHardValidCount?: number[] }
   } | undefined
 
   const ownerAuthProfile = await getOwnerProfileForMeeting(

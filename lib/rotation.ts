@@ -16,6 +16,7 @@ import {
   type FairnessThresholds,
   type ForcedReason,
   type ForcedPlanEvidence,
+  type ZeroBurdenAlternativesResult,
   DEFAULT_FAIRNESS_THRESHOLDS,
 } from "./types"
 
@@ -449,7 +450,8 @@ function computeTotalScore(memberTimes: MemberTime[]): number {
 }
 
 function computeMaxIndividualScore(memberTimes: MemberTime[]): number {
-  return Math.max(...memberTimes.map((mt) => mt.score ?? 0), 0)
+  const scores = memberTimes.map((mt) => mt.score ?? 0)
+  return scores.length ? Math.max(...scores) : 0
 }
 
 /**
@@ -462,7 +464,8 @@ function computeFairnessAdjustedScores(
   memberTimes: MemberTime[],
   burden: Record<string, number>
 ): Map<string, number> {
-  const maxBurden = Math.max(...Object.values(burden), 0)
+  const burdenVals = Object.values(burden)
+  const maxBurden = burdenVals.length ? Math.max(...burdenVals) : 0
   const adjusted = new Map<string, number>()
 
   for (const mt of memberTimes) {
@@ -783,8 +786,8 @@ function generateRotationWithMode(
             (projectedBurden[mt.memberId] ?? 0) + adjScore
         }
         const burdens = Object.values(projectedBurden)
-        const maxBurdenAfter = Math.max(...burdens, 0)
-        const minBurdenAfter = Math.min(...burdens, 0)
+        const maxBurdenAfter = burdens.length ? Math.max(...burdens) : 0
+        const minBurdenAfter = burdens.length ? Math.min(...burdens) : 0
         const spreadAfter = maxBurdenAfter - minBurdenAfter
         const sumPenalty = computeTotalScore(memberTimes)
         const wouldExceed60 = candidateWouldExceed60.get(utcHour) ?? false
@@ -903,8 +906,8 @@ function generateRotationWithMode(
       }
 
       const burdens = Object.values(projectedBurden)
-      const maxProjected = Math.max(...burdens, 0)
-      const minProjected = Math.min(...burdens, 0)
+      const maxProjected = burdens.length ? Math.max(...burdens) : 0
+      const minProjected = burdens.length ? Math.min(...burdens) : 0
       const gap = maxProjected - minProjected
       const equityPenalty = computeEquityPenalty(memberTimes, burden)
       const sumDiscomfort = computeTotalScore(memberTimes)
@@ -1156,8 +1159,8 @@ function generateRotationWithMode(
 
       // Compute fairness stats
       const burdenValues = Object.values(projectedBurden)
-      const maxBurden = Math.max(...burdenValues, 0)
-      const minBurden = Math.min(...burdenValues, 0)
+      const maxBurden = burdenValues.length ? Math.max(...burdenValues) : 0
+      const minBurden = burdenValues.length ? Math.min(...burdenValues) : 0
       const spread = maxBurden - minBurden
       const sumPenalty = computeTotalScore(bestMemberTimes)
 
@@ -1492,8 +1495,8 @@ function computeFullPlanMetrics(
   }
   debugLogPlanMetrics(team, burden, "computeFullPlanMetrics")
   const values = Object.values(burden)
-  const maxBurden = Math.max(...values, 0)
-  const minBurden = Math.min(...values, 0)
+  const maxBurden = values.length ? Math.max(...values) : 0
+  const minBurden = values.length ? Math.min(...values) : 0
   const spread = maxBurden - minBurden
   const maxBurdenMemberIds = team
     .filter((m) => (burden[m.id] ?? 0) === maxBurden)
@@ -1518,6 +1521,25 @@ type FairnessBeamState = {
   totalSlotDeviation: number
 }
 
+export type BeamDebugPerWeek = {
+  week: number
+  statesExplored: number
+  statesKept: number
+  statesPruned: number
+  prunedByBurdenDiff: number
+  prunedByConsecutiveMax: number
+  prunedBySpread: number
+  prunedByConsecutiveMaxLimit: number
+}
+
+export type BeamDebug = {
+  beamWidth: number
+  beamK: number
+  perWeek: BeamDebugPerWeek[]
+  firstBlockingWeek: number | null
+  firstBlockingReason: string | null
+}
+
 function fairnessGuaranteeBeamSearch(
   team: TeamMember[],
   config: MeetingConfig
@@ -1529,6 +1551,7 @@ function fairnessGuaranteeBeamSearch(
   perWeekHardValidCount: number[]
   perWeekMaxMemberSets: string[][]
   perWeekFeasibleUtcHours: number[][]
+  beamDebug: BeamDebug
 } {
   const thresholds = getThresholds(config)
   const utcStart = getWeek1DateUtc(config)
@@ -1537,6 +1560,14 @@ function fairnessGuaranteeBeamSearch(
   const perWeekHardValidCount: number[] = []
   const perWeekMaxMemberSets: string[][] = []
   const perWeekFeasibleUtcHours: number[][] = []
+
+  const beamDebug: BeamDebug = {
+    beamWidth: FAIRNESS_BEAM_WIDTH,
+    beamK: FAIRNESS_BEAM_K,
+    perWeek: [],
+    firstBlockingWeek: null,
+    firstBlockingReason: null,
+  }
 
   const initialBurden: Record<string, number> = {}
   for (const m of team) initialBurden[m.id] = 0
@@ -1586,6 +1617,7 @@ function fairnessGuaranteeBeamSearch(
         perWeekHardValidCount,
         perWeekMaxMemberSets,
         perWeekFeasibleUtcHours,
+        beamDebug,
       }
     }
 
@@ -1598,6 +1630,10 @@ function fairnessGuaranteeBeamSearch(
     perWeekMaxMemberSets.push([...weekMaxMemberSets])
 
     const nextBeam: FairnessBeamState[] = []
+    let prunedByBurdenDiff = 0
+    let prunedByConsecutiveMax = 0
+    let prunedBySpread = 0
+    let prunedByConsecutiveMaxLimit = 0
     for (const state of beam) {
       for (const utcHour of topK) {
         const memberTimes = computeMemberTimes(utcDate, utcHour, team)
@@ -1605,10 +1641,17 @@ function fairnessGuaranteeBeamSearch(
         for (const mt of memberTimes) {
           memberScores.set(mt.memberId, mt.score ?? 0)
         }
-        if (wouldViolateBurdenDiff(team, state.burden, memberScores)) continue
+        if (
+          !config.devSkipBurdenDiff &&
+          wouldViolateBurdenDiff(team, state.burden, memberScores)
+        ) {
+          prunedByBurdenDiff++
+          continue
+        }
         if (
           wouldBeConsecutiveMaxDiscomfort(memberTimes, state.lastWeekMaxMemberId)
         ) {
+          prunedByConsecutiveMax++
           continue
         }
 
@@ -1622,7 +1665,7 @@ function fairnessGuaranteeBeamSearch(
         const newMaxIds = [...state.maxMemberIdsPerWeek, maxId ?? ""]
         const newConsecutiveMax = computeConsecutiveMax(newMaxIds)
         const vals = Object.values(newBurden)
-        const spread = Math.max(...vals, 0) - Math.min(...vals, 0)
+        const spread = vals.length ? Math.max(...vals) - Math.min(...vals) : 0
         const weekPenalty = memberTimes.reduce((s, mt) => s + (mt.score ?? 0), 0)
         const weekOffset = getAnchorOffsetForWeek(utcDate, config)
         const slotDev =
@@ -1633,8 +1676,14 @@ function fairnessGuaranteeBeamSearch(
               )
             : 0
 
-        if (spread > thresholds.spreadLimit) continue
-        if (newConsecutiveMax > thresholds.consecutiveMaxLimit) continue
+        if (spread > thresholds.spreadLimit) {
+          prunedBySpread++
+          continue
+        }
+        if (newConsecutiveMax > thresholds.consecutiveMaxLimit) {
+          prunedByConsecutiveMaxLimit++
+          continue
+        }
 
         nextBeam.push({
           weeks: [...state.weeks, { utcHour, memberTimes }],
@@ -1645,6 +1694,26 @@ function fairnessGuaranteeBeamSearch(
           totalSlotDeviation: state.totalSlotDeviation + slotDev,
         })
       }
+    }
+
+    beamDebug.perWeek.push({
+      week: i + 1,
+      statesExplored: beam.length * topK.length,
+      statesKept: nextBeam.length,
+      statesPruned: beam.length * topK.length - nextBeam.length,
+      prunedByBurdenDiff,
+      prunedByConsecutiveMax,
+      prunedBySpread,
+      prunedByConsecutiveMaxLimit,
+    })
+    if (nextBeam.length === 0 && beamDebug.firstBlockingWeek === null) {
+      beamDebug.firstBlockingWeek = i + 1
+      const reasons: string[] = []
+      if (prunedByBurdenDiff > 0) reasons.push("BURDEN_DIFF")
+      if (prunedByConsecutiveMax > 0) reasons.push("CONSECUTIVE_MAX_DISCOMFORT")
+      if (prunedBySpread > 0) reasons.push("SPREAD")
+      if (prunedByConsecutiveMaxLimit > 0) reasons.push("CONSECUTIVE_MAX_LIMIT")
+      beamDebug.firstBlockingReason = reasons.join("|") || "UNKNOWN"
     }
 
     if (DEBUG_VERIFY) {
@@ -1678,6 +1747,7 @@ function fairnessGuaranteeBeamSearch(
         perWeekHardValidCount,
         perWeekMaxMemberSets,
         perWeekFeasibleUtcHours,
+        beamDebug,
       }
     }
 
@@ -1746,6 +1816,7 @@ function fairnessGuaranteeBeamSearch(
       perWeekHardValidCount,
       perWeekMaxMemberSets,
       perWeekFeasibleUtcHours,
+      beamDebug,
     }
   }
 
@@ -1758,9 +1829,8 @@ function fairnessGuaranteeBeamSearch(
   if (DEBUG_VERIFY) {
     const numFinalPlans = beam.length
     const numShareablePlansFound = beam.filter((s) => {
-      const spread =
-        Math.max(...Object.values(s.burden), 0) -
-        Math.min(...Object.values(s.burden), 0)
+      const vals = Object.values(s.burden)
+      const spread = vals.length ? Math.max(...vals) - Math.min(...vals) : 0
       const conc = computeConsecutiveMax(s.maxMemberIdsPerWeek)
       return spread <= thresholds.spreadLimit && conc <= thresholds.consecutiveMaxLimit
     }).length
@@ -1779,6 +1849,7 @@ function fairnessGuaranteeBeamSearch(
     perWeekHardValidCount,
     perWeekMaxMemberSets,
     perWeekFeasibleUtcHours,
+    beamDebug,
   }
 }
 
@@ -1826,7 +1897,12 @@ function runFallbackBeamNoPruning(
         for (const mt of memberTimes) {
           memberScores.set(mt.memberId, mt.score ?? 0)
         }
-        if (wouldViolateBurdenDiff(team, state.burden, memberScores)) continue
+        if (
+          !config.devSkipBurdenDiff &&
+          wouldViolateBurdenDiff(team, state.burden, memberScores)
+        ) {
+          continue
+        }
         if (
           wouldBeConsecutiveMaxDiscomfort(memberTimes, state.lastWeekMaxMemberId)
         ) {
@@ -1863,15 +1939,13 @@ function runFallbackBeamNoPruning(
     }
 
     nextBeam.sort((a, b) => {
-      const spreadA =
-        Math.max(...Object.values(a.burden), 0) -
-        Math.min(...Object.values(a.burden), 0)
-      const spreadB =
-        Math.max(...Object.values(b.burden), 0) -
-        Math.min(...Object.values(b.burden), 0)
+      const valsA = Object.values(a.burden)
+      const valsB = Object.values(b.burden)
+      const spreadA = valsA.length ? Math.max(...valsA) - Math.min(...valsA) : 0
+      const spreadB = valsB.length ? Math.max(...valsB) - Math.min(...valsB) : 0
       if (spreadA !== spreadB) return spreadA - spreadB
-      const maxA = Math.max(...Object.values(a.burden), 0)
-      const maxB = Math.max(...Object.values(b.burden), 0)
+      const maxA = valsA.length ? Math.max(...valsA) : 0
+      const maxB = valsB.length ? Math.max(...valsB) : 0
       if (maxA !== maxB) return maxA - maxB
       const concA = computeConsecutiveMax(a.maxMemberIdsPerWeek)
       const concB = computeConsecutiveMax(b.maxMemberIdsPerWeek)
@@ -1948,8 +2022,8 @@ function computePlanMetrics(
   }
   debugLogPlanMetrics(team, burden, "computePlanMetrics")
   const values = Object.values(burden)
-  const maxBurden = Math.max(...values, 0)
-  const minBurden = Math.min(...values, 0)
+  const maxBurden = values.length ? Math.max(...values) : 0
+  const minBurden = values.length ? Math.min(...values) : 0
   const spread = maxBurden - minBurden
   const maxBurdenMemberIds = team
     .filter((m) => (burden[m.id] ?? 0) === maxBurden)
@@ -2031,15 +2105,13 @@ function beamSearchBetterPlan(
     }
 
     nextBeam.sort((a, b) => {
-      const spreadA =
-        Math.max(...Object.values(a.burden), 0) -
-        Math.min(...Object.values(a.burden), 0)
-      const spreadB =
-        Math.max(...Object.values(b.burden), 0) -
-        Math.min(...Object.values(b.burden), 0)
+      const valsA = Object.values(a.burden)
+      const valsB = Object.values(b.burden)
+      const spreadA = valsA.length ? Math.max(...valsA) - Math.min(...valsA) : 0
+      const spreadB = valsB.length ? Math.max(...valsB) - Math.min(...valsB) : 0
       if (spreadA !== spreadB) return spreadA - spreadB
-      const maxA = Math.max(...Object.values(a.burden), 0)
-      const maxB = Math.max(...Object.values(b.burden), 0)
+      const maxA = valsA.length ? Math.max(...valsA) : 0
+      const maxB = valsB.length ? Math.max(...valsB) : 0
       return maxA - maxB
     })
     beam = nextBeam.slice(0, FAIRNESS_BEAM_WIDTH)
@@ -2255,8 +2327,8 @@ function tryFixedAnchorPlan(
     }
   }
   const values = Object.values(burden)
-  const maxBurden = Math.max(...values, 0)
-  const minBurden = Math.min(...values, 0)
+  const maxBurden = values.length ? Math.max(...values) : 0
+  const minBurden = values.length ? Math.min(...values) : 0
   const spread = maxBurden - minBurden
   const maxBurdenMemberIds = team
     .filter((m) => (burden[m.id] ?? 0) === maxBurden)
@@ -2537,8 +2609,8 @@ export function generateRotation(
           }
         }
         const burdenValues = Object.values(finalBurden)
-        const maxBurden = Math.max(...burdenValues, 0)
-        const minBurden = Math.min(...burdenValues, 0)
+        const maxBurden = burdenValues.length ? Math.max(...burdenValues) : 0
+        const minBurden = burdenValues.length ? Math.min(...burdenValues) : 0
         const spread = maxBurden - minBurden
 
         console.group("[ROTATION_DEBUG] Final burden distribution")
@@ -2583,8 +2655,8 @@ export function generateRotation(
         }
         debugLogPlanMetrics(team, b, "currentPlanMetrics (greedy)")
         const vals = Object.values(b)
-        const maxB = Math.max(...vals, 0)
-        const minB = Math.min(...vals, 0)
+        const maxB = vals.length ? Math.max(...vals) : 0
+        const minB = vals.length ? Math.min(...vals) : 0
         const maxIds = team
           .filter((m) => (b[m.id] ?? 0) === maxB)
           .map((m) => m.id)
@@ -2680,6 +2752,8 @@ export function generateRotation(
           perWeekMaxMemberSets,
           perWeekFeasibleUtcHours,
           bestAchievableMetrics: currentPlanMetrics,
+          ...(beamActuallyExhausted &&
+            beamResult.beamDebug && { beamDebug: beamResult.beamDebug }),
         }
         const hasNoFeasible = perWeekHardValidCount.some((c) => c === 0)
         if (hasNoFeasible && !beamActuallyExhausted) {
@@ -2849,23 +2923,59 @@ export function getBurdenCounts(
   }))
 }
 
+/** Check if meeting [localStart, localEnd) overlaps hardNo [start, end). Half-open intervals. */
+function meetingOverlapsHardNo(
+  localStart: number,
+  localEnd: number,
+  hardNoRanges: { start: number; end: number }[]
+): boolean {
+  for (const r of hardNoRanges) {
+    if (r.start < r.end) {
+      if (localStart < r.end && localEnd > r.start) return true
+    } else {
+      if (localStart < r.end || localEnd > r.start) return true
+    }
+  }
+  return false
+}
+
+/** Duration-aware: slot is zero-burden only if FULL meeting stays within working hours and clear of hardNo. */
+function isSlotZeroBurdenForDuration(
+  utcDate: DateTime,
+  utcHour: number,
+  team: TeamMember[],
+  durationMinutes: number
+): boolean {
+  const durationHours = durationMinutes / 60
+  for (const m of team) {
+    const localStart = utcToLocalHour(utcDate, utcHour, m)
+    const localEnd = localStart + durationHours
+    if (localStart < m.workStartHour || localEnd > m.workEndHour) return false
+    if (meetingOverlapsHardNo(localStart, localEnd, m.hardNoRanges)) return false
+  }
+  return true
+}
+
 /** Zero-burden alternative times for the full rotation.
- * Only returns when: (1) current schedule has zero total burden,
- * (2) there are other hard-valid times that are zero-burden for all weeks,
+ * Duration-aware: only slots where the FULL meeting stays within working hours and clear of hardNo.
+ * Returns when: (1) current schedule has zero total burden,
+ * (2) there are other zero-burden times for all weeks,
  * (3) at least 2 total zero-burden options exist.
- * Used for "Other equally comfortable options" UX. */
+ * Used for "Other equally comfortable times" UX. */
 export function getZeroBurdenAlternatives(
   team: TeamMember[],
   config: MeetingConfig,
   weeks: RotationWeekData[],
   displayTimezoneIana: string
-): { baseTimeMinutes: number; label: string }[] | null {
+): ZeroBurdenAlternativesResult | null {
   if (weeks.length === 0) return null
   const burdenData = getBurdenCounts(weeks, team)
   const totalBurden = burdenData.reduce((s, d) => s + d.count, 0)
   if (totalBurden > 0) return null
 
+  const durationMinutes = config.durationMinutes ?? 60
   const configNoBase = { ...config, baseTimeMinutes: null }
+  const candidates = getCandidateUtcHours()
   let zeroBurdenUtcHours: Set<number> | null = null
 
   for (const week of weeks) {
@@ -2874,12 +2984,12 @@ export function getZeroBurdenAlternatives(
     const utcDate = DateTime.fromISO(utcDateIso, { zone: "utc" })
     if (!utcDate.isValid) return null
 
-    const hardValid = findValidCandidates(utcDate, team, configNoBase)
     const weekZero: Set<number> = new Set()
-    for (const utcHour of hardValid) {
-      const memberTimes = computeMemberTimes(utcDate, utcHour, team)
-      const allZero = memberTimes.every((mt) => (mt.score ?? 0) === 0)
-      if (allZero) weekZero.add(utcHour)
+    for (const utcHour of candidates) {
+      if (!isCandidateHardValid(utcDate, utcHour, team)) continue
+      if (isSlotZeroBurdenForDuration(utcDate, utcHour, team, durationMinutes)) {
+        weekZero.add(utcHour)
+      }
     }
 
     if (zeroBurdenUtcHours === null) {
@@ -2901,24 +3011,50 @@ export function getZeroBurdenAlternatives(
   if (zeroBurdenUtcHours!.size < 2) return null
 
   const week1Date = DateTime.fromISO(weeks[0]!.utcDateIso!, { zone: "utc" })
-  const displayOffsetHours =
-    week1Date.setZone(displayTimezoneIana).offset / 60
+  const displayOffsetHours = week1Date.setZone(displayTimezoneIana).offset / 60
 
+  const sortedFull = [...zeroBurdenUtcHours!].sort((a, b) => a - b)
+  let isContinuous = sortedFull.length >= 2
+  for (let i = 1; i < sortedFull.length; i++) {
+    if (sortedFull[i]! - sortedFull[i - 1]! !== 0.5) {
+      isContinuous = false
+      break
+    }
+  }
+
+  const fullAll: { baseTimeMinutes: number; label: string }[] = []
+  const seenFull = new Set<number>()
+  for (const utcHour of sortedFull) {
+    const displayHour = utcHour + displayOffsetHours
+    const wrapped = ((displayHour % 24) + 24) % 24
+    const baseTimeMinutes = Math.round(wrapped * 60) % 1440
+    if (seenFull.has(baseTimeMinutes)) continue
+    seenFull.add(baseTimeMinutes)
+    fullAll.push({ baseTimeMinutes, label: formatHourLabel(wrapped) })
+  }
+
+  const rangeStartLabel = fullAll.length > 0 ? fullAll[0]!.label : undefined
+  const rangeEndLabel = fullAll.length > 0 ? fullAll[fullAll.length - 1]!.label : undefined
+
+  const sortedAlternatives = [...alternatives].sort((a, b) => a - b)
+  const all: { baseTimeMinutes: number; label: string }[] = []
   const seen = new Set<number>()
-  const result: { baseTimeMinutes: number; label: string }[] = []
-  for (const utcHour of alternatives.slice(0, 5)) {
+  for (const utcHour of sortedAlternatives) {
     const displayHour = utcHour + displayOffsetHours
     const wrapped = ((displayHour % 24) + 24) % 24
     const baseTimeMinutes = Math.round(wrapped * 60) % 1440
     if (seen.has(baseTimeMinutes)) continue
     seen.add(baseTimeMinutes)
-    result.push({
-      baseTimeMinutes,
-      label: formatHourLabel(wrapped),
-    })
-    if (result.length >= 3) break
+    all.push({ baseTimeMinutes, label: formatHourLabel(wrapped) })
   }
-  return result.length > 0 ? result : null
+
+  return {
+    all,
+    isContinuous,
+    rangeStartLabel: isContinuous ? rangeStartLabel : undefined,
+    rangeEndLabel: isContinuous ? rangeEndLabel : undefined,
+    count: all.length,
+  }
 }
 
 export function hasConsecutiveStretch(

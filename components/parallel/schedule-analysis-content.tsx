@@ -34,11 +34,18 @@ import {
   ensureDisplayTimezoneIana,
   getIanaShortLabel,
 } from "@/lib/timezone"
+import {
+  analyzePlan,
+  buildFairnessAtGlance,
+  getRotationCardDescription,
+} from "@/lib/fairness-at-a-glance"
 
 type ExplainData = {
   shareablePlanExists?: boolean
   forcedSummary?: string
   forcedReason?: string
+  weeks?: Array<{ hardValidCandidatesCount?: number }>
+  evidence?: { perWeekHardValidCount?: number[] }
 } | undefined
 
 export function ScheduleAnalysisContent({
@@ -201,6 +208,21 @@ export function ScheduleAnalysisContent({
 
   const maxWidth = embedded ? "w-full max-w-none" : "max-w-6xl"
   const [timezoneExpanded, setTimezoneExpanded] = useState(false)
+
+  const planAnalysis =
+    !demoMode && weeks.length > 0 && burdenData.length > 0
+      ? analyzePlan({
+          weeks,
+          team: team.map((t) => ({ id: t.id, name: t.name, timezone: t.timezone })),
+          burdenData,
+          explain: explain
+            ? { weeks: explain.weeks, evidence: explain.evidence }
+            : undefined,
+          modeUsed: modeUsedProp,
+          shareablePlanExists: explain?.shareablePlanExists,
+          forcedReason: explain?.forcedReason,
+        })
+      : null
 
   const { modeDisplayLabel, modeDescription } = (() => {
     if (useFixedBaseTime === true) {
@@ -613,6 +635,30 @@ export function ScheduleAnalysisContent({
         </div>
       </section>
 
+      {/* Fairness at a glance — rule-based dynamic bullets from actual plan */}
+      {planAnalysis && (() => {
+        const bullets = buildFairnessAtGlance(planAnalysis)
+        if (bullets.length === 0) return null
+        return (
+          <section className="rounded-2xl border border-[#edeef0] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-5 sm:p-6 mb-6 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-shadow">
+            <h2 className="text-[#1a1a2e] text-[0.95rem] font-semibold mb-4">
+              Fairness at a glance
+            </h2>
+            <ul className="space-y-2">
+              {bullets.map((b, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-2 text-[0.84rem] text-[#6b7280] leading-relaxed"
+                >
+                  <span className="text-[#0d9488] mt-0.5 shrink-0">•</span>
+                  <span>{b}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )
+      })()}
+
       {/* Explanation Section — Bottom */}
       <section className="rounded-2xl border border-[#edeef0] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.03)] p-5 sm:p-6 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-shadow">
         <h2 className="text-[#1a1a2e] text-[0.95rem] font-semibold mb-5">
@@ -669,7 +715,9 @@ export function ScheduleAnalysisContent({
             </div>
             <h3 className="text-[#1a1a2e] text-[0.84rem] font-semibold mb-1">Rotation generated</h3>
             <p className="text-[#9ca3af] text-[0.78rem] leading-relaxed">
-              The schedule distributes meeting inconvenience across the cycle.
+              {planAnalysis
+                ? getRotationCardDescription(planAnalysis)
+                : "The schedule distributes meeting inconvenience across the cycle."}
             </p>
           </div>
         </div>

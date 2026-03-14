@@ -3,9 +3,22 @@
 import { useState } from "react"
 import type { ResolvedPlan } from "@/components/pricing/pricing-cards"
 import { PricingCards } from "@/components/pricing/pricing-cards"
+import { FeedbackModal } from "@/components/feedback/feedback-modal"
 
-export function UpgradePageContent({ resolvedPlan }: { resolvedPlan: ResolvedPlan }) {
+export function UpgradePageContent({
+  resolvedPlan,
+  userEmail,
+  userId,
+}: {
+  resolvedPlan: ResolvedPlan
+  userEmail?: string
+  userId?: string
+}) {
   const [loading, setLoading] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackDefaultType, setFeedbackDefaultType] = useState<
+    "general" | "enterprise_inquiry"
+  >("general")
 
   const handleUpgrade = async (billingInterval: "monthly" | "yearly") => {
     setLoading(true)
@@ -24,14 +37,30 @@ export function UpgradePageContent({ resolvedPlan }: { resolvedPlan: ResolvedPla
     }
   }
 
+  const handleContactSales = () => {
+    setFeedbackDefaultType("enterprise_inquiry")
+    setFeedbackOpen(true)
+  }
+
   return (
-    <PricingCards
-      mode="upgrade"
-      resolvedPlan={resolvedPlan}
-      onUpgradeClick={loading ? undefined : handleUpgrade}
-      showBillingToggle={true}
-      showHeader={false}
-      showOwnerNote={true}
-    />
+    <>
+      <PricingCards
+        mode="upgrade"
+        resolvedPlan={resolvedPlan}
+        onUpgradeClick={loading ? undefined : handleUpgrade}
+        onContactSalesClick={handleContactSales}
+        showBillingToggle={true}
+        showHeader={false}
+        showOwnerNote={true}
+      />
+      <FeedbackModal
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        source="pricing"
+        defaultType={feedbackDefaultType}
+        defaultEmail={userEmail ?? ""}
+        userId={userId}
+      />
+    </>
   )
 }

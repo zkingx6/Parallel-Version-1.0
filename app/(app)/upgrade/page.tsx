@@ -31,7 +31,11 @@ export default async function UpgradePage() {
       <p className="text-sm text-muted-foreground mb-10">
         Get more capacity for your teams and longer rotation schedules.
       </p>
-      <UpgradePageContent resolvedPlan={resolvedPlan} />
+      <UpgradePageContent
+        resolvedPlan={resolvedPlan}
+        userEmail={user?.email ?? undefined}
+        userId={user?.id ?? undefined}
+      />
     </main>
   )
 }

@@ -2,8 +2,8 @@
  * Shared client helper for submitting feedback to /api/feedback.
  */
 
-export type FeedbackType = "bug" | "idea" | "confusing" | "love_it" | "general"
-export type FeedbackSource = "landing_page" | "owner_dashboard" | "member_dashboard" | "privacy_page" | "terms_page" | "footer"
+export type FeedbackType = "bug" | "idea" | "confusing" | "love_it" | "general" | "enterprise_inquiry"
+export type FeedbackSource = "landing_page" | "owner_dashboard" | "member_dashboard" | "privacy_page" | "terms_page" | "footer" | "pricing"
 
 export type SubmitFeedbackPayload = {
   type: FeedbackType

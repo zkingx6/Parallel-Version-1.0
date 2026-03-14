@@ -148,11 +148,13 @@ function PricingCard({
   index,
   isYearly,
   onUpgradeClick,
+  onContactSalesClick,
 }: {
   plan: PricingPlan
   index: number
   isYearly: boolean
   onUpgradeClick?: () => void
+  onContactSalesClick?: () => void
 }) {
   const [isHovered, setIsHovered] = useState(false)
 
@@ -208,6 +210,22 @@ function PricingCard({
       )
     }
 
+    if (plan.cta === "Contact sales") {
+      return (
+        <motion.button
+          type="button"
+          onClick={onContactSalesClick}
+          className={`${baseButtonClass} ${outlineClass}`}
+          style={{ fontWeight: 500 }}
+          whileHover={PRICING_SECONDARY_HOVER}
+          whileTap={{ scale: 0.98 }}
+          transition={{ duration: 0.2 }}
+        >
+          {plan.cta}
+        </motion.button>
+      )
+    }
+
     return plan.ctaStyle === "filled" ? (
       <motion.button
         type="button"
@@ -229,11 +247,6 @@ function PricingCard({
     ) : (
       <motion.button
         type="button"
-        onClick={
-          plan.cta === "Contact sales"
-            ? () => window.open("mailto:sales@parallel.app", "_blank")
-            : undefined
-        }
         className={`${baseButtonClass} ${outlineClass}`}
         style={{ fontWeight: 500 }}
         whileHover={PRICING_SECONDARY_HOVER}
@@ -388,6 +401,8 @@ export type PricingCardsProps = {
   /** @deprecated Use resolvedPlan. Kept for backward compatibility with marketing mode. */
   currentPlan?: AppPlan
   onUpgradeClick?: (billingInterval: "monthly" | "yearly") => void
+  /** Called when user clicks "Contact sales" on Enterprise card. Use to open feedback modal with enterprise_inquiry. */
+  onContactSalesClick?: () => void
   showBillingToggle?: boolean
   showHeader?: boolean
   showOwnerNote?: boolean
@@ -398,6 +413,7 @@ export function PricingCards({
   resolvedPlan: resolvedPlanProp,
   currentPlan = "starter",
   onUpgradeClick,
+  onContactSalesClick,
   showBillingToggle = true,
   showHeader = true,
   showOwnerNote = true,
@@ -484,6 +500,7 @@ export function PricingCards({
                 ? () => onUpgradeClick?.(isYearly ? "yearly" : "monthly")
                 : undefined
             }
+            onContactSalesClick={onContactSalesClick}
           />
         ))}
       </div>

@@ -777,21 +777,6 @@ export function RotationSection({
     [demoMode, meeting, onUpdateMeeting, plan]
   )
 
-  const handleApplyAlternative = useCallback(
-    (baseTimeMinutes: number) => {
-      const anchorOffset =
-        DateTime.now().setZone(displayTimezoneIana).offset / 60
-      generateOverrideRef.current = { baseTimeMinutes, anchorOffset }
-      handleConfigChange({
-        base_time_minutes: baseTimeMinutes,
-        anchor_offset: anchorOffset,
-      }).then(() => {
-        handleGenerate()
-      })
-    },
-    [displayTimezoneIana, handleConfigChange]
-  )
-
   useEffect(() => {
     if (demoMode) return
     if (
@@ -1385,26 +1370,26 @@ export function RotationSection({
                   rotation,
                   displayTimezoneIana
                 )
-              return alternatives && alternatives.length > 0 ? (
+              return alternatives && alternatives.count > 0 ? (
                 <div className="rounded-lg border border-[#0d9488]/20 bg-[#f0fdfa] px-4 py-3 mb-4 space-y-2 animate-in fade-in-0 duration-300">
                   <p className="text-[0.88rem] font-medium text-[#1a1a2e]">
-                    Other equally comfortable options available
+                    Other equally comfortable times available
                   </p>
                   <p className="text-[0.78rem] text-[#6b7280] leading-relaxed">
-                    Parallel also found additional meeting times that keep everyone within working hours and avoid any burden.
+                    We found other available times with no burden. Switch to fixed time to choose your preferred time within this range.
                   </p>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {alternatives.map((alt) => (
-                      <button
-                        key={alt.baseTimeMinutes}
-                        type="button"
-                        onClick={() => handleApplyAlternative(alt.baseTimeMinutes)}
-                        className="inline-flex items-center px-3 py-1.5 text-[0.8rem] font-medium rounded-lg border border-[#0d9488]/30 bg-white text-[#0d9488] hover:bg-[#0d9488]/10 hover:border-[#0d9488]/50 transition-colors cursor-pointer"
-                      >
-                        {alt.label}
-                      </button>
-                    ))}
-                  </div>
+                  {alternatives.isContinuous && alternatives.rangeStartLabel && alternatives.rangeEndLabel ? (
+                    <p className="text-[0.84rem] font-medium text-[#0d9488]">
+                      {alternatives.rangeStartLabel} – {alternatives.rangeEndLabel}
+                    </p>
+                  ) : (
+                    <p className="text-[0.78rem] text-[#6b7280]">
+                      Multiple equally comfortable fixed-time options are available.
+                    </p>
+                  )}
+                  <p className="text-[0.72rem] text-[#9ca3af]">
+                    Based on your current meeting length and team availability.
+                  </p>
                 </div>
               ) : null
             })()}

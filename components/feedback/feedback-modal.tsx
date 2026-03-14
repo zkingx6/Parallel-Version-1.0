@@ -17,7 +17,13 @@ const TYPE_OPTIONS: { value: FeedbackType; label: string }[] = [
   { value: "confusing", label: "Something's confusing" },
   { value: "love_it", label: "Love it" },
   { value: "general", label: "General feedback" },
+  { value: "enterprise_inquiry", label: "Enterprise inquiry" },
 ]
+
+const MESSAGE_PLACEHOLDERS: Partial<Record<FeedbackType, string>> = {
+  enterprise_inquiry:
+    "Tell us about your team size and needs. Our team will reach out with Enterprise plan details.",
+}
 
 type FeedbackModalProps = {
   open: boolean
@@ -132,7 +138,7 @@ export function FeedbackModal({
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Share your thoughts..."
+                placeholder={MESSAGE_PLACEHOLDERS[type] ?? "Share your thoughts..."}
                 rows={4}
                 className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 required

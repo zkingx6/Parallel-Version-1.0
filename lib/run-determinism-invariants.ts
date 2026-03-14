@@ -62,8 +62,8 @@ function computePlanMetricsFromWeeks(
     }
   }
   const values = Object.values(burden)
-  const maxBurden = Math.max(...values, 0)
-  const minBurden = Math.min(...values, 0)
+  const maxBurden = values.length ? Math.max(...values) : 0
+  const minBurden = values.length ? Math.min(...values) : 0
   const spread = maxBurden - minBurden
   const maxBurdenMemberIds = team
     .filter((m) => (burden[m.id] ?? 0) === maxBurden)
