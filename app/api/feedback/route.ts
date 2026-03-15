@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { createServiceSupabase } from "@/lib/supabase-server"
+import { type FeedbackType, type FeedbackSource } from "@/lib/feedback"
 
 const TYPE_VALUES = ["bug", "idea", "confusing", "love_it", "general", "enterprise_inquiry"] as const
 const SOURCE_VALUES = ["landing_page", "owner_dashboard", "member_dashboard", "privacy_page", "terms_page", "footer", "pricing"] as const
