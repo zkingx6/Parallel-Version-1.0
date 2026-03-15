@@ -154,7 +154,7 @@ This is a core product design principle. Any change that blurs this boundary mus
 When modifying:
 - `lib/actions.ts` → `resolvePostLoginRedirect`
 - `app/(app)/layout.tsx` (owner layout)
-- `middleware.ts` (auth gates)
+- `proxy.ts` (auth gates)
 - `app/join/[token]/` (invite flow)
 - `app/member-dashboard/` (member routes)
 

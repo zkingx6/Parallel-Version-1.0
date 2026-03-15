@@ -15,7 +15,7 @@ const faqs = [
     answer: (
       <>
         Calendly and Doodle help teams find a time that works <strong>once</strong>. Parallel focuses on{" "}
-        {highlight("recurring meetings")} across {highlight("time zones")}.
+        {highlight("recurring meetings across global time zones")}.
         <br /><br />
         Instead of always picking the same &quot;least bad&quot; meeting time, Parallel makes scheduling burden visible and{" "}
         {highlight("rotates inconvenient meeting times across weeks")} so the cost is shared across the team.
