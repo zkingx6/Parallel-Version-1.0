@@ -46,6 +46,7 @@ export default function JoinPage() {
     work_end_hour: number
     hard_no_ranges: unknown[]
     role: string | null
+    user_id?: string | null
     avatar_url?: string | null
     updated_at?: string
     memberDisplay?: { name: string; avatarUrl: string }
@@ -73,12 +74,19 @@ export default function JoinPage() {
   useEffect(() => {
     if (token && existingId) {
       getExistingMemberForJoin(token, existingId).then((result) => {
-        if (result.data) setExistingMember(result.data)
+        if (result.data) {
+          const data = result.data
+          if (data.user_id) {
+            router.replace(`/member-dashboard/account?token=${encodeURIComponent(token)}&memberId=${encodeURIComponent(existingId)}`)
+            return
+          }
+          setExistingMember(data)
+        }
       })
     } else {
       setExistingMember(null)
     }
-  }, [token, existingId])
+  }, [token, existingId, router])
 
   const handleSubmit = async (payload: Parameters<typeof submitMember>[1]) => {
     setSaving(true)

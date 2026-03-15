@@ -1,3 +1,4 @@
+import "server-only"
 /**
  * Public schedule fetch by share_token.
  * Uses service role to allow unauthenticated access.

@@ -2632,7 +2632,7 @@ export function generateRotation(
         }
         console.groupEnd()
       }
-      if (mode !== "STRICT") {
+      if (mode !== "STRICT" && DEBUG) {
         console.warn("[ROTATION_DEBUG] modeUsed:", mode)
       }
 

@@ -906,6 +906,7 @@ export function RotationSection({
           setOrderedWeeks(null)
           if (
             typeof process !== "undefined" &&
+            process.env.NODE_ENV === "development" &&
             process.env.NEXT_PUBLIC_DEBUG_ROTATION === "1"
           ) {
             console.log("[ROTATION_DEBUG] explain:", JSON.stringify(result.explain, null, 2))

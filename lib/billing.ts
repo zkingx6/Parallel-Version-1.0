@@ -2,6 +2,7 @@
  * Billing metadata for Pro users. Fetched from profiles.
  */
 
+import "server-only"
 import Stripe from "stripe"
 import { createServiceSupabase } from "./supabase-server"
 

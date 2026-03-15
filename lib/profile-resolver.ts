@@ -1,3 +1,4 @@
+import "server-only"
 /**
  * Canonical profile resolution. User display name and avatar come from
  * auth user / profiles, NOT from member_submissions.

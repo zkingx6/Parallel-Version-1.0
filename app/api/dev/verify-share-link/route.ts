@@ -2,17 +2,19 @@
  * DEV ONLY: Verify share-link resolution for schedules.
  * GET /api/dev/verify-share-link?scheduleId=<id> | ?token=<shareToken>
  *
- * - scheduleId: fetches schedule row, reports share_token, then resolves by token
+ * - scheduleId: fetches schedule row, checks hasToken/tokenFormatValid, then resolves by token
  * - token: resolves directly via getPublicScheduleByToken
  *
  * Returns a report indicating whether the share link would work.
+ * Never returns real token values; uses hasToken, tokenFormatValid, publicUrlPattern.
  */
 import { NextRequest, NextResponse } from "next/server"
+import { isDevRouteAllowed } from "@/lib/dev-route-guard"
 import { createServiceSupabase } from "@/lib/supabase-server"
 import { getPublicScheduleByToken } from "@/lib/public-schedule"
 
 export async function GET(request: NextRequest) {
-  if (process.env.NODE_ENV !== "development") {
+  if (!isDevRouteAllowed()) {
     return NextResponse.json(
       { error: "Only available in development" },
       { status: 404 }
@@ -54,16 +56,23 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    const shareToken = schedule.share_token
+    const hasToken = !!(
+      shareToken &&
+      typeof shareToken === "string" &&
+      shareToken.trim() !== ""
+    )
+    const tokenFormatValid = hasToken && /^[a-f0-9]+$/i.test(shareToken.trim())
+
     report.scheduleId = schedule.id
     report.scheduleName = schedule.name
     report.teamId = schedule.team_id
-    report.dbShareToken = schedule.share_token ?? null
-    report.dbShareTokenType = typeof schedule.share_token
-    report.dbShareTokenLength = schedule.share_token?.length ?? 0
+    report.hasToken = hasToken
+    report.tokenFormatValid = tokenFormatValid
     report.dbWeeksCount = (schedule.weeks ?? 0) as number
+    report.publicUrlPattern = "/s/[token]"
 
-    const shareToken = schedule.share_token
-    if (!shareToken || typeof shareToken !== "string" || shareToken.trim() === "") {
+    if (!hasToken) {
       return NextResponse.json({
         ok: false,
         report,
@@ -102,13 +111,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       report,
-      conclusion: "Share link would work. /s/" + shareToken + " should load.",
+      conclusion: "Share link would work. Public URL pattern: /s/[token]",
     })
   }
 
   if (token) {
+    const tokenProvided = !!(
+      token &&
+      typeof token === "string" &&
+      token.trim() !== ""
+    )
+    const tokenFormatValid = tokenProvided && /^[a-f0-9]+$/i.test(token.trim())
+
     const resolved = await getPublicScheduleByToken(token)
-    report.tokenProvided = token
+    report.tokenProvided = tokenProvided
+    report.tokenFormatValid = tokenFormatValid
+    report.publicUrlPattern = "/s/[token]"
     report.resolveResult = resolved
       ? {
           scheduleName: resolved.scheduleName,
@@ -138,7 +156,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       report,
-      conclusion: "Share link would work.",
+      conclusion: "Share link would work. Public URL pattern: /s/[token]",
     })
   }
 

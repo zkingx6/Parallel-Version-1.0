@@ -1,3 +1,4 @@
+import "server-only"
 /**
  * Server Supabase client for Server Components, Server Actions, and Route Handlers.
  * Uses cookies() from next/headers for session management.

@@ -242,24 +242,34 @@ export function ParallelApp() {
   const canGenerate = team.length >= 2 && team.every((m) => m.name.trim())
 
   const handleGenerate = () => {
-    console.log("[DEBUG] Plan button clicked (ParallelApp)")
+    if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+      console.log("[DEBUG] Plan button clicked (ParallelApp)")
+    }
 
     const validation = canGenerateRotation(team, config)
     if (!validation.valid) {
-      console.log("[DEBUG] Early return triggered: validation.valid=false", validation.reason)
+      if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+        console.log("[DEBUG] Early return triggered: validation.valid=false", validation.reason)
+      }
       setRotationError(validation.reason || "No viable rotation.")
       setRotation(null)
       return
     }
-    console.log("[DEBUG] Team length:", team?.length)
+    if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+      console.log("[DEBUG] Team length:", team?.length)
+    }
     setIsGenerating(true)
     setRotation(null)
     setRotationError(null)
-    console.log("[DEBUG] Calling generateRotationGuarded")
+    if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+      console.log("[DEBUG] Calling generateRotationGuarded")
+    }
     setTimeout(() => {
       try {
         const result = generateRotationGuarded(team, config)
-        console.log("[DEBUG] generateRotationGuarded result:", result)
+        if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+          console.log("[DEBUG] generateRotationGuarded result:", result)
+        }
         if (isInputContractViolation(result)) {
           const msg =
             result.error.details
@@ -278,7 +288,9 @@ export function ParallelApp() {
           setRotation(result.weeks)
         }
       } catch (error) {
-        console.error("[DEBUG] Error occurred:", error)
+        if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+          console.error("[DEBUG] Error occurred:", error)
+        }
       }
       setIsGenerating(false)
     }, 1400)

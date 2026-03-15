@@ -6,6 +6,7 @@
  * - Does NOT modify any production scheduling behavior.
  */
 import { NextRequest, NextResponse } from "next/server"
+import { isDevRouteAllowed } from "@/lib/dev-route-guard"
 import { createServiceSupabase } from "@/lib/supabase-server"
 import {
   dbMemberToTeamMember,
@@ -23,7 +24,7 @@ import { DEFAULT_FAIRNESS_THRESHOLDS, type TeamMember } from "@/lib/types"
 import { validateTeamInput } from "@/lib/contract/validateTeamInput"
 
 export async function GET(request: NextRequest) {
-  if (process.env.NODE_ENV !== "development") {
+  if (!isDevRouteAllowed()) {
     return NextResponse.json(
       { error: "Only available in development" },
       { status: 404 }

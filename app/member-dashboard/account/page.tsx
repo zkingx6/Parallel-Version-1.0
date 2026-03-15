@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input"
 
 type MemberData = {
   meeting: { id: string; title: string }
-  member: { id: string; name: string; avatar_url?: string | null; updated_at?: string; user_id?: string | null }
+  member: { id: string; name: string; role?: string | null; avatar_url?: string | null; updated_at?: string; user_id?: string | null }
   memberDisplay: { name: string; avatarUrl: string }
   memberEmail?: string | null
 }
@@ -205,14 +205,16 @@ export default function MemberAccountPage() {
               }}
               className="text-[0.84rem] font-medium text-[#0d9488] hover:text-[#0f766e] transition-colors shrink-0 cursor-pointer"
             >
-              Edit profile
+              Edit my info
             </button>
           </div>
         </section>
 
         <section className="rounded-xl border border-[#edeef0] bg-white p-5 mb-6 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
           <h3 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-4">Team Role</h3>
-          <p className="text-[0.88rem] font-medium text-[#1a1a2e] mb-1">Member</p>
+          <p className="text-[0.88rem] font-medium text-[#1a1a2e] mb-1">
+            {member.role?.trim() || "Member"}
+          </p>
           <p className="text-[0.82rem] text-[#9ca3af]">
             You are part of a team managed by the workspace owner.
           </p>
@@ -221,7 +223,7 @@ export default function MemberAccountPage() {
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Edit profile</DialogTitle>
+              <DialogTitle>Edit my info</DialogTitle>
             </DialogHeader>
             <form
               id="member-edit-profile-form"
@@ -245,6 +247,25 @@ export default function MemberAccountPage() {
                   disabled={saving}
                   className="w-full"
                 />
+              </div>
+              <div>
+                <label
+                  htmlFor="member-role"
+                  className="block text-sm font-medium mb-1.5"
+                >
+                  Role
+                </label>
+                <Input
+                  id="member-role"
+                  name="role"
+                  defaultValue={member.role ?? ""}
+                  placeholder="e.g. Engineer, Designer"
+                  disabled={saving}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Optional. Your role within the team.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Avatar</label>

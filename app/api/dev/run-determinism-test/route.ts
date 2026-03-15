@@ -9,6 +9,7 @@
  * - hard_no_ranges must never be derived from overlap/selected time or persisted here.
  */
 import { NextResponse } from "next/server"
+import { isDevRouteAllowed } from "@/lib/dev-route-guard"
 import { createServiceSupabase } from "@/lib/supabase-server"
 import {
   dbMemberToTeamMember,
@@ -127,7 +128,8 @@ function snapshotsDiffer(a: RunSnapshot, b: RunSnapshot): string[] {
 }
 
 export async function GET() {
-  if (process.env.NODE_ENV !== "development") {
+  // Block in production and preview. Uses VERCEL_ENV + NODE_ENV for defense in depth.
+  if (!isDevRouteAllowed()) {
     return NextResponse.json(
       { error: "Only available in development" },
       { status: 404 }
@@ -229,48 +231,16 @@ export async function GET() {
     0
   )
 
-  console.log("[run-determinism] DST debug:")
-  console.log("  displayTimezone (raw):", JSON.stringify(displayTimezoneRaw))
-  console.log("  startDate (raw):", JSON.stringify(startDateRaw))
-  console.log("  week1Date (computed):", week1DateIso)
-  console.log("  displayTimezone (IANA resolved):", displayTimezoneIana)
-  console.log("  week1OffsetMinutes:", week1OffsetMinutes)
-  console.log("  labelFromNow:", JSON.stringify(labelFromNow))
-  console.log("  labelForWeek1:", JSON.stringify(labelForWeek1))
-
-  // --- Debug: before generateRotation ---
-  const debugMeetingConfig = {
-    day_of_week: meeting.day_of_week,
-    start_date: (meeting as DbMeeting).start_date ?? null,
-    duration_minutes: meeting.duration_minutes,
-    rotation_weeks: meeting.rotation_weeks,
-    anchor_offset: meetingForConfig.anchor_offset,
-    base_time_minutes: meeting.base_time_minutes ?? null,
-    useFixedBaseTime,
-    effective_anchor_offset: config.anchorOffset,
+  if (process.env.NODE_ENV === "development") {
+    console.log("[run-determinism] DST debug:")
+    console.log("  displayTimezone (raw):", JSON.stringify(displayTimezoneRaw))
+    console.log("  startDate (raw):", JSON.stringify(startDateRaw))
+    console.log("  week1Date (computed):", week1DateIso)
+    console.log("  displayTimezone (IANA resolved):", displayTimezoneIana)
+    console.log("  week1OffsetMinutes:", week1OffsetMinutes)
+    console.log("  labelFromNow:", JSON.stringify(labelFromNow))
+    console.log("  labelForWeek1:", JSON.stringify(labelForWeek1))
   }
-  const debugRawMembers = (members ?? []).map((m: DbMemberSubmission) => ({
-    name: m.name,
-    timezone: dbMemberToTeamMember(m).timezone,
-    work_start_hour: m.work_start_hour,
-    work_end_hour: m.work_end_hour,
-    hard_no_ranges: m.hard_no_ranges,
-  }))
-  const debugTeamMembers = team.map((m: TeamMember) => ({
-    memberId: m.id,
-    name: m.name,
-    timezone: m.timezone,
-    workWindowLocal: `${formatHourLabel(m.workStartHour)}–${formatHourLabel(m.workEndHour)}`,
-    hardNoRanges: m.hardNoRanges,
-  }))
-
-  console.log("[run-determinism] meeting:", debugMeetingConfig)
-  console.log(
-    "[run-determinism] chosen start_date:",
-    (meeting as DbMeeting).start_date ?? `next occurrence of weekday ${meeting.day_of_week}`
-  )
-  console.log("[run-determinism] raw member_submissions:", JSON.stringify(debugRawMembers, null, 2))
-  console.log("[run-determinism] computed TeamMembers:", JSON.stringify(debugTeamMembers, null, 2))
 
   const runs: (RunSnapshot & { runIndex: number })[] = []
   let firstRotationResult: ReturnType<typeof generateRotation> | null = null
@@ -303,18 +273,8 @@ export async function GET() {
     }
   }
 
-  // --- Debug: week1 after generation ---
-  let debugWeek1: {
-    selectedTimeUtcHour: number
-    perMember: Array<{
-      memberId: string
-      name: string
-      localHour: number
-      localTime: string
-      localDateLabel?: string
-    }>
-  } | null = null
   if (
+    process.env.NODE_ENV === "development" &&
     firstRotationResult &&
     isRotationResult(firstRotationResult) &&
     firstRotationResult.weeks.length > 0
@@ -325,35 +285,6 @@ export async function GET() {
       .filter((d) => d !== "?")
     console.log("[run-determinism] week dates (for DST testing):", weekDates)
     console.log("[run-determinism] week1 selectedTime UTC hour:", w1.utcHour)
-    console.log(
-      "[run-determinism] week1 per-member:",
-      JSON.stringify(
-        w1.memberTimes.map((mt) => {
-          const member = team.find((t) => t.id === mt.memberId)
-          return {
-            name: member?.name ?? mt.memberId,
-            localHour: mt.localHour,
-            localTime: mt.localTime,
-            localDateLabel: mt.localDateLabel,
-          }
-        }),
-        null,
-        2
-      )
-    )
-    debugWeek1 = {
-      selectedTimeUtcHour: w1.utcHour,
-      perMember: w1.memberTimes.map((mt) => {
-        const member = team.find((t) => t.id === mt.memberId)
-        return {
-          memberId: mt.memberId,
-          name: member?.name ?? mt.memberId,
-          localHour: mt.localHour,
-          localTime: mt.localTime,
-          localDateLabel: mt.localDateLabel,
-        }
-      }),
-    }
   }
 
   // --- Display timezone match (legacy) ---
@@ -414,57 +345,38 @@ export async function GET() {
     resultInvariantViolations.length === 0 &&
     displayTzMatchViolations.length === 0
 
-  const week1FeasibleUtcHours =
-    firstRotationResult &&
-    isRotationResult(firstRotationResult) &&
-    firstRotationResult.explain.evidence?.perWeekFeasibleUtcHours?.[0]
-
-  const weekDates =
-    firstRotationResult &&
-    isRotationResult(firstRotationResult)
-      ? firstRotationResult.weeks
-          .map((w) => w.utcDateIso ?? "?")
-          .filter((d) => d !== "?")
-      : []
+  // Redact PII and internal config from response. Only return verification-safe fields.
+  const runsRedacted = runs.map((r) => ({
+    runIndex: r.runIndex,
+    modeUsed: r.modeUsed,
+    shareablePlanExists: r.shareablePlanExists,
+    spread: r.spread,
+    selectedTimes: r.selectedTimes,
+    maxBurdenMemberCount: r.maxBurdenMembers?.length ?? 0,
+    status: r.status,
+  }))
+  const violationsRedacted = resultInvariantViolations.map((v) => ({
+    runIndex: v.runIndex,
+    weekIndex: v.weekIndex,
+    selectedUtcHour: v.selectedUtcHour,
+    localStart: v.localStart,
+    localEnd: v.localEnd,
+    reason: v.reason,
+  }))
+  const displayTzRedacted = displayTzMatchViolations.map((v) => ({
+    reason: v.reason,
+    displayTimezone: v.displayTimezone,
+  }))
 
   return NextResponse.json({
     ok,
     ...(uniqueDiffs.length > 0 && { differingFields: uniqueDiffs }),
     ...(resultInvariantViolations.length > 0 && {
-      violations: resultInvariantViolations,
+      violations: violationsRedacted,
     }),
     ...(displayTzMatchViolations.length > 0 && {
-      displayTzMatchViolations,
+      displayTzMatchViolations: displayTzRedacted,
     }),
-    runs,
-    debug: {
-      meetingConfig: debugMeetingConfig,
-      chosenStartDate: (meeting as DbMeeting).start_date ?? `next occurrence of weekday ${meeting.day_of_week}`,
-      weekDates,
-      dstDebug: {
-        displayTimezoneRaw,
-        startDateRaw,
-        week1DateIso,
-        displayTimezoneIana,
-        week1OffsetMinutes,
-        week1OffsetHours: week1OffsetMinutes / 60,
-        labelFromNow,
-        labelForWeek1,
-      },
-      rawMemberSubmissions: debugRawMembers,
-      computedTeamMembers: debugTeamMembers,
-      week1: debugWeek1,
-      perWeekHardValidCount:
-        firstRotationResult &&
-        isRotationResult(firstRotationResult) &&
-        firstRotationResult.explain.evidence?.perWeekHardValidCount,
-      week1FeasibleUtcHours,
-      ...(resultInvariantViolations.length > 0 && {
-        resultInvariantViolations,
-      }),
-      ...(displayTzMatchViolations.length > 0 && {
-        displayTzMatchViolations,
-      }),
-    },
+    runs: runsRedacted,
   })
 }

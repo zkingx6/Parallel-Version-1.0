@@ -5,8 +5,49 @@ import { createServiceSupabase } from "@/lib/supabase-server"
 const TYPE_VALUES = ["bug", "idea", "confusing", "love_it", "general", "enterprise_inquiry"] as const
 const SOURCE_VALUES = ["landing_page", "owner_dashboard", "member_dashboard", "privacy_page", "terms_page", "footer", "pricing"] as const
 
-type FeedbackType = (typeof TYPE_VALUES)[number]
-type FeedbackSource = (typeof SOURCE_VALUES)[number]
+const MAX_MESSAGE_LENGTH = 5000
+const MAX_EMAIL_LENGTH = 500
+const MAX_PAGE_PATH_LENGTH = 500
+const MAX_USER_ID_LENGTH = 100
+const MAX_TEAM_ID_LENGTH = 100
+const MAX_PAYLOAD_BYTES = 50 * 1024
+
+const RATE_LIMIT_WINDOW_MS = 60 * 1000
+const RATE_LIMIT_MAX_REQUESTS = 5
+
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+
+function getClientIp(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")
+  if (forwarded) {
+    const client = forwarded.split(",")[0]?.trim()
+    if (client) return client
+  }
+  const realIp = request.headers.get("x-real-ip")
+  if (realIp) return realIp
+  return "unknown"
+}
+
+function checkRateLimit(key: string): boolean {
+  const now = Date.now()
+  if (rateLimitMap.size > 10000) {
+    for (const [k, v] of rateLimitMap) {
+      if (now > v.resetAt) rateLimitMap.delete(k)
+    }
+  }
+  const entry = rateLimitMap.get(key)
+  if (!entry) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return true
+  }
+  if (now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return true
+  }
+  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) return false
+  entry.count++
+  return true
+}
 
 function validatePayload(body: unknown): {
   type: FeedbackType
@@ -36,40 +77,71 @@ function validatePayload(body: unknown): {
   if (typeof message !== "string" || !message.trim()) {
     return { error: "Message is required" }
   }
+  const trimmedMessage = message.trim()
+  if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+    return { error: `Message must be at most ${MAX_MESSAGE_LENGTH} characters` }
+  }
 
   const email = b.email
   if (email !== undefined && email !== null && typeof email !== "string") {
     return { error: "Email must be a string if provided" }
+  }
+  const trimmedEmail = typeof email === "string" ? email.trim() || undefined : undefined
+  if (trimmedEmail && trimmedEmail.length > MAX_EMAIL_LENGTH) {
+    return { error: `Email must be at most ${MAX_EMAIL_LENGTH} characters` }
   }
 
   const userId = b.userId
   if (userId !== undefined && userId !== null && typeof userId !== "string") {
     return { error: "userId must be a string if provided" }
   }
+  const trimmedUserId = typeof userId === "string" ? userId.trim() || undefined : undefined
+  if (trimmedUserId && trimmedUserId.length > MAX_USER_ID_LENGTH) {
+    return { error: "userId too long" }
+  }
 
   const teamId = b.teamId
   if (teamId !== undefined && teamId !== null && typeof teamId !== "string") {
     return { error: "teamId must be a string if provided" }
+  }
+  const trimmedTeamId = typeof teamId === "string" ? teamId.trim() || undefined : undefined
+  if (trimmedTeamId && trimmedTeamId.length > MAX_TEAM_ID_LENGTH) {
+    return { error: "teamId too long" }
   }
 
   const pagePath = b.pagePath
   if (pagePath !== undefined && pagePath !== null && typeof pagePath !== "string") {
     return { error: "pagePath must be a string if provided" }
   }
+  const trimmedPagePath = typeof pagePath === "string" ? pagePath.trim() || undefined : undefined
+  if (trimmedPagePath && trimmedPagePath.length > MAX_PAGE_PATH_LENGTH) {
+    return { error: "pagePath too long" }
+  }
 
   return {
     type: type as FeedbackType,
     source: source as FeedbackSource,
-    message: message.trim(),
-    email: typeof email === "string" ? email.trim() || undefined : undefined,
-    userId: typeof userId === "string" ? userId.trim() || undefined : undefined,
-    teamId: typeof teamId === "string" ? teamId.trim() || undefined : undefined,
-    pagePath: typeof pagePath === "string" ? pagePath.trim() || undefined : undefined,
+    message: trimmedMessage,
+    email: trimmedEmail,
+    userId: trimmedUserId,
+    teamId: trimmedTeamId,
+    pagePath: trimmedPagePath,
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = request.headers.get("content-length")
+    if (contentLength && parseInt(contentLength, 10) > MAX_PAYLOAD_BYTES) {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 })
+    }
+
+    const ip = getClientIp(request)
+    const rateLimitKey = `feedback:${ip}`
+    if (!checkRateLimit(rateLimitKey)) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+    }
+
     const body = await request.json()
     const validated = validatePayload(body)
     if ("error" in validated) {
@@ -84,7 +156,6 @@ export async function POST(request: NextRequest) {
     const resendKey = process.env.RESEND_API_KEY
 
     if (!toEmail || !fromEmail) {
-      console.error("[feedback] Missing FEEDBACK_TO_EMAIL or FEEDBACK_FROM_EMAIL")
       return NextResponse.json(
         { error: "Feedback service not configured" },
         { status: 500 }
@@ -112,14 +183,11 @@ export async function POST(request: NextRequest) {
         text: textBody,
       })
       if (emailError) {
-        console.error("[feedback] Resend error:", emailError)
         return NextResponse.json(
-          { error: "Failed to send notification email" },
+          { error: "Failed to send notification" },
           { status: 500 }
         )
       }
-    } else {
-      console.warn("[feedback] RESEND_API_KEY not set, skipping email")
     }
 
     const supabase = createServiceSupabase()
@@ -135,7 +203,6 @@ export async function POST(request: NextRequest) {
     })
 
     if (dbError) {
-      console.error("[feedback] Supabase insert error:", dbError)
       return NextResponse.json(
         { error: "Failed to store feedback" },
         { status: 500 }
@@ -144,7 +211,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error("[feedback] Unexpected error:", err)
+    if (err instanceof SyntaxError) {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
+    }
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }

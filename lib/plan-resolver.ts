@@ -1,3 +1,4 @@
+import "server-only"
 /**
  * Server-side plan resolution. Reads from profiles.plan + trial_ends_at.
  * Uses getTrialStatus for display, getEffectivePlan for feature limits.

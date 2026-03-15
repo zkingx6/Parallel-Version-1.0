@@ -583,11 +583,17 @@ export async function getJoinData(token: string) {
 }
 
 export async function getMemberTeamSummary(token: string, memberId: string) {
+  const serverSupabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await serverSupabase.auth.getUser()
+  if (!user) return { error: "Not authorized" }
+
   const supabase = createServiceSupabase()
 
   const { data: meeting, error: meetingError } = await supabase
     .from("meetings")
-    .select("id, title, day_of_week, duration_minutes")
+    .select("id, title, day_of_week, duration_minutes, manager_id")
     .eq("invite_token", token)
     .single()
 
@@ -595,13 +601,17 @@ export async function getMemberTeamSummary(token: string, memberId: string) {
 
   const { data: member, error: memberError } = await supabase
     .from("member_submissions")
-    .select("id")
+    .select("id, user_id")
     .eq("meeting_id", meeting.id)
     .eq("id", memberId)
     .maybeSingle()
 
   if (memberError) return { error: memberError.message }
-  if (!member) return { error: "Member not found." }
+  if (!member) return { error: "Not authorized" }
+
+  const isOwner = meeting.manager_id === user.id
+  const isSelf = (member as { user_id?: string | null }).user_id === user.id
+  if (!isOwner && !isSelf) return { error: "Not authorized" }
 
   const { count } = await supabase
     .from("member_submissions")
@@ -630,6 +640,12 @@ export async function getMemberTeamSummary(token: string, memberId: string) {
 }
 
 export async function getMemberDashboardData(token: string, memberId: string) {
+  const serverSupabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await serverSupabase.auth.getUser()
+  if (!user) return { error: "Not authorized" }
+
   const supabase = createServiceSupabase()
 
   const { data: meeting, error: meetingError } = await supabase
@@ -648,7 +664,11 @@ export async function getMemberDashboardData(token: string, memberId: string) {
     .maybeSingle()
 
   if (memberError) return { error: memberError.message }
-  if (!member) return { error: "Member not found." }
+  if (!member) return { error: "Not authorized" }
+
+  const isOwner = meeting.manager_id === user.id
+  const isSelf = (member as { user_id?: string | null }).user_id === user.id
+  if (!isOwner && !isSelf) return { error: "Not authorized" }
 
   const { resolveMembersDisplay, resolveDisplayProfile, fetchProfilesForUserIds } = await import("@/lib/profile-resolver")
   const ownerProfiles = meeting.manager_id
@@ -714,7 +734,19 @@ export async function getExistingMemberForJoin(token: string, memberId: string) 
     .maybeSingle()
 
   if (error) return { error: error.message }
-  if (!member) return { error: "Member not found." }
+  if (!member) return { error: "Not authorized" }
+
+  const memberUserId = (member as { user_id?: string | null }).user_id
+  if (memberUserId) {
+    const serverSupabase = await createServerSupabase()
+    const {
+      data: { user },
+    } = await serverSupabase.auth.getUser()
+    if (!user) return { error: "Not authorized" }
+    const isOwner = meeting.manager_id === user.id
+    const isSelf = memberUserId === user.id
+    if (!isOwner && !isSelf) return { error: "Not authorized" }
+  }
 
   const { resolveMembersDisplay, resolveDisplayProfile, fetchProfilesForUserIds } = await import("@/lib/profile-resolver")
   const ownerProfiles = meeting.manager_id
@@ -834,11 +866,17 @@ export async function updateMemberProfile(
   memberId: string,
   formData: FormData
 ) {
+  const serverSupabase = await createServerSupabase()
+  const {
+    data: { user },
+  } = await serverSupabase.auth.getUser()
+  if (!user) return { error: "Not authorized" }
+
   const supabase = createServiceSupabase()
 
   const { data: meeting } = await supabase
     .from("meetings")
-    .select("id")
+    .select("id, manager_id")
     .eq("invite_token", token)
     .single()
 
@@ -851,10 +889,18 @@ export async function updateMemberProfile(
     .eq("meeting_id", meeting.id)
     .maybeSingle()
 
-  if (!member) return { error: "Member not found." }
+  if (!member) return { error: "Not authorized" }
+
+  const memberUserId = (member as { user_id?: string | null }).user_id
+  const isOwner = meeting.manager_id === user.id
+  const isSelf = memberUserId === user.id
+  if (!isOwner && !isSelf) return { error: "Not authorized" }
 
   const name = (formData.get("displayName") as string)?.trim() ?? ""
   if (!name) return { error: "Display name is required." }
+
+  const roleRaw = (formData.get("role") as string)?.trim() ?? ""
+  const role = roleRaw || null
 
   const removeAvatar = formData.get("removeAvatar") === "1" || formData.get("removeAvatar") === "true"
   const memberWithUserId = member as { avatar_url?: string; user_id?: string | null }
@@ -891,26 +937,32 @@ export async function updateMemberProfile(
 
   const userId = memberWithUserId.user_id
 
-  if (userId) {
-    const serverSupabase = await createServerSupabase()
-    const { data: { user } } = await serverSupabase.auth.getUser()
-    if (user?.id === userId) {
-      const existing = (user.user_metadata || {}) as Record<string, unknown>
-      await serverSupabase.auth.updateUser({
-        data: {
-          ...existing,
+  if (userId && isSelf) {
+    const existing = (user.user_metadata || {}) as Record<string, unknown>
+    await serverSupabase.auth.updateUser({
+      data: {
+        ...existing,
+        full_name: name,
+        avatar_url: removeAvatar ? null : (avatarUrl ?? existing.avatar_url ?? existing.picture ?? undefined),
+      },
+    })
+    try {
+      const { error: profileError } = await supabase.from("profiles").upsert(
+        {
+          user_id: userId,
           full_name: name,
-          avatar_url: removeAvatar ? null : (avatarUrl ?? existing.avatar_url ?? existing.picture ?? undefined),
+          avatar_url: removeAvatar ? null : (avatarUrl ?? null),
+          updated_at: new Date().toISOString(),
         },
-      })
-    } else {
-      await supabase.auth.admin.updateUserById(userId, {
-        user_metadata: {
-          full_name: name,
-          avatar_url: removeAvatar ? null : (avatarUrl ?? undefined),
-        },
-      })
+        { onConflict: "user_id" }
+      )
+      if (profileError) {
+        console.error("[updateMemberProfile] profiles upsert failed:", profileError.message)
+      }
+    } catch (e) {
+      console.error("[updateMemberProfile] profiles upsert error:", e)
     }
+  } else if (userId && isOwner) {
     try {
       const { error: profileError } = await supabase.from("profiles").upsert(
         {
@@ -929,11 +981,12 @@ export async function updateMemberProfile(
     }
   }
 
-  const updatePayload: { name?: string; avatar_url?: string | null; updated_at: string } = {
+  const updatePayload: { name?: string; role?: string | null; avatar_url?: string | null; updated_at: string } = {
     updated_at: new Date().toISOString(),
     avatar_url: avatarUrl,
+    role,
   }
-  if (!userId) {
+  if (!userId || isOwner) {
     updatePayload.name = name
   }
 

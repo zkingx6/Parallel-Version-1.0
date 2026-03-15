@@ -126,8 +126,8 @@ export default function MemberTeamDetailPage() {
     ? (member.hard_no_ranges as HardNoRange[])
     : []
   const hardNoRanges = isComplementOfOverlapPattern(rawRanges) ? [] : rawRanges
-  const editUrl = `/join/${token}?memberId=${member.id}`
   const baseParams = `token=${encodeURIComponent(token ?? "")}&memberId=${encodeURIComponent(member.id)}`
+  const editInfoUrl = `/member-dashboard/account?${baseParams}`
   const teamsListUrl = `/member-dashboard?${baseParams}`
   const scheduleUrl = `/member-dashboard?${baseParams}&tab=schedule`
   const accountUrl = `/member-dashboard/account?${baseParams}`
@@ -208,13 +208,13 @@ export default function MemberTeamDetailPage() {
             </p>
           </div>
           <div className="mt-4">
-            <Link href={editUrl}>
+            <Link href={editInfoUrl}>
               <Button
                 variant="outline"
                 size="sm"
                 className="border-[#e5e7eb] text-[0.84rem] hover:border-[#d1d5db] hover:bg-[#f9fafb]"
               >
-                Edit my availability
+                Edit my info
               </Button>
             </Link>
           </div>
@@ -265,8 +265,8 @@ export default function MemberTeamDetailPage() {
 
         <section className="rounded-xl border border-dashed border-[#e0e2e6] bg-white/50 p-5 mb-6">
           <p className="text-[0.88rem] text-[#9ca3af]">
-            The team owner manages rotation settings. You can update your
-            availability before the deadline.
+            The team owner manages rotation settings. You can update your info
+            from the Account tab.
           </p>
         </section>
         </div>
