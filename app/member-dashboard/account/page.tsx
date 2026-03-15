@@ -166,7 +166,7 @@ export default function MemberAccountPage() {
           <h2 className="text-[1.6rem] text-[#1a1a2e] tracking-[-0.03em] font-semibold">
             Account
           </h2>
-          <p className="text-[#9ca3af] text-[0.88rem] mt-1 mb-10">
+          <p className="text-[#9ca3af] text-[0.88rem] mt-1 mb-6">
             Manage your profile and identity.
           </p>
 

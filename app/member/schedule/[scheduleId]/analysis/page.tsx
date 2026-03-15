@@ -107,20 +107,20 @@ export default async function MemberScheduleAnalysisPage({
 
   return (
     <ScheduleAnalysisContent
-      scheduleId={scheduleId}
-      scheduleName={schedule.name}
-      teamName={meeting.title}
-      weeksCount={schedule.weeks ?? weeks.length}
-      modeLabel={getModeLabel(modeUsed)}
-      explain={explain}
-      members={members ?? []}
-      weeks={weeks}
-      membersDisplay={membersDisplay}
-      scheduleBasePath="/member/schedule"
-      scheduleLinkParams={baseParams}
-      displayTimezone={meeting.display_timezone}
-      modeUsed={modeUsed}
-      useFixedBaseTime={meeting.base_time_minutes != null}
-    />
+        scheduleId={scheduleId}
+        scheduleName={schedule.name}
+        teamName={meeting.title}
+        weeksCount={schedule.weeks ?? weeks.length}
+        modeLabel={getModeLabel(modeUsed)}
+        explain={explain}
+        members={members ?? []}
+        weeks={weeks}
+        membersDisplay={membersDisplay}
+        scheduleBasePath="/member/schedule"
+        scheduleLinkParams={baseParams}
+        displayTimezone={meeting.display_timezone}
+        modeUsed={modeUsed}
+        useFixedBaseTime={meeting.base_time_minutes != null}
+      />
   )
 }

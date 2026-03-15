@@ -82,15 +82,15 @@ export default async function MemberScheduleDetailPage({
 
   return (
     <ScheduleDetailContent
-      scheduleId={scheduleId}
-      scheduleName={schedule.name}
-      meeting={meeting}
-      members={members ?? []}
-      weeks={weeks}
-      membersDisplay={membersDisplay}
-      scheduleBasePath="/member/schedule"
-      backHref={backHref}
-      scheduleLinkParams={baseParams || undefined}
-    />
+        scheduleId={scheduleId}
+        scheduleName={schedule.name}
+        meeting={meeting}
+        members={members ?? []}
+        weeks={weeks}
+        membersDisplay={membersDisplay}
+        scheduleBasePath="/member/schedule"
+        backHref={backHref}
+        scheduleLinkParams={baseParams || undefined}
+      />
   )
 }

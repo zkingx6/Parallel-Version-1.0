@@ -1,19 +1,27 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { getMemberDashboardData } from "@/lib/actions"
+import { getMemberDashboardData, updateMemberProfile } from "@/lib/actions"
 import { setCachedMember } from "@/lib/member-avatar-cache"
 import { formatHourLabel } from "@/lib/types"
 import { getTimezoneDisplayLabelNow } from "@/lib/timezone"
 import { isComplementOfOverlapPattern } from "@/lib/hard-no-ranges"
 import type { HardNoRange } from "@/lib/types"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { PageBackLink } from "@/components/ui/page-back-link"
 import { MemberAvatar } from "@/components/ui/avatar"
 import { MemberTopNav } from "@/components/parallel/member-top-nav"
+import { AvailabilityLockedNotice } from "@/components/parallel/availability-locked-notice"
 import { ParallelWordmark } from "@/components/ui/parallel-wordmark"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
 const DAY_NAMES = [
   "",
@@ -25,6 +33,13 @@ const DAY_NAMES = [
   "Saturday",
   "Sunday",
 ]
+
+function formatHardBoundariesDisplay(ranges: HardNoRange[]): string {
+  if (!ranges.length) return "None"
+  return ranges
+    .map((r) => `${formatHourLabel(r.start)}–${formatHourLabel(r.end)}`)
+    .join(", ")
+}
 
 type MemberSubmission = {
   id: string
@@ -64,6 +79,8 @@ export default function MemberTeamDetailPage() {
 
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!token || !memberId) return
@@ -127,7 +144,6 @@ export default function MemberTeamDetailPage() {
     : []
   const hardNoRanges = isComplementOfOverlapPattern(rawRanges) ? [] : rawRanges
   const baseParams = `token=${encodeURIComponent(token ?? "")}&memberId=${encodeURIComponent(member.id)}`
-  const editInfoUrl = `/member-dashboard/account?${baseParams}`
   const teamsListUrl = `/member-dashboard?${baseParams}`
   const scheduleUrl = `/member-dashboard?${baseParams}&tab=schedule`
   const accountUrl = `/member-dashboard/account?${baseParams}`
@@ -136,6 +152,31 @@ export default function MemberTeamDetailPage() {
   const meetingCadence = dayName
     ? `${meeting.duration_minutes} min, ${dayName}s`
     : `${meeting.duration_minutes} min, weekly`
+
+  const handleSaveTeamInfo = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const fd = new FormData(e.currentTarget)
+      const res = await updateMemberProfile(token!, memberId!, fd)
+      if (res.error) throw new Error(res.error)
+      setEditOpen(false)
+      const fresh = await getMemberDashboardData(token!, memberId!)
+      if (fresh.data) {
+        const d = fresh.data as DashboardData
+        setData(d)
+        setCachedMember(token!, memberId!, {
+          name: d.memberDisplay.name,
+          avatar_url: d.memberDisplay.avatarUrl,
+          updated_at: undefined,
+        })
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#f7f8fa]">
@@ -174,51 +215,104 @@ export default function MemberTeamDetailPage() {
           </section>
 
           <section className="rounded-xl border border-[#edeef0] bg-white p-5 mb-6 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
-            <h2 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-4">Your info</h2>
-          <div className="space-y-3 text-[0.88rem]">
-            <p>
-              <span className="text-[#9ca3af]">Team:</span>{" "}
-              <span className="font-medium text-[#1a1a2e]">{meeting.title}</span>
-            </p>
-            <p>
-              <span className="text-[#9ca3af]">Name:</span>{" "}
-              <span className="font-medium text-[#1a1a2e]">{memberDisplay.name}</span>
-            </p>
-            {member.role && (
+            <h2 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-4">Edit your team info</h2>
+            <div className="space-y-3 text-[0.88rem]">
+              <p>
+                <span className="text-[#9ca3af]">Team:</span>{" "}
+                <span className="font-medium text-[#1a1a2e]">{meeting.title}</span>
+              </p>
+              <p>
+                <span className="text-[#9ca3af]">Name:</span>{" "}
+                <span className="font-medium text-[#1a1a2e]">{memberDisplay.name}</span>
+              </p>
               <p>
                 <span className="text-[#9ca3af]">Role:</span>{" "}
-                <span className="font-medium text-[#1a1a2e]">{member.role}</span>
+                <span className="font-medium text-[#1a1a2e]">{member.role?.trim() || "—"}</span>
               </p>
-            )}
-            <p>
-              <span className="text-[#9ca3af]">Timezone:</span>{" "}
-              <span className="text-[#1a1a2e]">{getTimezoneDisplayLabelNow(member.timezone)}</span>
-            </p>
-            <p>
-              <span className="text-[#9ca3af]">Working hours:</span>{" "}
-              <span className="text-[#1a1a2e]">{formatHourLabel(member.work_start_hour)} – {formatHourLabel(member.work_end_hour)}</span>
-            </p>
-            <p>
-              <span className="text-[#9ca3af]">Hard boundaries:</span>{" "}
-              <span className="text-[#1a1a2e]">
-                {hardNoRanges.length === 0
-                  ? "None"
-                  : `${hardNoRanges.length} ${hardNoRanges.length === 1 ? "range" : "ranges"}`}
-              </span>
-            </p>
-          </div>
-          <div className="mt-4">
-            <Link href={editInfoUrl}>
+            </div>
+            <div className="mt-4">
               <Button
                 variant="outline"
                 size="sm"
-                className="border-[#e5e7eb] text-[0.84rem] hover:border-[#d1d5db] hover:bg-[#f9fafb]"
+                className="border-[#e5e7eb] text-[0.84rem] hover:border-[#d1d5db] hover:bg-[#f9fafb] cursor-pointer"
+                onClick={() => setEditOpen(true)}
               >
                 Edit my info
               </Button>
-            </Link>
-          </div>
-        </section>
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-[#edeef0] bg-white p-5 mb-6 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
+            <h2 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-4">Availability for this team</h2>
+            <div className="space-y-3 text-[0.88rem]">
+              <p>
+                <span className="text-[#9ca3af]">Timezone:</span>{" "}
+                <span className="text-[#1a1a2e]">{getTimezoneDisplayLabelNow(member.timezone)}</span>
+              </p>
+              <p>
+                <span className="text-[#9ca3af]">Working hours:</span>{" "}
+                <span className="text-[#1a1a2e]">Monday–Friday, {formatHourLabel(member.work_start_hour)}–{formatHourLabel(member.work_end_hour)}</span>
+              </p>
+              <p>
+                <span className="text-[#9ca3af]">Hard boundaries:</span>{" "}
+                <span className="text-[#1a1a2e]">
+                  {formatHardBoundariesDisplay(hardNoRanges)}
+                </span>
+              </p>
+            </div>
+            <AvailabilityLockedNotice compact />
+          </section>
+
+          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md" showCloseButton={true}>
+              <DialogHeader>
+                <DialogTitle>Edit your team info</DialogTitle>
+              </DialogHeader>
+              <form
+                onSubmit={handleSaveTeamInfo}
+                className="space-y-4"
+              >
+                <div>
+                  <label htmlFor="team-info-name" className="block text-sm font-medium mb-1.5">
+                    Display name
+                  </label>
+                  <Input
+                    id="team-info-name"
+                    name="displayName"
+                    defaultValue={memberDisplay.name}
+                    placeholder="Your name"
+                    required
+                    disabled={saving}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="team-info-role" className="block text-sm font-medium mb-1.5">
+                    Role
+                  </label>
+                  <Input
+                    id="team-info-role"
+                    name="role"
+                    defaultValue={member.role ?? ""}
+                    placeholder="e.g. Engineer, Designer"
+                    disabled={saving}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Optional. Your role within this team.
+                  </p>
+                </div>
+                <DialogFooter showCloseButton={false}>
+                  <Button type="button" variant="outline" onClick={() => setEditOpen(false)} disabled={saving}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={saving}>
+                    {saving ? "Saving…" : "Save"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
 
         <section className="rounded-xl border border-[#edeef0] bg-white p-5 mb-6 shadow-[0_1px_4px_rgba(0,0,0,0.03)]">
           <h2 className="text-[0.92rem] text-[#1a1a2e] font-semibold mb-4">Team snapshot</h2>
@@ -265,8 +359,7 @@ export default function MemberTeamDetailPage() {
 
         <section className="rounded-xl border border-dashed border-[#e0e2e6] bg-white/50 p-5 mb-6">
           <p className="text-[0.88rem] text-[#9ca3af]">
-            The team owner manages rotation settings. You can update your info
-            from the Account tab.
+            The team owner manages rotation settings.
           </p>
         </section>
         </div>
