@@ -14,13 +14,13 @@ const faqs = [
     question: "How does Parallel differ from Calendly or Doodle?",
     answer: (
       <>
-        Calendly and Doodle help teams find a time that works <strong>once</strong>. Parallel focuses on{" "}
+        Calendly and Doodle help teams find a time that works once. Parallel focuses on{" "}
         {highlight("recurring meetings across global time zones")}.
         <br /><br />
         Instead of always picking the same &quot;least bad&quot; meeting time, Parallel makes scheduling burden visible and{" "}
         {highlight("rotates inconvenient meeting times across weeks")} so the cost is shared across the team.
         <br /><br />
-        The goal isn&apos;t perfect equality — it&apos;s {highlight("intentional fairness over time")}.
+        The goal isn&apos;t perfect equality — it&apos;s {highlight("fairness over time")}.
       </>
     ),
   },
